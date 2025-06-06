@@ -573,7 +573,7 @@ jobs:
         echo "### Manual Install" >> release_notes.md
         echo "1. Download \`vlsubcom.lua\` from the assets below" >> release_notes.md
         echo "2. Copy to your VLC extensions directory:" >> release_notes.md
-        echo "   - **Windows**: \`%APPDATA%\\vlc\\lua\\extensions\\`" >> release_notes.md
+        echo "   - **Windows**: \`%APPDATA%\\vlc\\lua\\extensions\\\`" >> release_notes.md
         echo "   - **macOS**: \`~/Library/Application Support/org.videolan.vlc/lua/extensions/\`" >> release_notes.md
         echo "   - **Linux**: \`~/.local/share/vlc/lua/extensions/\`" >> release_notes.md
         echo "3. Restart VLC and go to View → VLSub OpenSubtitles.com" >> release_notes.md
