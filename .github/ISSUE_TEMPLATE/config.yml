@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 💬 GitHub Discussions
+    url: https://github.com/opensubtitles/vlsub-opensubtitles-com/discussions
+    about: For general questions, ideas, and community discussion
+  - name: 📖 Documentation
+    url: https://github.com/opensubtitles/vlsub-opensubtitles-com#readme
+    about: Read the documentation for installation and usage instructions
+  - name: 🆘 OpenSubtitles.com Support
+    url: https://www.opensubtitles.com/contact
+    about: For issues with your OpenSubtitles.com account or API access
