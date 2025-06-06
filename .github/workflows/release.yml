@@ -1,0 +1,633 @@
+name: Release VLSub OpenSubtitles.com
+
+on:
+  push:
+    tags:
+      - 'v*'
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., v1.0.1)'
+        required: true
+        type: string
+
+env:
+  SCRIPT_NAME: vlsubcom.lua
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    
+    # Only run on tag pushes or manual dispatch, not on regular main branch pushes
+    if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set version from tag or input
+      id: version
+      run: |
+        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          VERSION="${{ github.event.inputs.version }}"
+        else
+          VERSION=${GITHUB_REF#refs/tags/}
+        fi
+        echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+        echo "VERSION_NO_V=${VERSION#v}" >> $GITHUB_OUTPUT
+        echo "Release version: $VERSION"
+    
+    - name: Update version in script
+      run: |
+        echo "Updating version strings in $SCRIPT_NAME..."
+        
+        # Update app_version
+        sed -i 's/local app_version = "[^"]*"/local app_version = "${{ steps.version.outputs.VERSION_NO_V }}"/' $SCRIPT_NAME
+        
+        # Update auto_update current_version
+        sed -i 's/current_version = "[^"]*"/current_version = "${{ steps.version.outputs.VERSION_NO_V }}"/' $SCRIPT_NAME
+        
+        # Update user_agent version
+        sed -i 's/user_agent = "VLSub-OpenSubtitles\.com\/[^"]*"/user_agent = "VLSub-OpenSubtitles.com\/${{ steps.version.outputs.VERSION_NO_V }}"/' $SCRIPT_NAME
+        
+        echo "Version updates completed."
+        
+        # Verify changes
+        echo "=== Version Updates ==="
+        grep -n "app_version\|current_version\|user_agent.*VLSub" $SCRIPT_NAME || true
+    
+    - name: Validate Lua syntax
+      run: |
+        echo "Installing Lua for syntax validation..."
+        sudo apt-get update
+        sudo apt-get install -y lua5.3
+        
+        echo "Checking Lua syntax..."
+        if lua5.3 -l $SCRIPT_NAME -e "print('✅ Lua syntax validation: PASSED')" 2>/dev/null; then
+          echo "✅ Lua syntax validation successful"
+        else
+          echo "❌ Lua syntax validation failed"
+          echo "Attempting to show syntax errors:"
+          lua5.3 $SCRIPT_NAME 2>&1 || true
+          exit 1
+        fi
+    
+    - name: Create installation scripts
+      run: |
+        echo "Creating installation scripts..."
+        mkdir -p scripts
+        
+        # Create Unix installation script
+        cat > scripts/install.sh << 'EOF'
+        #!/bin/bash
+        set -e
+        
+        echo "================================================"
+        echo "VLSub OpenSubtitles.com Extension Installer"
+        echo "================================================"
+        echo
+        
+        # Colors for output
+        RED='\033[0;31m'
+        GREEN='\033[0;32m'
+        YELLOW='\033[1;33m'
+        BLUE='\033[0;34m'
+        NC='\033[0m' # No Color
+        
+        # Check if curl is available
+        if ! command -v curl &> /dev/null; then
+            echo -e "${RED}Error: curl is required but not installed.${NC}"
+            echo "Please install curl and try again."
+            echo ""
+            echo "Install curl:"
+            echo "  macOS: brew install curl (or use built-in)"
+            echo "  Ubuntu/Debian: sudo apt install curl"
+            echo "  Fedora: sudo dnf install curl"
+            echo "  Arch: sudo pacman -S curl"
+            exit 1
+        fi
+        
+        # Detect platform and set installation directory
+        detect_platform() {
+            case "$OSTYPE" in
+                darwin*)
+                    PLATFORM="macOS"
+                    VLC_EXT_DIR="$HOME/Library/Application Support/org.videolan.vlc/lua/extensions"
+                    ;;
+                linux-gnu*|linux-musl*)
+                    PLATFORM="Linux"
+                    VLC_EXT_DIR="$HOME/.local/share/vlc/lua/extensions"
+                    ;;
+                msys|cygwin|win*)
+                    PLATFORM="Windows"
+                    if [ -n "$APPDATA" ]; then
+                        VLC_EXT_DIR="$APPDATA/vlc/lua/extensions"
+                    else
+                        echo -e "${RED}Error: Cannot detect VLC extensions directory on Windows.${NC}"
+                        echo "Please install manually by copying vlsubcom.lua to:"
+                        echo "%APPDATA%\\vlc\\lua\\extensions\\"
+                        exit 1
+                    fi
+                    ;;
+                *)
+                    echo -e "${RED}Error: Unsupported platform: $OSTYPE${NC}"
+                    echo "Supported platforms: macOS, Linux, Windows (Git Bash/WSL)"
+                    echo ""
+                    echo "For manual installation, copy vlsubcom.lua to your VLC extensions directory:"
+                    echo "  Windows: %APPDATA%\\vlc\\lua\\extensions\\"
+                    echo "  macOS: ~/Library/Application Support/org.videolan.vlc/lua/extensions/"
+                    echo "  Linux: ~/.local/share/vlc/lua/extensions/"
+                    exit 1
+                    ;;
+            esac
+        }
+        
+        # Check if VLC is installed
+        check_vlc() {
+            echo "Checking for VLC installation..."
+            
+            case "$PLATFORM" in
+                "macOS")
+                    if [ -d "/Applications/VLC.app" ] || command -v vlc &> /dev/null; then
+                        echo -e "${GREEN}✓ VLC found${NC}"
+                    else
+                        echo -e "${YELLOW}⚠ VLC not found.${NC}"
+                        echo "Download VLC: https://www.videolan.org/vlc/download-macosx.html"
+                        read -p "Continue installation anyway? (y/N): " -n 1 -r
+                        echo
+                        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+                            exit 1
+                        fi
+                    fi
+                    ;;
+                "Linux")
+                    if command -v vlc &> /dev/null; then
+                        echo -e "${GREEN}✓ VLC found${NC}"
+                    else
+                        echo -e "${YELLOW}⚠ VLC not found.${NC}"
+                        echo "Install VLC:"
+                        echo "  Ubuntu/Debian: sudo apt install vlc"
+                        echo "  Fedora: sudo dnf install vlc"
+                        echo "  Arch: sudo pacman -S vlc"
+                        echo "  Or download from: https://www.videolan.org/"
+                        read -p "Continue installation anyway? (y/N): " -n 1 -r
+                        echo
+                        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+                            exit 1
+                        fi
+                    fi
+                    ;;
+                "Windows")
+                    echo "Please ensure VLC is installed from https://www.videolan.org/"
+                    ;;
+            esac
+        }
+        
+        # Create installation directory
+        create_directory() {
+            echo "Creating extension directory..."
+            echo -e "${BLUE}Directory: $VLC_EXT_DIR${NC}"
+            
+            if [ ! -d "$VLC_EXT_DIR" ]; then
+                mkdir -p "$VLC_EXT_DIR"
+                echo -e "${GREEN}✓ Directory created${NC}"
+            else
+                echo -e "${GREEN}✓ Directory exists${NC}"
+            fi
+        }
+        
+        # Backup existing installation
+        backup_existing() {
+            local existing_file="$VLC_EXT_DIR/vlsubcom.lua"
+            
+            if [ -f "$existing_file" ]; then
+                echo "Found existing VLSub installation..."
+                local backup_file="$existing_file.backup.$(date +%Y%m%d_%H%M%S)"
+                cp "$existing_file" "$backup_file"
+                echo -e "${GREEN}✓ Backup created: $(basename "$backup_file")${NC}"
+            fi
+        }
+        
+        # Download and install the extension
+        install_extension() {
+            local temp_file=$(mktemp)
+            local download_url="https://github.com/opensubtitles/vlsub-opensubtitles-com/releases/latest/download/vlsubcom.lua"
+            
+            echo "Downloading VLSub extension..."
+            echo -e "${BLUE}From: $download_url${NC}"
+            
+            if curl -L -f -o "$temp_file" "$download_url" --progress-bar; then
+                echo -e "${GREEN}✓ Download successful${NC}"
+            else
+                echo -e "${RED}✗ Download failed${NC}"
+                echo "Please check your internet connection and try again."
+                echo "Or download manually from: https://github.com/opensubtitles/vlsub-opensubtitles-com/releases"
+                rm -f "$temp_file"
+                exit 1
+            fi
+            
+            echo "Installing extension..."
+            mv "$temp_file" "$VLC_EXT_DIR/vlsubcom.lua"
+            echo -e "${GREEN}✓ Installation complete${NC}"
+        }
+        
+        # Set permissions (Linux/macOS)
+        set_permissions() {
+            if [ "$PLATFORM" != "Windows" ]; then
+                chmod 644 "$VLC_EXT_DIR/vlsubcom.lua"
+                echo -e "${GREEN}✓ Permissions set${NC}"
+            fi
+        }
+        
+        # Show completion message
+        show_completion() {
+            echo
+            echo "================================================"
+            echo -e "${GREEN}🎉 Installation Complete!${NC}"
+            echo "================================================"
+            echo
+            echo -e "${YELLOW}Next steps:${NC}"
+            echo "1. ${BLUE}Restart VLC Media Player${NC}"
+            echo "2. ${BLUE}Go to View → VLSub OpenSubtitles.com${NC}"
+            echo "3. ${BLUE}Enter your OpenSubtitles.com credentials${NC}"
+            echo "   ${GREEN}(Create free account at https://www.opensubtitles.com/)${NC}"
+            echo
+            echo -e "${YELLOW}Quick start:${NC}"
+            echo "• ${BLUE}Hash search:${NC} For exact subtitle matches"
+            echo "• ${BLUE}Name search:${NC} For flexible title-based search"
+            echo "• ${BLUE}Double-click subtitle${NC} to download and load"
+            echo
+            echo -e "${YELLOW}Support & Documentation:${NC}"
+            echo "• ${BLUE}Issues:${NC} https://github.com/opensubtitles/vlsub-opensubtitles-com/issues"
+            echo "• ${BLUE}Docs:${NC} https://github.com/opensubtitles/vlsub-opensubtitles-com"
+            echo "• ${BLUE}OpenSubtitles:${NC} https://www.opensubtitles.com/"
+            echo
+        }
+        
+        # Main installation process
+        main() {
+            echo -e "${BLUE}Platform detection...${NC}"
+            detect_platform
+            echo -e "${GREEN}Platform: $PLATFORM${NC}"
+            echo
+            
+            check_vlc
+            echo
+            
+            create_directory
+            echo
+            
+            backup_existing
+            echo
+            
+            install_extension
+            echo
+            
+            set_permissions
+            echo
+            
+            show_completion
+        }
+        
+        # Run installation
+        main "$@"
+        EOF
+        
+        chmod +x scripts/install.sh
+        
+        # Create Windows PowerShell installation script
+        cat > scripts/install.ps1 << 'EOF'
+        # VLSub OpenSubtitles.com Extension Installer for Windows
+        param(
+            [switch]$Force
+        )
+        
+        # Set colors
+        $Host.UI.RawUI.ForegroundColor = "White"
+        
+        Write-Host "================================================" -ForegroundColor Cyan
+        Write-Host "VLSub OpenSubtitles.com Extension Installer" -ForegroundColor Cyan
+        Write-Host "================================================" -ForegroundColor Cyan
+        Write-Host ""
+        
+        # Check PowerShell version
+        if ($PSVersionTable.PSVersion.Major -lt 3) {
+            Write-Host "❌ PowerShell 3.0 or higher is required" -ForegroundColor Red
+            Write-Host "Please update PowerShell and try again." -ForegroundColor Red
+            Read-Host "Press Enter to exit"
+            exit 1
+        }
+        
+        # Check execution policy
+        $executionPolicy = Get-ExecutionPolicy
+        if ($executionPolicy -eq "Restricted") {
+            Write-Host "⚠ PowerShell execution policy is restricted" -ForegroundColor Yellow
+            Write-Host "Run this command as Administrator to allow scripts:" -ForegroundColor Yellow
+            Write-Host "Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser" -ForegroundColor Cyan
+            if (-not $Force) {
+                Read-Host "Press Enter to exit"
+                exit 1
+            }
+        }
+        
+        # Detect VLC installation
+        Write-Host "Checking for VLC installation..." -ForegroundColor Blue
+        
+        $vlcPaths = @(
+            "${env:ProgramFiles}\VideoLAN\VLC\vlc.exe",
+            "${env:ProgramFiles(x86)}\VideoLAN\VLC\vlc.exe",
+            "${env:LOCALAPPDATA}\Programs\VideoLAN\VLC\vlc.exe"
+        )
+        
+        $vlcFound = $false
+        foreach ($path in $vlcPaths) {
+            if (Test-Path $path) {
+                Write-Host "✅ VLC found at: $path" -ForegroundColor Green
+                $vlcFound = $true
+                break
+            }
+        }
+        
+        if (-not $vlcFound) {
+            Write-Host "⚠ VLC not found in standard locations" -ForegroundColor Yellow
+            Write-Host "Download VLC: https://www.videolan.org/vlc/download-windows.html" -ForegroundColor Cyan
+            if (-not $Force) {
+                $continue = Read-Host "Continue installation anyway? (y/N)"
+                if ($continue -ne "y" -and $continue -ne "Y") {
+                    exit 1
+                }
+            }
+        }
+        
+        # Set installation directory
+        $vlcExtDir = "$env:APPDATA\vlc\lua\extensions"
+        Write-Host "Extension directory: $vlcExtDir" -ForegroundColor Blue
+        
+        # Create directory if it doesn't exist
+        if (-not (Test-Path $vlcExtDir)) {
+            Write-Host "Creating extension directory..." -ForegroundColor Blue
+            try {
+                New-Item -ItemType Directory -Path $vlcExtDir -Force | Out-Null
+                Write-Host "✅ Directory created" -ForegroundColor Green
+            } catch {
+                Write-Host "❌ Failed to create directory: $_" -ForegroundColor Red
+                Read-Host "Press Enter to exit"
+                exit 1
+            }
+        } else {
+            Write-Host "✅ Directory exists" -ForegroundColor Green
+        }
+        
+        # Backup existing installation
+        $existingFile = "$vlcExtDir\vlsubcom.lua"
+        if (Test-Path $existingFile) {
+            Write-Host "Found existing VLSub installation..." -ForegroundColor Blue
+            $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
+            $backupFile = "$existingFile.backup.$timestamp"
+            try {
+                Copy-Item $existingFile $backupFile
+                Write-Host "✅ Backup created: vlsubcom.lua.backup.$timestamp" -ForegroundColor Green
+            } catch {
+                Write-Host "⚠ Could not create backup: $_" -ForegroundColor Yellow
+            }
+        }
+        
+        # Download the extension
+        $downloadUrl = "https://github.com/opensubtitles/vlsub-opensubtitles-com/releases/latest/download/vlsubcom.lua"
+        $destinationFile = "$vlcExtDir\vlsubcom.lua"
+        
+        Write-Host "Downloading VLSub extension..." -ForegroundColor Blue
+        Write-Host "From: $downloadUrl" -ForegroundColor Cyan
+        
+        try {
+            # Use TLS 1.2 for better compatibility
+            [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+            
+            $progressPreference = 'Continue'
+            Invoke-WebRequest -Uri $downloadUrl -OutFile $destinationFile -UseBasicParsing
+            
+            Write-Host "✅ Download successful" -ForegroundColor Green
+            Write-Host "✅ Installation complete" -ForegroundColor Green
+        } catch {
+            Write-Host "❌ Download failed: $_" -ForegroundColor Red
+            Write-Host "Please check your internet connection and try again." -ForegroundColor Red
+            Write-Host "Or download manually from: https://github.com/opensubtitles/vlsub-opensubtitles-com/releases" -ForegroundColor Cyan
+            Read-Host "Press Enter to exit"
+            exit 1
+        }
+        
+        # Verify installation
+        if (Test-Path $destinationFile) {
+            $fileSize = (Get-Item $destinationFile).Length
+            Write-Host "✅ File installed successfully ($([math]::Round($fileSize/1KB, 1)) KB)" -ForegroundColor Green
+        }
+        
+        # Show completion message
+        Write-Host ""
+        Write-Host "================================================" -ForegroundColor Green
+        Write-Host "🎉 Installation Complete!" -ForegroundColor Green
+        Write-Host "================================================" -ForegroundColor Green
+        Write-Host ""
+        Write-Host "Next steps:" -ForegroundColor Yellow
+        Write-Host "1. Restart VLC Media Player" -ForegroundColor White
+        Write-Host "2. Go to View → VLSub OpenSubtitles.com" -ForegroundColor White
+        Write-Host "3. Enter your OpenSubtitles.com credentials" -ForegroundColor White
+        Write-Host "   (Create free account at https://www.opensubtitles.com/)" -ForegroundColor Cyan
+        Write-Host ""
+        Write-Host "Quick start:" -ForegroundColor Yellow
+        Write-Host "• Hash search: For exact subtitle matches" -ForegroundColor White
+        Write-Host "• Name search: For flexible title-based search" -ForegroundColor White
+        Write-Host "• Double-click subtitle to download and load" -ForegroundColor White
+        Write-Host ""
+        Write-Host "Support & Documentation:" -ForegroundColor Yellow
+        Write-Host "• Issues: https://github.com/opensubtitles/vlsub-opensubtitles-com/issues" -ForegroundColor Cyan
+        Write-Host "• Docs: https://github.com/opensubtitles/vlsub-opensubtitles-com" -ForegroundColor Cyan
+        Write-Host "• OpenSubtitles: https://www.opensubtitles.com/" -ForegroundColor Cyan
+        Write-Host ""
+        
+        if (-not $Force) {
+            Read-Host "Press Enter to exit"
+        }
+        EOF
+        
+        echo "✅ Installation scripts created"
+
+    - name: Generate release notes
+      id: changelog
+      run: |
+        echo "Generating release notes..."
+        
+        if [ -f CHANGELOG.md ]; then
+          # Extract changelog for this version
+          awk "/^## \[${{ steps.version.outputs.VERSION_NO_V }}\]/{flag=1;next}/^## \[/{flag=0}flag" CHANGELOG.md > release_notes.md
+        else
+          echo "## What's New in ${{ steps.version.outputs.VERSION }}" > release_notes.md
+        fi
+        
+        # If release notes are empty, generate from git commits
+        if [ ! -s release_notes.md ]; then
+          echo "## What's New in ${{ steps.version.outputs.VERSION }}" > release_notes.md
+          echo "" >> release_notes.md
+          
+          # Get commits since last tag
+          LAST_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+          if [ -n "$LAST_TAG" ]; then
+            echo "### Changes since $LAST_TAG" >> release_notes.md
+            echo "" >> release_notes.md
+            git log --pretty=format:"- %s" $LAST_TAG..HEAD >> release_notes.md 2>/dev/null || echo "- Updates and improvements" >> release_notes.md
+          else
+            echo "### ✨ Features" >> release_notes.md
+            echo "- Modern REST API v2 integration with OpenSubtitles.com" >> release_notes.md
+            echo "- Multi-language support (select up to 3 preferred languages)" >> release_notes.md
+            echo "- Smart search with hash + name + GuessIt API fallback" >> release_notes.md
+            echo "- Auto-update functionality with version management" >> release_notes.md
+            echo "- Intelligent locale detection (system + IP geolocation)" >> release_notes.md
+            echo "- Enhanced UI with quality indicators and download statistics" >> release_notes.md
+            echo "- Cross-platform installation scripts" >> release_notes.md
+            echo "- Comprehensive documentation and troubleshooting guides" >> release_notes.md
+            echo "" >> release_notes.md
+            echo "### 🔧 Technical Improvements" >> release_notes.md
+            echo "- Robust error handling and user feedback" >> release_notes.md
+            echo "- Session caching for better performance" >> release_notes.md
+            echo "- Network timeout management" >> release_notes.md
+            echo "- Memory optimization with garbage collection" >> release_notes.md
+          fi
+          echo "" >> release_notes.md
+        fi
+        
+        # Add installation instructions
+        echo "" >> release_notes.md
+        echo "## 🚀 Installation" >> release_notes.md
+        echo "" >> release_notes.md
+        echo "### Quick Install" >> release_notes.md
+        echo '```bash' >> release_notes.md
+        echo "# macOS/Linux" >> release_notes.md
+        echo "curl -sSL https://raw.githubusercontent.com/opensubtitles/vlsub-opensubtitles-com/main/scripts/install.sh | bash" >> release_notes.md
+        echo "" >> release_notes.md
+        echo "# Windows (PowerShell)" >> release_notes.md
+        echo "iwr -useb https://raw.githubusercontent.com/opensubtitles/vlsub-opensubtitles-com/main/scripts/install.ps1 | iex" >> release_notes.md
+        echo '```' >> release_notes.md
+        echo "" >> release_notes.md
+        echo "### Manual Install" >> release_notes.md
+        echo "1. Download \`vlsubcom.lua\` from the assets below" >> release_notes.md
+        echo "2. Copy to your VLC extensions directory:" >> release_notes.md
+        echo "   - **Windows**: \`%APPDATA%\\vlc\\lua\\extensions\\`" >> release_notes.md
+        echo "   - **macOS**: \`~/Library/Application Support/org.videolan.vlc/lua/extensions/`" >> release_notes.md
+        echo "   - **Linux**: \`~/.local/share/vlc/lua/extensions/`" >> release_notes.md
+        echo "3. Restart VLC and go to View → VLSub OpenSubtitles.com" >> release_notes.md
+        echo "" >> release_notes.md
+        echo "## 📋 Requirements" >> release_notes.md
+        echo "- VLC Media Player 3.0+" >> release_notes.md
+        echo "- OpenSubtitles.com account ([free registration](https://www.opensubtitles.com/newuser))" >> release_notes.md
+        echo "- Internet connection" >> release_notes.md
+        echo "- curl command (for downloads)" >> release_notes.md
+        echo "" >> release_notes.md
+        echo "## 📖 Documentation" >> release_notes.md
+        echo "- [Installation Guide](https://github.com/opensubtitles/vlsub-opensubtitles-com/blob/main/docs/installation.md)" >> release_notes.md
+        echo "- [Usage Guide](https://github.com/opensubtitles/vlsub-opensubtitles-com/blob/main/docs/usage.md)" >> release_notes.md
+        echo "- [Troubleshooting](https://github.com/opensubtitles/vlsub-opensubtitles-com/blob/main/docs/troubleshooting.md)" >> release_notes.md
+        echo "- [FAQ](https://github.com/opensubtitles/vlsub-opensubtitles-com/blob/main/docs/faq.md)" >> release_notes.md
+        
+        echo "✅ Release notes generated"
+    
+    - name: Create release package
+      run: |
+        echo "Creating release package..."
+        mkdir -p package
+        
+        # Copy main files
+        cp $SCRIPT_NAME package/
+        cp README.md package/
+        cp LICENSE package/
+        cp CHANGELOG.md package/
+        cp scripts/install.sh package/
+        cp scripts/install.ps1 package/
+        
+        # Copy documentation if it exists
+        if [ -d docs ]; then
+          cp -r docs package/ 2>/dev/null || true
+        fi
+        
+        # Create package info file
+        cat > package/PACKAGE_INFO.txt << EOF
+        VLSub OpenSubtitles.com Extension
+        =================================
+        
+        Version: ${{ steps.version.outputs.VERSION }}
+        Release Date: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+        Build: $(git rev-parse --short HEAD)
+        
+        Files included:
+        ├── vlsubcom.lua (Main extension file)
+        ├── README.md (Project documentation)
+        ├── LICENSE (GNU GPL v3.0)
+        ├── CHANGELOG.md (Version history)
+        ├── install.sh (Unix installation script)
+        ├── install.ps1 (Windows installation script)
+        └── docs/ (Additional documentation)
+        
+        Quick Installation:
+        
+        macOS/Linux:
+          curl -sSL https://raw.githubusercontent.com/opensubtitles/vlsub-opensubtitles-com/main/scripts/install.sh | bash
+        
+        Windows (PowerShell):
+          iwr -useb https://raw.githubusercontent.com/opensubtitles/vlsub-opensubtitles-com/main/scripts/install.ps1 | iex
+        
+        Manual Installation:
+        1. Copy vlsubcom.lua to your VLC extensions directory:
+           - Windows: %APPDATA%\\vlc\\lua\\extensions\\
+           - macOS: ~/Library/Application Support/org.videolan.vlc/lua/extensions/
+           - Linux: ~/.local/share/vlc/lua/extensions/
+        2. Restart VLC
+        3. Go to View → VLSub OpenSubtitles.com
+        
+        Support:
+        - Issues: https://github.com/opensubtitles/vlsub-opensubtitles-com/issues
+        - Documentation: https://github.com/opensubtitles/vlsub-opensubtitles-com
+        - OpenSubtitles.com: https://www.opensubtitles.com/
+        EOF
+        
+        # Create ZIP package
+        cd package
+        zip -r ../vlsub-opensubtitles-com-${{ steps.version.outputs.VERSION }}.zip . -x "*.DS_Store" "*/.*"
+        cd ..
+        
+        echo "✅ Package created: vlsub-opensubtitles-com-${{ steps.version.outputs.VERSION }}.zip"
+        ls -la *.zip
+    
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: ${{ steps.version.outputs.VERSION }}
+        name: "VLSub OpenSubtitles.com ${{ steps.version.outputs.VERSION }}"
+        body_path: release_notes.md
+        draft: false
+        prerelease: false
+        files: |
+          vlsubcom.lua
+          scripts/install.sh
+          scripts/install.ps1
+          vlsub-opensubtitles-com-${{ steps.version.outputs.VERSION }}.zip
+        token: ${{ secrets.GITHUB_TOKEN }}
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Verify release
+      run: |
+        echo "🎉 Release created successfully!"
+        echo ""
+        echo "📦 Release assets:"
+        echo "  - vlsubcom.lua (Main extension)"
+        echo "  - install.sh (Unix installer)"
+        echo "  - install.ps1 (Windows installer)" 
+        echo "  - vlsub-opensubtitles-com-${{ steps.version.outputs.VERSION }}.zip (Complete package)"
+        echo ""
+        echo "🔗 Release URL: https://github.com/opensubtitles/vlsub-opensubtitles-com/releases/tag/${{ steps.version.outputs.VERSION }}"
+        echo ""
+        echo "✅ Auto-update system will now detect this release"
+
