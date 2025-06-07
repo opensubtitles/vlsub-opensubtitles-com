@@ -109,6 +109,7 @@ try {
     
     Write-Host "✅ Download successful" -ForegroundColor Green
     Write-Host "✅ Installation complete" -ForegroundColor Green
+    Write-Host "📍 Installed to: $destinationFile" -ForegroundColor Blue
 } catch {
     Write-Host "❌ Download failed: $_" -ForegroundColor Red
     Write-Host "Please check your internet connection and try again." -ForegroundColor Red
@@ -129,6 +130,9 @@ Write-Host "================================================" -ForegroundColor G
 Write-Host "🎉 Installation Complete!" -ForegroundColor Green
 Write-Host "================================================" -ForegroundColor Green
 Write-Host ""
+Write-Host "📁 Extension installed to:" -ForegroundColor Blue
+Write-Host "   $destinationFile" -ForegroundColor Yellow
+Write-Host ""
 Write-Host "Next steps:" -ForegroundColor Yellow
 Write-Host "1. Restart VLC Media Player" -ForegroundColor White
 Write-Host "2. Go to View → VLSub OpenSubtitles.com" -ForegroundColor White
@@ -144,6 +148,8 @@ Write-Host "Support & Documentation:" -ForegroundColor Yellow
 Write-Host "• Issues: https://github.com/opensubtitles/vlsub-opensubtitles-com/issues" -ForegroundColor Cyan
 Write-Host "• Docs: https://github.com/opensubtitles/vlsub-opensubtitles-com" -ForegroundColor Cyan
 Write-Host "• OpenSubtitles: https://www.opensubtitles.com/" -ForegroundColor Cyan
+Write-Host ""
+Write-Host "💡 To uninstall: Delete the file at the path shown above" -ForegroundColor Blue
 Write-Host ""
 
 if (-not $Force) {

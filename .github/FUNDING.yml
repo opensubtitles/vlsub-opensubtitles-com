@@ -1,0 +1,20 @@
+# GitHub Sponsors configuration file
+# Place this file at: .github/FUNDING.yml
+
+# GitHub Sponsors (organization or individual accounts)
+github: [opensubtitles]
+
+# OpenSubtitles.com support page
+custom: ['https://www.opensubtitles.com/en/support_us/']
+
+# Optional: Add other platforms
+# patreon: username
+# open_collective: project-name
+# ko_fi: username
+# tidelift: pypi/package-name
+# community_bridge: project-name
+# liberapay: username
+# issuehunt: username
+# otechie: username
+# lfx_crowdfunding: project-name
+# polar: username

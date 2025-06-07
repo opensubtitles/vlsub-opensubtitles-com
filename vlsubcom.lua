@@ -1,21 +1,101 @@
 --[[
--- TODO:
--- integrate AI translation/transcription ? ai.opensubtitles.com
--- cleanup code
--- add installation instructions here
--- make install using curl
--- updates
+--I have this vlc extension. if user run it, set up his credentials, but there is no film loaded, he write something for search, then some results come, and then click download it is buggy. Actually nothing is downloade
 
+================================================================================
+VLSub OpenSubtitles.com Extension for VLC Media Player 3.0+
+================================================================================
 
-VLSub OpenSubtitles.com Extension for VLC media player 3
+DESCRIPTION:
+A modern VLC extension for downloading subtitles from OpenSubtitles.com using 
+their latest REST API v2. This extension provides smart search capabilities,
+multi-language support, automatic metadata detection, and enhanced performance
+compared to legacy XML-RPC based extensions.
+
+FEATURES:
+- 🔍 Smart Search: Hash-based + name-based search with GuessIt integration
+- 🌐 Multi-language Support: Up to 3 preferred languages with prioritization
+- 🎯 Auto-detection: System locale, timezone, and IP geolocation detection
+- 📱 Modern API: OpenSubtitles.com REST API v2 for better performance
+- 🔄 Auto-updates: Built-in update mechanism
+- 🎬 Smart Metadata: GuessIt API integration for movie/TV show detection
+- 🏆 Quality Indicators: Trusted uploaders, download counts, sync quality
+- 💾 Flexible Download: Auto-load or manual save with language codes
+- 🌍 Country-specific: Intelligent language suggestions
+
+REQUIREMENTS:
+- VLC Media Player 3.0 or newer
+- OpenSubtitles.com account (free registration required)
+- Internet connection for searching and downloading
+- curl command-line tool (for downloads - usually pre-installed)
+
+INSTALLATION:
+Quick Install (Recommended):
+  macOS/Linux: curl -sSL https://raw.githubusercontent.com/opensubtitles/vlsub-opensubtitles-com/main/scripts/install.sh | bash
+  Windows: iwr -useb https://raw.githubusercontent.com/opensubtitles/vlsub-opensubtitles-com/main/scripts/install.ps1 | iex
+
+Manual Install:
+1. Download vlsubcom.lua from: https://github.com/opensubtitles/vlsub-opensubtitles-com/releases
+2. Copy to VLC extensions directory:
+   - Windows: %APPDATA%\vlc\lua\extensions\
+   - macOS: ~/Library/Application Support/org.videolan.vlc/lua/extensions/
+   - Linux: ~/.local/share/vlc/lua/extensions/
+3. Restart VLC Media Player
+4. Access via View → VLSub OpenSubtitles.com
+
+USAGE:
+1. Setup: Open VLC → View → VLSub OpenSubtitles.com → Config
+2. Login: Enter your OpenSubtitles.com username and password
+3. Play: Start your video file
+4. Search: Click "🎯 Search by Hash" or "🔍 Search by Name"
+5. Download: Double-click any subtitle to download and load automatically
+
+SUPPORTED LANGUAGES:
+100+ languages including major languages (English, Spanish, French, German, 
+Italian, Portuguese, Russian, Chinese, Japanese, Korean), regional variants,
+and all EU languages.
+
+TROUBLESHOOTING:
+- "No results found": Ensure video is local for hash search, try name search
+- "Authentication failed": Verify credentials and internet connection
+- "Download failed": Check quota limits, verify curl installation
+- Extension not visible: Restart VLC, check installation directory
+
+DEBUG LOGGING:
+Enable in VLC: Tools → Preferences → Show settings: All → Advanced → 
+Logger verbosity: 2 (Debug)
+
+API COMPARISON:
+                    Legacy vlsub (.org)    VLSub OpenSubtitles.com
+API                 XML-RPC (legacy)       REST API v2 (modern)
+Authentication      Optional               Required (free account)
+Language Selection  Single language        Up to 3 with priority
+Search Methods      Basic hash/name        Hash + Name + GuessIt
+Auto-updates        None                   Built-in system
+Performance         Slower XML parsing     Fast JSON API
+
+TODO:
+
+- Integrate AI translation/transcription (ai.opensubtitles.com)
+- Code cleanup and optimization
+
+PROJECT LINKS:
+Repository: https://github.com/opensubtitles/vlsub-opensubtitles-com/
+Issues: https://github.com/opensubtitles/vlsub-opensubtitles-com/issues
+Documentation: https://github.com/opensubtitles/vlsub-opensubtitles-com/blob/main/docs/
+OpenSubtitles.com: https://www.opensubtitles.com/
+Contact: https://www.opensubtitles.com/en/contact/
+
+================================================================================
+COPYRIGHT & LICENSE:
+================================================================================
 
 Copyright 2025 OpenSubtitles.com
 Based on original work Copyright 2013 Guillaume Le Maout
-Authors: OpenSubtitles.com, Guillaume Le Maout
-Additional Development: Enhanced with assistance from Claude (Anthropic AI)
 
-Contact: 
-https://www.opensubtitles.com/en/contact/
+Authors: 
+- OpenSubtitles.com Team
+- Guillaume Le Maout (original vlsub author)
+- Additional Development: Enhanced with assistance from Claude (Anthropic AI)
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -24,18 +104,31 @@ the Free Software Foundation, either version 3 of the License, or
 
 This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>.
+along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+================================================================================
+VERSION HISTORY & CHANGELOG:
+================================================================================
+
+For detailed version history and changelog, see:
+https://github.com/opensubtitles/vlsub-opensubtitles-com/releases
+
+Latest changes can be found in the repository commit history:
+https://github.com/opensubtitles/vlsub-opensubtitles-com/commits/main
+
+================================================================================
 
 --]]
 
-
             --[[ Global var ]]-- 
 
-
+local app_name = "VLSub OpenSubtitles.com";
+local app_version = "1.0.0";
+local app_useragent = app_name.." "..app_version;
 
 local config = {
   api_key = "d3Sba6j6VYnty3ir5T8GXYoAuiLSBf0S",
@@ -44,6 +137,14 @@ local config = {
   token_cache_duration_seconds = 24 * 60 * 60, -- 24 hours in seconds
   login_api_url = "https://api.opensubtitles.com/api/v1/login",
   guessit_api_url = "https://api.opensubtitles.com/api/v1/utilities/guessit"  -- Add GuessIt URL
+}
+
+-- Auto-update configuration
+local update_config = {
+  check_url = "https://api.github.com/repos/opensubtitles/vlsub-opensubtitles-com/releases/latest",
+  current_version = app_version, -- Uses existing app_version variable
+  check_interval_seconds = 24 * 60 * 60, -- 24 hours
+  last_check_file = "last_update_check.json"
 }
 
 -- First, update the options structure to support 3 languages
@@ -314,6 +415,8 @@ local sub_languages = {
 }
 
 
+
+
 -- initial declarations
 
 local json = nil
@@ -356,9 +459,6 @@ local last_click_time = 0
 local last_click_item = 0
 local double_click_threshold = 500 -- milliseconds
 
-local app_name = "VLSub OpenSubtitles.com";
-local app_version = "1.0.0";
-local app_useragent = app_name.." "..app_version;
 
             --[[ VLC extension stuff ]]--
 
@@ -370,7 +470,7 @@ function descriptor()
     url = 'http://www.opensubtitles.com/',
     shortdesc = app_name;
     description = options.translation.int_descr,
-    capabilities = {"menu", "input-listener", "dialog" }
+    capabilities = {"menu", "input-listener" }
   }
 end
 
@@ -408,6 +508,7 @@ function check_cli_curl()
     return true
 end
 
+-- Enhanced activation function to always initialize auto-update
 function activate()
   vlc.msg.dbg("[VLSub] Starting activation with debug window")
   
@@ -513,10 +614,10 @@ function activate()
     
     if detected_locale.suggested_languages and #detected_locale.suggested_languages > 0 then
       local lang_codes = {}
-for i, suggestion in ipairs(detected_locale.suggested_languages) do
-  table.insert(lang_codes, suggestion.language)
-end
-append_debug_log("Found " .. #detected_locale.suggested_languages .. " suggested languages: " .. table.concat(lang_codes, ", "))
+      for i, suggestion in ipairs(detected_locale.suggested_languages) do
+        table.insert(lang_codes, suggestion.language)
+      end
+      append_debug_log("Found " .. #detected_locale.suggested_languages .. " suggested languages: " .. table.concat(lang_codes, ", "))
 
       
       for i, suggestion in ipairs(detected_locale.suggested_languages) do
@@ -570,7 +671,7 @@ append_debug_log("Found " .. #detected_locale.suggested_languages .. " suggested
     append_debug_log("No media loaded")
   end
   
--- Authentication check (IMPROVED SECTION)
+  -- Authentication check (IMPROVED SECTION)
   update_debug_progress("Checking authentication...")
   
   -- Check credentials directly instead of relying on session tokens
@@ -607,10 +708,6 @@ append_debug_log("Found " .. #detected_locale.suggested_languages .. " suggested
   -- Mark initialization as complete
   initialization_complete = true
   
-  
-  -- Mark initialization as complete
-  initialization_complete = true
-  
   -- Determine final status and auto-close if appropriate
   update_debug_progress("Initialization complete!")
   append_debug_log("Initialization complete - checking for auto-close...")
@@ -629,6 +726,12 @@ append_debug_log("Found " .. #detected_locale.suggested_languages .. " suggested
   
   -- Check if we should auto-close
   checkInitializationStatus()
+
+  -- IMPORTANT: Initialize auto-update checking regardless of config state
+  -- This is the key fix - move this outside the network/config checks
+  update_debug_progress("Initializing auto-update system...")
+  append_debug_log("Setting up automatic update checking...")
+  initialize_auto_update()
   
   vlc.msg.dbg("[VLSub] Activation complete")
 end
@@ -682,6 +785,736 @@ function Curl:_build_command(method, url, data)
     table.insert(cmd, '"' .. escape(url) .. '"')
 
     return table.concat(cmd, " ")
+end
+
+-- Function to get the last update check timestamp (FIXED)
+function get_last_update_check()
+  -- Use a fallback directory if main config path isn't available
+  local check_dir = openSub.conf.dirPath
+  
+  if not check_dir then
+    -- Try alternative directories for storing update check data
+    local userdatadir = vlc.config.userdatadir()
+    local datadir = vlc.config.datadir()
+    
+    if userdatadir then
+      check_dir = userdatadir .. slash .. "lua" .. slash .. "extensions" .. slash .. "userdata" .. slash .. "vlsub.com"
+    elseif datadir then
+      check_dir = datadir .. slash .. "lua" .. slash .. "extensions" .. slash .. "userdata" .. slash .. "vlsub.com"
+    else
+      vlc.msg.dbg("[VLSub] No directory available for update check storage")
+      return 0
+    end
+    
+    -- Try to create the directory if it doesn't exist
+    if not is_dir(check_dir) then
+      mkdir_p(check_dir)
+    end
+  end
+  
+  local check_file_path = check_dir .. slash .. update_config.last_check_file
+  
+  if not file_exist(check_file_path) then
+    vlc.msg.dbg("[VLSub] No previous update check file found")
+    return 0
+  end
+  
+  local file = io.open(check_file_path, "rb")
+  if not file then
+    vlc.msg.dbg("[VLSub] Cannot read update check file")
+    return 0
+  end
+  
+  local content = file:read("*all")
+  file:close()
+  
+  local ok, data = pcall(json.decode, content, 1, true)
+  if ok and data and data.last_check then
+    vlc.msg.dbg("[VLSub] Last update check: " .. data.last_check)
+    return tonumber(data.last_check) or 0
+  end
+  
+  vlc.msg.dbg("[VLSub] Invalid update check file format")
+  return 0
+end
+
+
+-- Function to save the last update check timestamp (FIXED)
+function save_last_update_check()
+  -- Use the same fallback logic as get_last_update_check
+  local check_dir = openSub.conf.dirPath
+  
+  if not check_dir then
+    local userdatadir = vlc.config.userdatadir()
+    local datadir = vlc.config.datadir()
+    
+    if userdatadir then
+      check_dir = userdatadir .. slash .. "lua" .. slash .. "extensions" .. slash .. "userdata" .. slash .. "vlsub.com"
+    elseif datadir then
+      check_dir = datadir .. slash .. "lua" .. slash .. "extensions" .. slash .. "userdata" .. slash .. "vlsub.com"
+    else
+      vlc.msg.err("[VLSub] No directory available for saving update check")
+      return false
+    end
+    
+    -- Ensure directory exists
+    if not is_dir(check_dir) then
+      mkdir_p(check_dir)
+    end
+  end
+  
+  local check_file_path = check_dir .. slash .. update_config.last_check_file
+  
+  local data = {
+    last_check = os.time(),
+    version_checked = update_config.current_version
+  }
+  
+  if file_touch(check_file_path) then
+    local file = io.open(check_file_path, "wb")
+    if file then
+      local content = json.encode(data, { indent = true })
+      file:write(content)
+      file:flush()
+      file:close()
+      vlc.msg.dbg("[VLSub] Update check timestamp saved")
+      return true
+    end
+  end
+  
+  vlc.msg.err("[VLSub] Failed to save update check timestamp")
+  return false
+end
+
+-- Function to check if we should perform an update check
+function should_check_for_updates()
+  local last_check = get_last_update_check()
+  local now = os.time()
+  local time_since_last_check = now - last_check
+  
+  vlc.msg.dbg("[VLSub] Last update check: " .. last_check .. ", time since: " .. time_since_last_check .. "s")
+  
+  return time_since_last_check >= update_config.check_interval_seconds
+end
+
+-- Function to compare version strings (semantic versioning)
+function compare_versions(version1, version2)
+  -- Returns: 1 if version1 > version2, -1 if version1 < version2, 0 if equal
+  
+  local function parse_version(version)
+    local parts = {}
+    for part in string.gmatch(version, "(%d+)") do
+      table.insert(parts, tonumber(part))
+    end
+    -- Pad with zeros if needed
+    while #parts < 3 do
+      table.insert(parts, 0)
+    end
+    return parts
+  end
+  
+  local v1_parts = parse_version(version1)
+  local v2_parts = parse_version(version2)
+  
+  for i = 1, 3 do
+    if v1_parts[i] > v2_parts[i] then
+      return 1
+    elseif v1_parts[i] < v2_parts[i] then
+      return -1
+    end
+  end
+  
+  return 0
+end
+
+-- Function to get installation instructions for the user's OS
+function get_install_instructions(download_url)
+  local instructions = {}
+  
+  if openSub.conf.os == "win" then
+    -- Windows instructions
+    table.insert(instructions, "<b>Windows Installation:</b>")
+    table.insert(instructions, "")
+    table.insert(instructions, "<b>Option 1 - PowerShell (Recommended):</b>")
+    table.insert(instructions, "1. Press Win+R, type 'powershell' and press Enter")
+    table.insert(instructions, "2. Copy and paste this command:")
+    table.insert(instructions, "<code>iwr -useb https://raw.githubusercontent.com/opensubtitles/vlsub-opensubtitles-com/main/scripts/install.ps1 | iex</code>")
+    table.insert(instructions, "")
+    table.insert(instructions, "<b>Option 2 - Manual Download:</b>")
+    table.insert(instructions, "1. Download: <a href='" .. download_url .. "'>vlsubcom.lua</a>")
+    table.insert(instructions, "2. Copy to: <code>%APPDATA%\\vlc\\lua\\extensions\\</code>")
+    table.insert(instructions, "3. Restart VLC")
+    
+  else
+    -- macOS/Linux instructions
+    local os_name = "Linux"
+    if string.find(string.lower(os.getenv("HOME") or ""), "users") then
+      os_name = "macOS"
+    end
+    
+    table.insert(instructions, "<b>" .. os_name .. " Installation:</b>")
+    table.insert(instructions, "")
+    table.insert(instructions, "<b>Option 1 - Automatic (Recommended):</b>")
+    table.insert(instructions, "1. Open Terminal")
+    table.insert(instructions, "2. Copy and paste this command:")
+    table.insert(instructions, "<code>curl -sSL https://raw.githubusercontent.com/opensubtitles/vlsub-opensubtitles-com/main/scripts/install.sh | bash</code>")
+    table.insert(instructions, "")
+    table.insert(instructions, "<b>Option 2 - Manual Download:</b>")
+    table.insert(instructions, "1. Download: <a href='" .. download_url .. "'>vlsubcom.lua</a>")
+    if os_name == "macOS" then
+      table.insert(instructions, "2. Copy to: <code>~/Library/Application Support/org.videolan.vlc/lua/extensions/</code>")
+    else
+      table.insert(instructions, "2. Copy to: <code>~/.local/share/vlc/lua/extensions/</code>")
+    end
+    table.insert(instructions, "3. Restart VLC")
+  end
+  
+  table.insert(instructions, "")
+  table.insert(instructions, "<b>After installation:</b>")
+  table.insert(instructions, "• Restart VLC Media Player")
+  table.insert(instructions, "• Access via View → VLSub OpenSubtitles.com")
+  
+  return table.concat(instructions, "<br>")
+end
+
+-- Compact function to show update available dialog (single dialog, VLC-compatible, compact)
+function show_update_dialog(latest_version, release_notes, download_url)
+  if not dlg then
+    return -- No dialog available
+  end
+  
+  vlc.msg.dbg("[VLSub] Showing update dialog for version: " .. latest_version)
+  
+  -- Close current dialog and show update dialog
+  close_dlg()
+  
+  dlg = vlc.dialog("VLSub Update Available - " .. latest_version)
+  
+  -- Row 1: Update notification header with link and version info in compact format
+  dlg:add_label("<a href='https://github.com/opensubtitles/vlsub-opensubtitles-com'><b>VLSub Update Available</b></a> (" .. update_config.current_version .. " => " .. latest_version .. ")", 1, 1, 6, 1)
+  
+  -- Row 2: Installation instructions
+  dlg:add_label("<b>Installation Instructions:</b>", 1, 2, 6, 1)
+  
+  -- Detect OS and show appropriate instructions
+  if openSub.conf.os == "win" then
+    -- Windows instructions - compact with 2-line fallback
+    dlg:add_label("Open PowerShell as Administrator and run:", 1, 3, 6, 1)
+    dlg:add_label("iwr -useb https://raw.githubusercontent.com/opensubtitles/vlsub-opensubtitles-com/main/scripts/install.ps1 | iex", 1, 4, 6, 1)
+    dlg:add_label("If this doesn't work, download <a href='" .. download_url .. "'>vlsubcom.lua</a> and save to:", 1, 5, 6, 1)
+    dlg:add_label("%APPDATA%\\vlc\\lua\\extensions\\vlsubcom.lua", 1, 6, 6, 1)
+    
+  else
+    -- macOS/Linux instructions - compact with 2-line fallback
+    local install_path = "~/.local/share/vlc/lua/extensions/vlsubcom.lua"
+    
+    -- Detect macOS
+    if string.find(string.lower(os.getenv("HOME") or ""), "users") or 
+       string.find(string.lower(os.getenv("USER") or ""), "user") then
+      install_path = "~/Library/Application Support/org.videolan.vlc/lua/extensions/vlsubcom.lua"
+    end
+    
+    dlg:add_label("Open Terminal and run:", 1, 3, 6, 1)
+    dlg:add_label("curl -sSL https://raw.githubusercontent.com/opensubtitles/vlsub-opensubtitles-com/main/scripts/install.sh | bash", 1, 4, 6, 1)
+    dlg:add_label("If this doesn't work, download <a href='" .. download_url .. "'>vlsubcom.lua</a> and save to:", 1, 5, 6, 1)
+    dlg:add_label(install_path, 1, 6, 6, 1)
+  end
+  
+  dlg:add_label("Then restart VLC and access via View → VLSub OpenSubtitles.com", 1, 7, 6, 1)
+  
+  -- Row 8: What's new section (compact - exactly 6 lines)
+  dlg:add_label("<b>What's New in v" .. latest_version .. ":</b>", 1, 8, 6, 1)
+  
+  -- Process and display release notes - exactly 6 lines
+  local processed_notes = process_release_notes(release_notes)
+  local notes_lines = split_text_into_lines(processed_notes, 80)
+  
+  -- Display exactly 6 lines of release notes
+  for i = 1, 6 do
+    local line_content = ""
+    if i <= #notes_lines then
+      line_content = notes_lines[i]
+    end
+    dlg:add_label(line_content, 1, 8 + i, 6, 1)
+  end
+  
+  -- Row 15: Action buttons (compact layout)
+  dlg:add_button("⏭️ Skip Version", function()
+    save_skipped_version(latest_version)
+    close_dlg()
+    show_appropriate_window()
+  end, 2, 15, 1, 1)
+  
+  dlg:add_button("⏰ Later", function()
+    close_dlg()
+    show_appropriate_window()
+  end, 4, 15, 1, 1)
+  
+  dlg:add_button("❌ Close", function()
+    close_dlg()
+    show_appropriate_window()
+  end, 5, 15, 1, 1)
+  
+  if dlg then
+    dlg:show()
+  end
+end
+
+-- Helper function to process release notes (ASCII-only, simple text output) - NO DEBUG
+function process_release_notes(notes)
+  if not notes or notes == "" or string.gsub(notes, "%s", "") == "" then
+    return "General improvements and bug fixes."
+  end
+  
+  -- Start processing
+  local processed = notes
+  
+  -- Remove all non-ASCII characters (including emojis and unicode bullets)
+  processed = string.gsub(processed, "[^\32-\126\n\r\t]", "")
+  
+  -- Remove all markdown headers completely (##, ###, etc.)
+  processed = string.gsub(processed, "#+%s*[^\n]*\n?", "")
+  
+  -- Remove markdown bold/italic (**text** *text*)
+  processed = string.gsub(processed, "%*%*([^*]+)%*%*", "%1")
+  processed = string.gsub(processed, "%*([^*]+)%*", "%1")
+  
+  -- Remove markdown links [text](url) -> text
+  processed = string.gsub(processed, "%[([^%]]+)%]%([^%)]+%)", "%1")
+  
+  -- Remove code blocks completely
+  processed = string.gsub(processed, "```[^`]*```", "")
+  processed = string.gsub(processed, "`([^`]+)`", "%1")
+  
+  -- Convert markdown lists to simple ASCII bullet points using "-"
+  processed = string.gsub(processed, "^%s*[-*+]%s+", "- ")
+  processed = string.gsub(processed, "\n%s*[-*+]%s+", "\n- ")
+  
+  -- Remove installation and documentation sections (not needed in dialog)
+  local sections_to_remove = {
+    "Installation[^\n]*\n[^#]*",
+    "Requirements[^\n]*\n[^#]*", 
+    "Documentation[^\n]*\n[^#]*",
+    "Quick Install[^\n]*\n[^#]*",
+    "Manual Install[^\n]*\n[^#]*"
+  }
+  
+  for _, pattern in ipairs(sections_to_remove) do
+    processed = string.gsub(processed, pattern, "")
+  end
+  
+  -- Clean up excessive whitespace
+  processed = string.gsub(processed, "\n\n+", "\n")
+  processed = string.gsub(processed, "^%s+", "")
+  processed = string.gsub(processed, "%s+$", "")
+  
+  -- If after all processing we have very little content, provide a default
+  if processed == "" or string.len(processed) < 10 then
+    return "General improvements and bug fixes."
+  end
+  
+  -- Split into individual features and clean up
+  local features = {}
+  for line in processed:gmatch("[^\n]+") do
+    line = string.gsub(line, "^%s*", "") -- Remove leading spaces
+    line = string.gsub(line, "%s*$", "") -- Remove trailing spaces
+    
+    -- Skip empty lines and section headers
+    if line ~= "" and not string.match(line, "^[A-Z][a-z]+%s*$") then
+      table.insert(features, line)
+    end
+  end
+  
+  -- Return first few meaningful features
+  local result_lines = {}
+  local count = 0
+  for _, feature in ipairs(features) do
+    if count >= 6 then break end -- Limit to 6 features
+    if string.len(feature) > 5 then -- Skip very short lines
+      table.insert(result_lines, feature)
+      count = count + 1
+    end
+  end
+  
+  if #result_lines == 0 then
+    return "General improvements and bug fixes."
+  end
+  
+  local final_result = table.concat(result_lines, "\n")
+  
+  -- Final safety check - ensure only ASCII characters in result
+  final_result = string.gsub(final_result, "[^\32-\126\n\r\t]", "")
+  
+  return final_result
+end
+
+-- Helper function to split text into lines with word wrapping
+function split_text_into_lines(text, max_length)
+  local lines = {}
+  
+  -- Split by existing newlines first
+  for paragraph in text:gmatch("[^\n]+") do
+    local words = {}
+    
+    -- Split paragraph into words
+    for word in string.gmatch(paragraph, "%S+") do
+      table.insert(words, word)
+    end
+    
+    local current_line = ""
+    
+    for _, word in ipairs(words) do
+      -- Check if adding this word would exceed the line length
+      local test_line = current_line == "" and word or (current_line .. " " .. word)
+      
+      if #test_line <= max_length then
+        current_line = test_line
+      else
+        -- Line would be too long, start a new line
+        if current_line ~= "" then
+          table.insert(lines, current_line)
+        end
+        current_line = word
+      end
+    end
+    
+    -- Add the last line if it's not empty
+    if current_line ~= "" then
+      table.insert(lines, current_line)
+    end
+  end
+  
+  return lines
+end
+
+-- Helper function to save skipped version
+function save_skipped_version(version)
+  -- Use the same directory logic as update checks
+  local check_dir = openSub.conf.dirPath
+  
+  if not check_dir then
+    local userdatadir = vlc.config.userdatadir()
+    local datadir = vlc.config.datadir()
+    
+    if userdatadir then
+      check_dir = userdatadir .. slash .. "lua" .. slash .. "extensions" .. slash .. "userdata" .. slash .. "vlsub.com"
+    elseif datadir then
+      check_dir = datadir .. slash .. "lua" .. slash .. "extensions" .. slash .. "userdata" .. slash .. "vlsub.com"
+    else
+      return false
+    end
+    
+    -- Ensure directory exists
+    if not is_dir(check_dir) then
+      mkdir_p(check_dir)
+    end
+  end
+  
+  local skip_file_path = check_dir .. slash .. "skipped_version.txt"
+  
+  if file_touch(skip_file_path) then
+    local file = io.open(skip_file_path, "w")
+    if file then
+      file:write(version)
+      file:close()
+      return true
+    end
+  end
+  
+  return false
+end
+
+-- Function to check if a version was previously skipped
+function is_version_skipped(version)
+  local check_dir = openSub.conf.dirPath
+  
+  if not check_dir then
+    local userdatadir = vlc.config.userdatadir()
+    local datadir = vlc.config.datadir()
+    
+    if userdatadir then
+      check_dir = userdatadir .. slash .. "lua" .. slash .. "extensions" .. slash .. "userdata" .. slash .. "vlsub.com"
+    elseif datadir then
+      check_dir = datadir .. slash .. "lua" .. slash .. "extensions" .. slash .. "userdata" .. slash .. "vlsub.com"
+    else
+      return false
+    end
+  end
+  
+  local skip_file_path = check_dir .. slash .. "skipped_version.txt"
+  
+  if not file_exist(skip_file_path) then
+    return false
+  end
+  
+  local file = io.open(skip_file_path, "r")
+  if not file then
+    return false
+  end
+  
+  local skipped_version = file:read("*all")
+  file:close()
+  
+  if skipped_version then
+    skipped_version = string.gsub(skipped_version, "%s+", "") -- Trim whitespace
+    return skipped_version == version
+  end
+  
+  return false
+end
+
+
+
+-- Function to get the last update check timestamp (FIXED)
+function get_last_update_check()
+  -- Use a fallback directory if main config path isn't available
+  local check_dir = openSub.conf.dirPath
+  
+  if not check_dir then
+    -- Try alternative directories for storing update check data
+    local userdatadir = vlc.config.userdatadir()
+    local datadir = vlc.config.datadir()
+    
+    if userdatadir then
+      check_dir = userdatadir .. slash .. "lua" .. slash .. "extensions" .. slash .. "userdata" .. slash .. "vlsub.com"
+    elseif datadir then
+      check_dir = datadir .. slash .. "lua" .. slash .. "extensions" .. slash .. "userdata" .. slash .. "vlsub.com"
+    else
+      vlc.msg.dbg("[VLSub] No directory available for update check storage")
+      return 0
+    end
+    
+    -- Try to create the directory if it doesn't exist
+    if not is_dir(check_dir) then
+      mkdir_p(check_dir)
+    end
+  end
+  
+  local check_file_path = check_dir .. slash .. update_config.last_check_file
+  
+  if not file_exist(check_file_path) then
+    vlc.msg.dbg("[VLSub] No previous update check file found")
+    return 0
+  end
+  
+  local file = io.open(check_file_path, "rb")
+  if not file then
+    vlc.msg.dbg("[VLSub] Cannot read update check file")
+    return 0
+  end
+  
+  local content = file:read("*all")
+  file:close()
+  
+  local ok, data = pcall(json.decode, content, 1, true)
+  if ok and data and data.last_check then
+    vlc.msg.dbg("[VLSub] Last update check: " .. data.last_check)
+    return tonumber(data.last_check) or 0
+  end
+  
+  vlc.msg.dbg("[VLSub] Invalid update check file format")
+  return 0
+end
+
+-- Function to save the last update check timestamp (FIXED)
+function save_last_update_check()
+  -- Use the same fallback logic as get_last_update_check
+  local check_dir = openSub.conf.dirPath
+  
+  if not check_dir then
+    local userdatadir = vlc.config.userdatadir()
+    local datadir = vlc.config.datadir()
+    
+    if userdatadir then
+      check_dir = userdatadir .. slash .. "lua" .. slash .. "extensions" .. slash .. "userdata" .. slash .. "vlsub.com"
+    elseif datadir then
+      check_dir = datadir .. slash .. "lua" .. slash .. "extensions" .. slash .. "userdata" .. slash .. "vlsub.com"
+    else
+      vlc.msg.err("[VLSub] No directory available for saving update check")
+      return false
+    end
+    
+    -- Ensure directory exists
+    if not is_dir(check_dir) then
+      mkdir_p(check_dir)
+    end
+  end
+  
+  local check_file_path = check_dir .. slash .. update_config.last_check_file
+  
+  local data = {
+    last_check = os.time(),
+    version_checked = update_config.current_version
+  }
+  
+  if file_touch(check_file_path) then
+    local file = io.open(check_file_path, "wb")
+    if file then
+      local content = json.encode(data, { indent = true })
+      file:write(content)
+      file:flush()
+      file:close()
+      vlc.msg.dbg("[VLSub] Update check timestamp saved")
+      return true
+    end
+  end
+  
+  vlc.msg.err("[VLSub] Failed to save update check timestamp")
+  return false
+end
+
+-- Function to initialize auto-update checking (FIXED)
+function initialize_auto_update()
+  vlc.msg.dbg("[VLSub] Initializing auto-update system...")
+  
+  -- Always attempt update check, regardless of config state
+  -- The only requirements are: json module loaded and some network connectivity
+  
+  if not jsonModuleLoaded then
+    vlc.msg.dbg("[VLSub] Skipping auto-update: JSON module not loaded")
+    return
+  end
+  
+  -- Don't require full config - we can check for updates even without OpenSubtitles credentials
+  vlc.msg.dbg("[VLSub] Auto-update check starting...")
+  
+  -- Perform update check in background (non-blocking)
+  pcall(function()
+    check_for_updates(false) -- Don't force, respect timing
+  end)
+end
+
+-- Main function to check for updates (ENHANCED)
+function check_for_updates(force_check)
+  vlc.msg.dbg("[VLSub] check_for_updates called, force=" .. tostring(force_check))
+  
+  -- Don't check if no internet connection (unless forced)
+  if networkTestsFailed and not force_check then
+    vlc.msg.dbg("[VLSub] Skipping update check - no internet connection")
+    return
+  end
+  
+  -- Check if we should perform the check (unless forced)
+  if not force_check and not should_check_for_updates() then
+    vlc.msg.dbg("[VLSub] Skipping update check - too soon since last check")
+    return
+  end
+  
+  vlc.msg.dbg("[VLSub] Proceeding with update check...")
+  
+  -- Make API request to GitHub
+  local client = Curl.new()
+  client:add_header("User-Agent", app_useragent)
+  client:add_header("Accept", "application/vnd.github.v3+json")
+  client:set_timeout(15)  -- Slightly longer timeout for update checks
+  client:set_retries(1)
+  
+  local res = client:get(update_config.check_url)
+  
+  if not res or res.status ~= 200 then
+    vlc.msg.err("[VLSub] Failed to check for updates: " .. (res and res.status or "no response"))
+    
+    -- Still save the check attempt to avoid repeated failures
+    if force_check then
+      save_last_update_check()
+    end
+    return
+  end
+  
+  if not res.body then
+    vlc.msg.err("[VLSub] Empty response from update check")
+    return
+  end
+  
+  -- Parse the GitHub API response
+  local ok, release_data = pcall(json.decode, res.body, 1, true)
+  if not ok or not release_data then
+    vlc.msg.err("[VLSub] Failed to parse update response")
+    return
+  end
+  
+  local latest_version = release_data.tag_name or release_data.name
+  if not latest_version then
+    vlc.msg.err("[VLSub] No version found in release data")
+    return
+  end
+  
+  -- Remove 'v' prefix if present
+  latest_version = string.gsub(latest_version, "^v", "")
+  
+  vlc.msg.dbg("[VLSub] Current version: " .. update_config.current_version)
+  vlc.msg.dbg("[VLSub] Latest version: " .. latest_version)
+  
+  -- Save that we performed the check (IMPORTANT: do this regardless of result)
+  save_last_update_check()
+  
+  -- Compare versions
+  local version_comparison = compare_versions(latest_version, update_config.current_version)
+  
+  if version_comparison > 0 then
+    -- New version available
+    vlc.msg.dbg("[VLSub] Update available: " .. latest_version)
+    
+    -- Check if this version was skipped (only if not forced)
+    if is_version_skipped(latest_version) and not force_check then
+      vlc.msg.dbg("[VLSub] Version " .. latest_version .. " was previously skipped")
+      return
+    end
+    
+    -- Find download URL (look for .lua file in assets)
+    local download_url = "https://github.com/opensubtitles/vlsub-opensubtitles-com/releases/latest"
+    if release_data.assets then
+      for _, asset in ipairs(release_data.assets) do
+        if asset.name and string.match(asset.name, "%.lua$") then
+          download_url = asset.browser_download_url
+          break
+        end
+      end
+    end
+    
+    local release_notes = release_data.body or ""
+    
+    -- Show update dialog (this will work even without full config)
+    show_update_dialog(latest_version, release_notes, download_url)
+    
+  else
+    vlc.msg.dbg("[VLSub] No update available")
+    if force_check then
+      -- If manually triggered, show a message only if we have an interface
+      if input_table and input_table["message"] then
+        setMessage(success_tag("You're running the latest version (" .. update_config.current_version .. ")"))
+      end
+    end
+  end
+end
+
+-- Function to add "Check for Updates" button to config window
+function add_update_button_to_config()
+  -- Add this to your interface_config() function, in the button row
+  dlg:add_button("🔄 Check Updates", function()
+    check_for_updates(true) -- Force check
+  end, 1, 11, 1, 1)
+end
+
+-- Function to initialize auto-update checking (FIXED)
+function initialize_auto_update()
+  vlc.msg.dbg("[VLSub] Initializing auto-update system...")
+  
+  -- Always attempt update check, regardless of config state
+  -- The only requirements are: json module loaded and some network connectivity
+  
+  if not jsonModuleLoaded then
+    vlc.msg.dbg("[VLSub] Skipping auto-update: JSON module not loaded")
+    return
+  end
+  
+  -- Don't require full config - we can check for updates even without OpenSubtitles credentials
+  vlc.msg.dbg("[VLSub] Auto-update check starting...")
+  
+  -- Perform update check in background (non-blocking)
+  pcall(function()
+    check_for_updates(false) -- Don't force, respect timing
+  end)
 end
 
 
@@ -997,7 +1830,7 @@ function interface_main()
   end
 end
 
--- Modified interface_config function with conditional close button
+-- Updated interface_config with repositioned buttons: Save, Help, Check Updates, Close
 function interface_config()
   -- Row 1: OpenSubtitles username
   dlg:add_label(lang["int_os_username"]..":", 1, 1, 1, 1)
@@ -1060,27 +1893,31 @@ function interface_config()
   input_table['message'] = nil
   input_table['message'] = dlg:add_label('', 1, 10, 4, 1)
 
-  -- Row 11: Action buttons with conditional close button
+  -- Row 11: Action buttons - NEW ORDER: Save, Help, Check Updates, Close
   dlg:add_button(
     "💾 " .. lang["int_save"],
-    apply_config, 2, 11, 1, 1)
+    apply_config, 1, 11, 1, 1)
+  
+  dlg:add_button(
+    "❓ " .. lang["int_help"],
+    function() show_help("config") end,
+    2, 11, 1, 1)
+  
+  dlg:add_button(
+    "🔄 Check Updates",
+    function() check_for_updates(true) end, 3, 11, 1, 1)
   
   -- Conditional close button - only enabled after successful authentication
   if has_valid_authentication() then
     dlg:add_button(
       "❌ " .. lang["int_close"],
-      show_main, 3, 11, 1, 1)
+      show_main, 4, 11, 1, 1)
   else
     -- Disabled close button or placeholder
     dlg:add_label(
       "<span style='color:#999;'>❌ " .. lang["int_close"] .. " (Login Required)</span>", 
-      3, 11, 1, 1)
+      4, 11, 1, 1)
   end
-  
-  dlg:add_button(
-    "❓ " .. lang["int_help"],
-    function() show_help("config") end,
-    4, 11, 1, 1)
 
   -- Setup dropdown values and language dropdowns
   input_table['langExt']:add_value(
@@ -1097,6 +1934,8 @@ function interface_config()
   assoc_select_conf('default_language3', 'language3', openSub.conf.languages, 2, 'None')
   assoc_select_conf('downloadBehaviour', 'downloadBehaviour', openSub.conf.downloadBehaviours, 1)
 end
+
+
 
 
 -- Modified interface_help function with improved content
@@ -4010,6 +4849,7 @@ end
 
 
 
+-- Enhanced saveAndLoadSubtitle function with Downloads folder support
 openSub.saveAndLoadSubtitle = function(subtitle_content, item)
   if not subtitle_content or subtitle_content == "" then
     local errorMsg = "Empty subtitle content received"
@@ -4032,11 +4872,19 @@ openSub.saveAndLoadSubtitle = function(subtitle_content, item)
   elseif item.SubFileName then
     subfileName = string.sub(item.SubFileName, 1, #item.SubFileName - 4)
   else
-    local inputItem = openSub.getInputItem()
-    if inputItem then
-      local uriName = vlc.strings.encode_uri_component(inputItem:uri())
-      if uriName then
-        subfileName = string.sub(uriName, -64, -1)
+    -- Use search query as filename if no video loaded
+    if openSub.movie.title and openSub.movie.title ~= "" then
+      subfileName = openSub.movie.title
+      -- Clean filename for filesystem
+      subfileName = string.gsub(subfileName, "[<>:\"/\\|?*]", "_") -- Remove invalid characters
+      subfileName = string.gsub(subfileName, "%s+", "_") -- Replace spaces with underscores
+    else
+      local inputItem = openSub.getInputItem()
+      if inputItem then
+        local uriName = vlc.strings.encode_uri_component(inputItem:uri())
+        if uriName then
+          subfileName = string.sub(uriName, -64, -1)
+        end
       end
     end
   end
@@ -4047,37 +4895,82 @@ openSub.saveAndLoadSubtitle = function(subtitle_content, item)
   
   subfileName = subfileName.."."..item.SubFormat
   
-  -- Determine target directory
+  -- Determine target directory with Downloads folder fallback
   local target
   local saveLocation = ""
+  local saved_to_downloads = false
   
-  if is_dir(openSub.file.dir) then
+  -- First priority: save with video file if available
+  if openSub.file.hasInput and openSub.file.dir and is_dir(openSub.file.dir) then
     target = openSub.file.dir..subfileName
     saveLocation = " (saved with video file)"
-  elseif openSub.conf.dirPath then
-    target = openSub.conf.dirPath..slash..subfileName
-    saveLocation = " (saved to VLSub directory)"
+    vlc.msg.dbg("[VLSub] Attempting to save with video file: " .. target)
+    
+  -- Second priority: Downloads folder when no video or video dir not accessible
   else
-    local errorMsg = "Cannot determine save location for subtitle file"
-    vlc.msg.err("[VLSub] " .. errorMsg)
-    setMessage(error_tag(errorMsg))
-    return false
-  end
-  
-  -- Test if we can write to the target location
-  if not file_touch(target) then
-    if openSub.conf.dirPath then
+    local downloads_folder = get_downloads_folder()
+    if downloads_folder then
+      target = downloads_folder .. slash .. subfileName
+      saveLocation = " (saved to Downloads folder)"
+      saved_to_downloads = true
+      vlc.msg.dbg("[VLSub] Attempting to save to Downloads: " .. target)
+      
+    -- Third priority: VLSub directory
+    elseif openSub.conf.dirPath then
       target = openSub.conf.dirPath..slash..subfileName
       saveLocation = " (saved to VLSub directory)"
+      vlc.msg.dbg("[VLSub] Attempting to save to VLSub directory: " .. target)
     else
-      local errorMsg = "Cannot write to subtitle file location: " .. target
+      local errorMsg = "Cannot determine save location for subtitle file"
       vlc.msg.err("[VLSub] " .. errorMsg)
       setMessage(error_tag(errorMsg))
       return false
     end
   end
   
-  vlc.msg.dbg("[VLSub] Saving subtitle to: "..target)
+  -- Test if we can write to the target location
+  if not file_touch(target) then
+    vlc.msg.dbg("[VLSub] Cannot write to primary target, trying fallbacks...")
+    
+    -- Fallback 1: Downloads folder if not already tried
+    if not saved_to_downloads then
+      local downloads_folder = get_downloads_folder()
+      if downloads_folder then
+        target = downloads_folder .. slash .. subfileName
+        saveLocation = " (saved to Downloads folder)"
+        saved_to_downloads = true
+        vlc.msg.dbg("[VLSub] Fallback: trying Downloads folder: " .. target)
+        
+        if not file_touch(target) then
+          vlc.msg.dbg("[VLSub] Downloads folder also not writable")
+        end
+      end
+    end
+    
+    -- Fallback 2: VLSub directory if not already tried
+    if not file_touch(target) and openSub.conf.dirPath then
+      target = openSub.conf.dirPath..slash..subfileName
+      saveLocation = " (saved to VLSub directory)"
+      saved_to_downloads = false
+      vlc.msg.dbg("[VLSub] Final fallback: VLSub directory: " .. target)
+      
+      if not file_touch(target) then
+        local errorMsg = "Cannot write to any available location: " .. target
+        vlc.msg.err("[VLSub] " .. errorMsg)
+        setMessage(error_tag(errorMsg))
+        return false
+      end
+    end
+    
+    if not file_touch(target) then
+      local errorMsg = "Cannot write subtitle file to any location"
+      vlc.msg.err("[VLSub] " .. errorMsg)
+      setMessage(error_tag(errorMsg))
+      return false
+    end
+  end
+  
+  vlc.msg.dbg("[VLSub] Final save target: " .. target)
   
   -- Write subtitle content to file
   local subfile = io.open(target, "wb")
@@ -4094,24 +4987,33 @@ openSub.saveAndLoadSubtitle = function(subtitle_content, item)
   
   vlc.msg.dbg("[VLSub] Subtitle file saved successfully")
   
-  -- Load subtitles into VLC
-  if add_sub(target) then 
-    -- SUCCESS: Show clear success message without progress bar
-    local successMsg = lang["mess_loaded"] .. saveLocation
-    setMessage(success_tag(successMsg))
+  -- Try to load subtitles into VLC if video is playing
+  local subtitle_loaded = false
+  if openSub.file.hasInput and add_sub(target) then
+    subtitle_loaded = true
     vlc.msg.dbg("[VLSub] Subtitle loaded successfully into VLC")
-    return true
-  else
-    -- ERROR: Show error message without progress bar
-    local errorMsg = lang["mess_not_load"] .. saveLocation
-    setMessage(error_tag(errorMsg))
-    vlc.msg.err("[VLSub] Failed to load subtitle into VLC")
-    return false
   end
+  
+  -- Build success message based on context
+  local successMsg
+  if subtitle_loaded then
+    successMsg = lang["mess_loaded"] .. saveLocation
+  else
+    if saved_to_downloads then
+      successMsg = "Subtitles saved to Downloads"  -- Removed duplicate saveLocation
+    else
+      successMsg = "Subtitles saved" .. saveLocation
+    end
+  end
+  
+  setMessage(success_tag(successMsg))
+
+  return true
 end
 
 
--- Updated download_subtitles_v2 function to check if results exist
+
+-- Enhanced download_subtitles_v2 function with better no-video handling
 function download_subtitles_v2()
   -- Check if we have any results first
   local hasResults = false
@@ -4137,8 +5039,8 @@ function download_subtitles_v2()
   
   local item = openSub.itemStore[index]
   
-  if openSub.option.downloadBehaviour == 'manual' 
-  or not openSub.file.hasInput then
+  -- Check if manual download is explicitly requested
+  if openSub.option.downloadBehaviour == 'manual' then
     -- For manual download, provide the web URL
     local link = "<span style='color:#181'>"
     link = link.."<b>"..lang["mess_dowload_link"]..":</b>"
@@ -4154,12 +5056,15 @@ function download_subtitles_v2()
   -- Show download progress
   setMessage(openSub.actionLabel..": "..progressBarContent(25))
   
-  -- For automatic download with new API
+  -- Always attempt automatic download (even without video loaded)
+  vlc.msg.dbg("[VLSub] Attempting automatic download. Video loaded: " .. tostring(openSub.file.hasInput))
+  
   local success = openSub.downloadFromNewAPI(item)
   
-  -- The downloadFromNewAPI function will handle success/error messages
   return success
 end
+
+
 
 -- Fixed getSelectedLanguages function
 function getSelectedLanguages()
@@ -4686,7 +5591,7 @@ function get_first_sel(list)
   return 0
 end
 
--- New download function for the modern API (Fixed version)
+-- Enhanced downloadFromNewAPI with improved quota display
 openSub.downloadFromNewAPI = function(item)
     if not item.FileID then
         local errorMsg = "No file ID available for download"
@@ -4776,7 +5681,6 @@ openSub.downloadFromNewAPI = function(item)
         vlc.msg.err("[VLSub] " .. errorMsg)
         if res.body then
             vlc.msg.err("[VLSub] Error response: " .. res.body)
-            -- Try to parse error message from response
             local ok, error_data = pcall(json.decode, res.body, 1, true)
             if ok and error_data and error_data.message then
                 errorMsg = errorMsg .. " - " .. error_data.message
@@ -4798,7 +5702,7 @@ openSub.downloadFromNewAPI = function(item)
     -- Parse the download response
     local ok, download_response = pcall(json.decode, res.body, 1, true)
     local subtitle_content
-    local downloads_used = "N/A" -- New variable for requests field
+    local downloads_used = "N/A"
     local downloads_remaining = "N/A"
     local reset_time_display = "N/A"
 
@@ -4850,23 +5754,27 @@ openSub.downloadFromNewAPI = function(item)
             setMessage(error_tag(errorMsg))
             return false
         else
-            -- Fallback: use the entire response as content if not link, content, or error
             subtitle_content = res.body
             vlc.msg.dbg("[VLSub] Using entire response as subtitle content (fallback)")
         end
     else
-        -- If JSON parsing fails, assume the response body is the subtitle content directly
         vlc.msg.dbg("[VLSub] Response is not JSON, treating as direct subtitle content")
         subtitle_content = res.body
     end
 
     setMessage(openSub.actionLabel..": "..progressBarContent(90))
 
-    -- Save and load subtitle, and then update message with quota
+    -- Save and load subtitle, then update message with quota
     local success_load_save = openSub.saveAndLoadSubtitle(subtitle_content, item)
     if success_load_save then
-        local final_message = lang["mess_loaded"]
-        -- Safely calculate total_allowed_downloads
+        -- Build enhanced message with quota info
+        local base_message = input_table["message"]:get_text()
+        
+        -- Extract the base success message (before any quota info)
+        local clean_message = string.gsub(base_message, "<[^>]*>", "") -- Remove HTML tags
+        clean_message = string.gsub(clean_message, "Success:%s*", "") -- Remove "Success:" prefix
+        
+        -- Calculate quota info
         local num_downloads_used = tonumber(downloads_used)
         local num_downloads_remaining = tonumber(downloads_remaining)
         local total_allowed_downloads = "N/A"
@@ -4877,19 +5785,21 @@ openSub.downloadFromNewAPI = function(item)
 
         -- Format the quota message
         local quota_display = ""
-        if num_downloads_used ~= nil and total_allowed_downloads ~= "N/A" then -- Check num_downloads_used for safety
-            quota_display = num_downloads_used .. "/" .. total_allowed_downloads .. " downloads"
+        if num_downloads_used ~= nil and total_allowed_downloads ~= "N/A" then
+            quota_display = "Quota: " .. num_downloads_used .. "/" .. total_allowed_downloads .. " downloads"
         end
 
         if reset_time_display ~= "N/A" then
             if quota_display ~= "" then
-                quota_display = quota_display .. ", "
+                quota_display = quota_display .. ", reset in: " .. reset_time_display
+            else
+                quota_display = "Quota reset in: " .. reset_time_display
             end
-            quota_display = quota_display .. "reset in: " .. reset_time_display
         end
 
+        local final_message = clean_message
         if quota_display ~= "" then
-            final_message = final_message .. ". Quota: " .. quota_display .. "."
+            final_message = final_message .. ". " .. quota_display .. "."
         end
 
         setMessage(success_tag(final_message))
@@ -4897,6 +5807,7 @@ openSub.downloadFromNewAPI = function(item)
 
     return success_load_save
 end
+
 
 -- Enhanced temporary config button with tooltip explanation
 function show_auth_error_with_config_button(errorMessage)
@@ -6259,6 +7170,54 @@ function close_debug_window()
   initialization_complete = true
 end
 
+
+-- Enhanced function to get Downloads folder path
+function get_downloads_folder()
+  local downloads_path = nil
+  
+  if openSub.conf.os == "win" then
+    -- Windows: Try multiple methods to find Downloads folder
+    local win_downloads_paths = {
+      os.getenv("USERPROFILE") .. "\\Downloads",
+      os.getenv("HOMEDRIVE") .. os.getenv("HOMEPATH") .. "\\Downloads"
+    }
+    
+    for _, path in ipairs(win_downloads_paths) do
+      if path and is_dir(path) then
+        downloads_path = path
+        break
+      end
+    end
+    
+    -- Fallback: try to get Downloads folder via PowerShell
+    if not downloads_path then
+      local handle = io.popen('powershell -Command "([Environment]::GetFolderPath([Environment+SpecialFolder]::Downloads))" 2>nul')
+      if handle then
+        local result = handle:read("*all")
+        handle:close()
+        if result and result ~= "" then
+          result = string.gsub(result, "[\r\n]", "")
+          if is_dir(result) then
+            downloads_path = result
+          end
+        end
+      end
+    end
+    
+  else
+    -- macOS/Linux: Standard Downloads folder
+    local home = os.getenv("HOME")
+    if home then
+      local unix_downloads_path = home .. "/Downloads"
+      if is_dir(unix_downloads_path) then
+        downloads_path = unix_downloads_path
+      end
+    end
+  end
+  
+  vlc.msg.dbg("[VLSub] Downloads folder detected: " .. (downloads_path or "not found"))
+  return downloads_path
+end
 
 
 

@@ -15,7 +15,7 @@ NC='\033[0m' # No Color
 
 # Check if curl is available
 if ! command -v curl &> /dev/null; then
-    echo -e "${RED}Error: curl is required but not installed.${NC}"
+    printf "${RED}Error: curl is required but not installed.${NC}\n"
     echo "Please install curl and try again."
     echo ""
     echo "Install curl:"
@@ -42,14 +42,14 @@ detect_platform() {
             if [ -n "$APPDATA" ]; then
                 VLC_EXT_DIR="$APPDATA/vlc/lua/extensions"
             else
-                echo -e "${RED}Error: Cannot detect VLC extensions directory on Windows.${NC}"
+                printf "${RED}Error: Cannot detect VLC extensions directory on Windows.${NC}\n"
                 echo "Please install manually by copying vlsubcom.lua to:"
                 echo "%APPDATA%\\vlc\\lua\\extensions\\"
                 exit 1
             fi
             ;;
         *)
-            echo -e "${RED}Error: Unsupported platform: $OSTYPE${NC}"
+            printf "${RED}Error: Unsupported platform: $OSTYPE${NC}\n"
             echo "Supported platforms: macOS, Linux, Windows (Git Bash/WSL)"
             echo ""
             echo "For manual installation, copy vlsubcom.lua to your VLC extensions directory:"
@@ -68,9 +68,9 @@ check_vlc() {
     case "$PLATFORM" in
         "macOS")
             if [ -d "/Applications/VLC.app" ] || command -v vlc &> /dev/null; then
-                echo -e "${GREEN}✓ VLC found${NC}"
+                printf "${GREEN}✓ VLC found${NC}\n"
             else
-                echo -e "${YELLOW}⚠ VLC not found.${NC}"
+                printf "${YELLOW}⚠ VLC not found.${NC}\n"
                 echo "Download VLC: https://www.videolan.org/vlc/download-macosx.html"
                 read -p "Continue installation anyway? (y/N): " -n 1 -r
                 echo
@@ -81,9 +81,9 @@ check_vlc() {
             ;;
         "Linux")
             if command -v vlc &> /dev/null; then
-                echo -e "${GREEN}✓ VLC found${NC}"
+                printf "${GREEN}✓ VLC found${NC}\n"
             else
-                echo -e "${YELLOW}⚠ VLC not found.${NC}"
+                printf "${YELLOW}⚠ VLC not found.${NC}\n"
                 echo "Install VLC:"
                 echo "  Ubuntu/Debian: sudo apt install vlc"
                 echo "  Fedora: sudo dnf install vlc"
@@ -105,13 +105,13 @@ check_vlc() {
 # Create installation directory
 create_directory() {
     echo "Creating extension directory..."
-    echo -e "${BLUE}Directory: $VLC_EXT_DIR${NC}"
+    printf "${BLUE}Directory: $VLC_EXT_DIR${NC}\n"
     
     if [ ! -d "$VLC_EXT_DIR" ]; then
         mkdir -p "$VLC_EXT_DIR"
-        echo -e "${GREEN}✓ Directory created${NC}"
+        printf "${GREEN}✓ Directory created${NC}\n"
     else
-        echo -e "${GREEN}✓ Directory exists${NC}"
+        printf "${GREEN}✓ Directory exists${NC}\n"
     fi
 }
 
@@ -123,7 +123,7 @@ backup_existing() {
         echo "Found existing VLSub installation..."
         local backup_file="$existing_file.backup.$(date +%Y%m%d_%H%M%S)"
         cp "$existing_file" "$backup_file"
-        echo -e "${GREEN}✓ Backup created: $(basename "$backup_file")${NC}"
+        printf "${GREEN}✓ Backup created: $(basename "$backup_file")${NC}\n"
     fi
 }
 
@@ -133,12 +133,12 @@ install_extension() {
     local download_url="https://github.com/opensubtitles/vlsub-opensubtitles-com/releases/latest/download/vlsubcom.lua"
     
     echo "Downloading VLSub extension..."
-    echo -e "${BLUE}From: $download_url${NC}"
+    printf "${BLUE}From: $download_url${NC}\n"
     
     if curl -L -f -o "$temp_file" "$download_url" --progress-bar; then
-        echo -e "${GREEN}✓ Download successful${NC}"
+        printf "${GREEN}✓ Download successful${NC}\n"
     else
-        echo -e "${RED}✗ Download failed${NC}"
+        printf "${RED}✗ Download failed${NC}\n"
         echo "Please check your internet connection and try again."
         echo "Or download manually from: https://github.com/opensubtitles/vlsub-opensubtitles-com/releases"
         rm -f "$temp_file"
@@ -147,14 +147,15 @@ install_extension() {
     
     echo "Installing extension..."
     mv "$temp_file" "$VLC_EXT_DIR/vlsubcom.lua"
-    echo -e "${GREEN}✓ Installation complete${NC}"
+    printf "${GREEN}✓ Installation complete${NC}\n"
+    printf "${BLUE}📍 Installed to: $VLC_EXT_DIR/vlsubcom.lua${NC}\n"
 }
 
 # Set permissions (Linux/macOS)
 set_permissions() {
     if [ "$PLATFORM" != "Windows" ]; then
         chmod 644 "$VLC_EXT_DIR/vlsubcom.lua"
-        echo -e "${GREEN}✓ Permissions set${NC}"
+        printf "${GREEN}✓ Permissions set${NC}\n"
     fi
 }
 
@@ -162,32 +163,37 @@ set_permissions() {
 show_completion() {
     echo
     echo "================================================"
-    echo -e "${GREEN}🎉 Installation Complete!${NC}"
+    printf "${GREEN}🎉 Installation Complete!${NC}\n"
     echo "================================================"
     echo
-    echo -e "${YELLOW}Next steps:${NC}"
-    echo "1. ${BLUE}Restart VLC Media Player${NC}"
-    echo "2. ${BLUE}Go to View → VLSub OpenSubtitles.com${NC}"
-    echo "3. ${BLUE}Enter your OpenSubtitles.com credentials${NC}"
-    echo "   ${GREEN}(Create free account at https://www.opensubtitles.com/)${NC}"
+    printf "${BLUE}📁 Extension installed to:${NC}\n"
+    printf "${YELLOW}   $VLC_EXT_DIR/vlsubcom.lua${NC}\n"
     echo
-    echo -e "${YELLOW}Quick start:${NC}"
-    echo "• ${BLUE}Hash search:${NC} For exact subtitle matches"
-    echo "• ${BLUE}Name search:${NC} For flexible title-based search"
-    echo "• ${BLUE}Double-click subtitle${NC} to download and load"
+    printf "${YELLOW}Next steps:${NC}\n"
+    printf "1. ${BLUE}Restart VLC Media Player${NC}\n"
+    printf "2. ${BLUE}Go to View → VLSub OpenSubtitles.com${NC}\n"
+    printf "3. ${BLUE}Enter your OpenSubtitles.com credentials${NC}\n"
+    printf "   ${GREEN}(Create free account at https://www.opensubtitles.com/)${NC}\n"
     echo
-    echo -e "${YELLOW}Support & Documentation:${NC}"
-    echo "• ${BLUE}Issues:${NC} https://github.com/opensubtitles/vlsub-opensubtitles-com/issues"
-    echo "• ${BLUE}Docs:${NC} https://github.com/opensubtitles/vlsub-opensubtitles-com"
-    echo "• ${BLUE}OpenSubtitles:${NC} https://www.opensubtitles.com/"
+    printf "${YELLOW}Quick start:${NC}\n"
+    printf "• ${BLUE}Hash search:${NC} For exact subtitle matches\n"
+    printf "• ${BLUE}Name search:${NC} For flexible title-based search\n"
+    printf "• ${BLUE}Double-click subtitle${NC} to download and load\n"
+    echo
+    printf "${YELLOW}Support & Documentation:${NC}\n"
+    printf "• ${BLUE}Issues:${NC} https://github.com/opensubtitles/vlsub-opensubtitles-com/issues\n"
+    printf "• ${BLUE}Docs:${NC} https://github.com/opensubtitles/vlsub-opensubtitles-com\n"
+    printf "• ${BLUE}OpenSubtitles:${NC} https://www.opensubtitles.com/\n"
+    echo
+    printf "${BLUE}💡 To uninstall:${NC} Delete the file at the path shown above\n"
     echo
 }
 
 # Main installation process
 main() {
-    echo -e "${BLUE}Platform detection...${NC}"
+    printf "${BLUE}Platform detection...${NC}\n"
     detect_platform
-    echo -e "${GREEN}Platform: $PLATFORM${NC}"
+    printf "${GREEN}Platform: $PLATFORM${NC}\n"
     echo
     
     check_vlc
