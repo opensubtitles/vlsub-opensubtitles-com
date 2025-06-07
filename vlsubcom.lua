@@ -6333,7 +6333,7 @@ function detect_macos_locale(detected_locales)
   end
 end
 
--- Analyze detected locales and return the best guess with multi-language support
+-- Enhanced analyze_detected_locales function with English fallback
 function analyze_detected_locales(detected_locales)
   if #detected_locales == 0 then
     return nil
@@ -6352,13 +6352,13 @@ function analyze_detected_locales(detected_locales)
     win_env_LANG = 8,
     env_LANG = 7,
     env_LC_ALL = 6,
-    ip_geolocation = 6, -- FIXED: Higher priority for IP detection
+    ip_geolocation = 6,
     locale_cmd_LANG = 5,
     vlc_intf = 4,
     file_locale_conf = 4,
     file_locale = 4,
     file_i18n = 4,
-    ip_country_specific = 3, -- FIXED: Higher priority for country-specific
+    ip_country_specific = 3,
     linux_available_locale = 3,
     win_timezone_hint = 3,
     win_codepage_hint = 3,
@@ -6597,7 +6597,6 @@ function analyze_detected_locales(detected_locales)
         ["tz"] = {"sw", "en"}, -- Tanzania: Swahili + English
         ["gh"] = {"en", "tw"}, -- Ghana: English + Twi
         ["et"] = {"am", "en"}, -- Ethiopia: Amharic + English
-        ["ma"] = {"ar", "fr", "en"}, -- Morocco: Arabic + French + English (already defined above)
       }
       
       local country_languages = country_languages_map[most_likely_country]
@@ -6628,6 +6627,42 @@ function analyze_detected_locales(detected_locales)
       else
         vlc.msg.dbg("[VLSub] No multilingual mapping found for country: " .. most_likely_country)
       end
+    end
+    
+    -- ENHANCED: Check if English is already included, if not add it as fallback
+    local has_english = false
+    for _, lang_suggestion in ipairs(suggested_languages) do
+      if lang_suggestion.language == "en" then
+        has_english = true
+        break
+      end
+    end
+    
+    -- If English is not present and we have 1-2 languages detected, add English as fallback
+    if not has_english and #suggested_languages >= 1 and #suggested_languages <= 2 then
+      vlc.msg.dbg("[VLSub] Adding English as fallback language (detected " .. #suggested_languages .. " non-English languages)")
+      table.insert(suggested_languages, {
+        language = "en",
+        priority = 1, -- Lower priority than detected languages
+        source = "english_fallback",
+        reason = "international_fallback"
+      })
+    end
+    
+    -- ADDITIONAL: Always ensure English is available if no languages detected at all
+    if #suggested_languages == 0 then
+      vlc.msg.dbg("[VLSub] No languages detected, defaulting to English")
+      table.insert(suggested_languages, {
+        language = "en",
+        priority = 1,
+        source = "english_default",
+        reason = "default_language"
+      })
+    end
+    
+    vlc.msg.dbg("[VLSub] Final suggested languages count: " .. #suggested_languages)
+    for i, lang_suggestion in ipairs(suggested_languages) do
+      vlc.msg.dbg("[VLSub]   " .. i .. ": " .. lang_suggestion.language .. " (" .. lang_suggestion.reason .. ")")
     end
     
     return {

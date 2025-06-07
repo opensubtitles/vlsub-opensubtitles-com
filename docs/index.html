@@ -189,9 +189,9 @@
                     Windows
                 </div>
                 
-                <div class="option-label">Option 1: PowerShell (Recommended)</div>
+                <div class="option-label">Option 1: Windows (PowerShell): Press Windows + R → type powershell → Enter, then run:</div>
                 <div class="install-command">
-                    iwr -useb https://raw.githubusercontent.com/opensubtitles/vlsub-opensubtitles-com/main/scripts/install.ps1 | iex
+                    Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser; iwr -useb https://raw.githubusercontent.com/opensubtitles/vlsub-opensubtitles-com/main/scripts/install.ps1 | iex
                     <button class="copy-btn" onclick="copyCommand(this)">Copy</button>
                 </div>
                 
@@ -263,7 +263,7 @@
         <div class="card">
             <h3 style="margin-bottom: 15px;">🎯 Features</h3>
             <ul style="margin-left: 20px;">
-                <li><strong>Modern REST API:</strong> Uses latest OpenSubtitles.com REST API v2</li>
+                <li><strong>Modern REST API:</strong> Uses latest OpenSubtitles.com REST API</li>
                 <li><strong>Multi-language support:</strong> Select up to 3 preferred languages</li>
                 <li><strong>Smart search:</strong> Hash-based search with name + GuessIt API fallback</li>
                 <li><strong>Auto-update:</strong> Automatic version management and updates</li>
