@@ -43,10 +43,11 @@ A modern VLC extension for downloading subtitles from **OpenSubtitles.com** usin
 curl -sSL https://raw.githubusercontent.com/opensubtitles/vlsub-opensubtitles-com/main/scripts/install.sh | bash
 ```
 
+
 **Windows (PowerShell):**
+*Press `Windows + R` → type `powershell` → Enter, then run:*
 ```powershell
-iwr -useb https://raw.githubusercontent.com/opensubtitles/vlsub-opensubtitles-com/main/scripts/install.ps1 | iex
-```
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser; iwr -useb https://raw.githubusercontent.com/opensubtitles/vlsub-opensubtitles-com/main/scripts/install.ps1 | iex
 
 ### Method 2: Manual Installation
 
