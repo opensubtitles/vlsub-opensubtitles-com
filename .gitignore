@@ -159,3 +159,4 @@ typings/
 
 # TernJS port file
 .tern-port
+/*.sh
