@@ -67,12 +67,28 @@ jobs:
       run: |
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
+        
+        # Switch to main branch if we're in detached HEAD (from tag push)
+        if git symbolic-ref -q HEAD >/dev/null; then
+          echo "Already on a branch"
+        else
+          echo "Switching to main branch from detached HEAD"
+          git checkout main
+          git pull origin main
+          
+          # Re-apply version updates since we switched branches
+          echo "Re-applying version updates on main branch..."
+          sed -i 's/local app_version = "[^"]*"/local app_version = "${{ steps.version.outputs.VERSION_NO_V }}"/' $SCRIPT_NAME
+          sed -i 's/current_version = "[^"]*"/current_version = "${{ steps.version.outputs.VERSION_NO_V }}"/' $SCRIPT_NAME
+          sed -i 's/user_agent = "VLSub-OpenSubtitles\.com\/[^"]*"/user_agent = "VLSub-OpenSubtitles.com\/${{ steps.version.outputs.VERSION_NO_V }}"/' $SCRIPT_NAME
+        fi
+        
         git add $SCRIPT_NAME
         if git diff --staged --quiet; then
           echo "No changes to commit"
         else
           git commit -m "Update version to ${{ steps.version.outputs.VERSION }}"
-          git push
+          git push origin main
         fi
 
     - name: Validate extension file
