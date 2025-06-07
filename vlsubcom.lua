@@ -127,7 +127,7 @@ https://github.com/opensubtitles/vlsub-opensubtitles-com/commits/main
             --[[ Global var ]]-- 
 
 local app_name = "VLSub OpenSubtitles.com";
-local app_version = "1.0.0";
+local app_version = "1.1.3";
 local app_useragent = app_name.." "..app_version;
 
 local config = {
