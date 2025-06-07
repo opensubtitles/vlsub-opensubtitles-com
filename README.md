@@ -13,7 +13,7 @@ A modern VLC extension for downloading subtitles from **OpenSubtitles.com** usin
 - 🔍 **Smart Search**: Hash-based search for exact matches + name-based search with GuessIt integration
 - 🌐 **Multi-language Support**: Select up to 3 preferred subtitle languages with intelligent prioritization
 - 🎯 **Auto-detection**: Automatic locale detection from system settings, timezone, and IP geolocation
-- 📱 **Modern API**: Uses OpenSubtitles.com REST API v2 for better performance and reliability
+- 📱 **Modern API**: Uses OpenSubtitles.com REST API v1 for better performance and reliability
 - 🔄 **Auto-updates**: Built-in update mechanism keeps the extension current
 - 🎬 **Smart Metadata**: GuessIt API integration for accurate movie/TV show detection
 - 🏆 **Quality Indicators**: Shows trusted uploaders, download counts, sync quality, and ratings
@@ -24,12 +24,12 @@ A modern VLC extension for downloading subtitles from **OpenSubtitles.com** usin
 
 | Feature | Legacy vlsub (.org) | VLSub OpenSubtitles.com |
 |---------|---------------------|-------------------------|
-| **API** | XML-RPC (legacy) | REST API v2 (modern) |
+| **API** | XML-RPC (legacy) | REST API v1 (modern) |
 | **Authentication** | Optional | Required (free account) |
 | **Language Selection** | Single language | Up to 3 languages with priority |
 | **Search Methods** | Basic hash/name | Hash + Name + GuessIt fallback |
 | **Auto-updates** | None | Built-in update system |
-| **Locale Detection** | Manual setup | Automatic system detection |
+| **Locale Detection** | Simple | Advanced system detection |
 | **Quality Indicators** | Basic | Detailed (trusted, HD, sync, etc.) |
 | **Performance** | Slower XML parsing | Fast JSON API |
 | **Metadata** | Manual input | Smart GuessIt extraction |
@@ -58,14 +58,6 @@ iwr -useb https://raw.githubusercontent.com/opensubtitles/vlsub-opensubtitles-co
 3. **Restart** VLC Media Player
 4. **Access** via `View → VLSub OpenSubtitles.com`
 
-### Method 3: Package Managers
-
-**Homebrew (macOS):**
-```bash
-# Coming soon
-brew install --cask vlsub-opensubtitles-com
-```
-
 ## 📋 Requirements
 
 - **VLC Media Player** 3.0 or newer
@@ -80,14 +72,14 @@ brew install --cask vlsub-opensubtitles-com
 2. **Login**: Enter your OpenSubtitles.com username and password
 3. **Play**: Start your video file
 4. **Search**: Click "🎯 Search by Hash" for exact matches or "🔍 Search by Name"
-5. **Download**: Double-click any subtitle to download and load automatically
+5. **Download**: Click download and load automatically
 
 ### Search Methods
 
 #### 🎯 Hash Search (Recommended)
 - **Best for**: Local video files
 - **Accuracy**: Finds exactly synchronized subtitles
-- **How it works**: Calculates unique file fingerprint for perfect matching
+- **How it works**: Calculates unique file fingerprint for perfect matching, failback to Name Search
 
 #### 🔍 Name Search
 - **Best for**: Streaming content, renamed files, or when hash fails
