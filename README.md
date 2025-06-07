@@ -48,6 +48,7 @@ curl -sSL https://raw.githubusercontent.com/opensubtitles/vlsub-opensubtitles-co
 *Press `Windows + R` → type `powershell` → Enter, then run:*
 ```powershell
 Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser; iwr -useb https://raw.githubusercontent.com/opensubtitles/vlsub-opensubtitles-com/main/scripts/install.ps1 | iex
+```
 
 ### Method 2: Manual Installation
 
