@@ -213,64 +213,6 @@ local options = {
     int_vlsub_work_dir = 'VLSub working directory',
     int_os_username = 'OpenSubtitles.com Username',
     int_os_password = 'OpenSubtitles.com Password',
-    int_help_mess =[[
-      Download subtitles from 
-      <a href='http://www.opensubtitles.org/'>
-      opensubtitles.org
-      </a> and display them while watching a video.<br>
-      <br>
-      <b><u>Usage:</u></b><br>
-      <br>
-      Start your video. If you use Vlsub witout playing a video 
-      you will get a link to download the subtitles in your browser 
-      but the subtitles won't be saved and loaded automatically.<br>
-      <br>
-      Choose up to 3 languages for your subtitles and click on the 
-      button corresponding to one of the two research methods 
-      provided by VLSub:<br>
-      <br>
-      <b>Method 1: Search by hash</b><br>
-      It is recommended to try this method first, because it 
-      performs a research based on the video file print, so you 
-      can find subtitles synchronized with your video.<br>
-      <br>
-      <b>Method 2: Search by name</b><br>
-      If you have no luck with the first method, just check the 
-      title is correct before clicking. If you search subtitles 
-      for a series, you can also provide a season and episode 
-      number.<br>
-      <br>
-      <b>Downloading Subtitles</b><br>
-      Select one subtitle in the list and click on 'Download'.<br>
-      It will be put in the same directory that your video, with 
-      the same name (different extension)
-      so VLC will load them automatically the next time you'll 
-      start the video.<br>
-      <br>
-      <b>/!\\ Beware :</b> Existing subtitles are overwritten 
-      without asking confirmation, so put them elsewhere if 
-      they're important.<br>
-      <br>
-      Find more VLC extensions at 
-      <a href='http://addons.videolan.org'>addons.videolan.org</a>.
-      ]],
-    int_no_support_mess = [[
-      <strong>VLSub is not working with Vlc 2.1.x on 
-      any platform</strong>
-      because the lua "net" module needed to interact 
-      with opensubtitles has been 
-      removed in this release for the extensions.
-      <br>
-      <strong>Works with Vlc 2.2 on mac and linux.</strong>
-      <br>
-      <strong>On windows you have to install an older version 
-      of Vlc (2.0.8 for example)</strong>
-      to use Vlsub:
-      <br>
-      <a target="_blank" rel="nofollow" 
-      href="http://download.videolan.org/pub/videolan/vlc/2.0.8/">
-      http://download.videolan.org/pub/videolan/vlc/2.0.8/</a><br>
-    ]],
   
     action_login = 'Logging in',
     action_logout = 'Logging out',
@@ -508,7 +450,7 @@ function check_cli_curl()
     return true
 end
 
--- Enhanced activation function to always initialize auto-update
+-- Modified activate function - only detect locale/IP if user has no preferences
 function activate()
   vlc.msg.dbg("[VLSub] Starting activation with debug window")
   
@@ -584,81 +526,90 @@ function activate()
     append_debug_log("Using built-in language list (offline mode)")
   end
   
-  -- Locale detection
-  update_debug_progress("Detecting user locale...")
-  local is_first_run_detected = is_first_run()
+  -- MODIFIED: Only detect locale if user has no language preferences set
+  update_debug_progress("Checking user preferences...")
+  local has_user_preferences = check_user_has_language_preferences()
   
-  if is_first_run_detected then
-    append_debug_log("First run detected")
-  end
-  
-  -- Enhanced locale detection with debug output
-  vlc.msg.dbg("[VLSub] Starting locale detection...")
-  append_debug_log("Starting locale detection...")
-  
-  local saved_user_pref = nil
-  if is_first_run_detected then
-    saved_user_pref = openSub.option.language
-    openSub.option.language = nil
-    append_debug_log("Temporarily cleared user preference for clean detection")
-  end
-  
-  local detected_locale = detect_user_locale()
-  
-  if saved_user_pref then
-    openSub.option.language = saved_user_pref
-  end
-  
-  if detected_locale then
-    append_debug_log("Locale detected: " .. detected_locale.locale .. " from " .. detected_locale.source)
+  if has_user_preferences then
+    append_debug_log("User has language preferences - skipping locale detection")
+    vlc.msg.dbg("[VLSub] User has preferences set, skipping IP/locale detection")
+  else
+    append_debug_log("No user preferences found - detecting locale...")
     
-    if detected_locale.suggested_languages and #detected_locale.suggested_languages > 0 then
-      local lang_codes = {}
-      for i, suggestion in ipairs(detected_locale.suggested_languages) do
-        table.insert(lang_codes, suggestion.language)
-      end
-      append_debug_log("Found " .. #detected_locale.suggested_languages .. " suggested languages: " .. table.concat(lang_codes, ", "))
-
+    local is_first_run_detected = is_first_run()
+    
+    if is_first_run_detected then
+      append_debug_log("First run detected")
+    end
+    
+    -- Enhanced locale detection with debug output
+    vlc.msg.dbg("[VLSub] Starting locale detection...")
+    append_debug_log("Starting locale detection...")
+    
+    local saved_user_pref = nil
+    if is_first_run_detected then
+      saved_user_pref = openSub.option.language
+      openSub.option.language = nil
+      append_debug_log("Temporarily cleared user preference for clean detection")
+    end
+    
+    local detected_locale = detect_user_locale()
+    
+    if saved_user_pref then
+      openSub.option.language = saved_user_pref
+    end
+    
+    if detected_locale then
+      append_debug_log("Locale detected: " .. detected_locale.locale .. " from " .. detected_locale.source)
       
-      for i, suggestion in ipairs(detected_locale.suggested_languages) do
-        local os_lang = map_to_opensubtitles_language(suggestion.language)
+      if detected_locale.suggested_languages and #detected_locale.suggested_languages > 0 then
+        local lang_codes = {}
+        for i, suggestion in ipairs(detected_locale.suggested_languages) do
+          table.insert(lang_codes, suggestion.language)
+        end
+        append_debug_log("Found " .. #detected_locale.suggested_languages .. " suggested languages: " .. table.concat(lang_codes, ", "))
+
         
-        local found_language = false
-        for j, lang_pair in ipairs(openSub.conf.languages) do
-          if lang_pair[1] == os_lang or lang_pair[1] == suggestion.language then
-            found_language = true
-            
-            if i == 1 and (not openSub.option.language or openSub.option.language == "") then
-              openSub.option.language = lang_pair[1]
-              append_debug_log("Set primary language: " .. lang_pair[1])
-            elseif i == 2 and (not openSub.option.language2 or openSub.option.language2 == "") then
-              openSub.option.language2 = lang_pair[1]
-              append_debug_log("Set secondary language: " .. lang_pair[1])
-            elseif i == 3 and (not openSub.option.language3 or openSub.option.language3 == "") then
-              openSub.option.language3 = lang_pair[1]
-              append_debug_log("Set third language: " .. lang_pair[1])
+        for i, suggestion in ipairs(detected_locale.suggested_languages) do
+          local os_lang = map_to_opensubtitles_language(suggestion.language)
+          
+          local found_language = false
+          for j, lang_pair in ipairs(openSub.conf.languages) do
+            if lang_pair[1] == os_lang or lang_pair[1] == suggestion.language then
+              found_language = true
+              
+              if i == 1 and (not openSub.option.language or openSub.option.language == "") then
+                openSub.option.language = lang_pair[1]
+                append_debug_log("Set primary language: " .. lang_pair[1])
+              elseif i == 2 and (not openSub.option.language2 or openSub.option.language2 == "") then
+                openSub.option.language2 = lang_pair[1]
+                append_debug_log("Set secondary language: " .. lang_pair[1])
+              elseif i == 3 and (not openSub.option.language3 or openSub.option.language3 == "") then
+                openSub.option.language3 = lang_pair[1]
+                append_debug_log("Set third language: " .. lang_pair[1])
+              end
+              break
             end
-            break
+          end
+          
+          if not found_language then
+            append_debug_log("Language not available: " .. os_lang)
           end
         end
         
-        if not found_language then
-          append_debug_log("Language not available: " .. os_lang)
+        if is_first_run_detected then
+          update_debug_progress("Saving auto-detected settings...")
+          local auto_save_success = save_config()
+          if auto_save_success then
+            append_debug_log("Auto-detected settings saved")
+          else
+            append_debug_log("Failed to save auto-detected settings")
+          end
         end
       end
-      
-      if is_first_run_detected then
-        update_debug_progress("Saving auto-detected settings...")
-        local auto_save_success = save_config()
-        if auto_save_success then
-          append_debug_log("Auto-detected settings saved")
-        else
-          append_debug_log("Failed to save auto-detected settings")
-        end
-      end
+    else
+      append_debug_log("Could not detect user locale")
     end
-  else
-    append_debug_log("Could not detect user locale")
   end
   
   -- File info initialization
@@ -671,15 +622,11 @@ function activate()
     append_debug_log("No media loaded")
   end
   
-  -- Authentication check (IMPROVED SECTION)
+  -- Authentication check
   update_debug_progress("Checking authentication...")
-  
-  -- Check credentials directly instead of relying on session tokens
   local username = trim(openSub.option.os_username or "")
   local password = trim(openSub.option.os_password or "")
   local has_credentials = (username ~= "" and password ~= "")
-  
-  -- Also check if session token exists and is valid
   local has_valid_session = has_valid_authentication()
   
   vlc.msg.dbg("[VLSub] Authentication status:")
@@ -688,7 +635,6 @@ function activate()
   vlc.msg.dbg("[VLSub]   - has_credentials: " .. tostring(has_credentials))
   vlc.msg.dbg("[VLSub]   - has_valid_session: " .. tostring(has_valid_session))
   
-  -- Determine authentication status
   is_authenticated = has_credentials or has_valid_session
   
   if is_authenticated then
@@ -697,9 +643,9 @@ function activate()
     append_debug_log("No valid authentication - missing credentials")
   end
   
-  -- Store results for when debug window closes (IMPROVED)
-  init_results.is_first_run = is_first_run_detected
-  init_results.has_auth = is_authenticated  -- Use the corrected authentication status
+  -- Store results for when debug window closes
+  init_results.is_first_run = not has_user_preferences
+  init_results.has_auth = is_authenticated
   
   vlc.msg.dbg("[VLSub] Storing initialization results:")
   vlc.msg.dbg("[VLSub]   - is_first_run: " .. tostring(init_results.is_first_run))
@@ -712,8 +658,8 @@ function activate()
   update_debug_progress("Initialization complete!")
   append_debug_log("Initialization complete - checking for auto-close...")
   
-  if is_first_run_detected then
-    append_debug_log("Ready to show configuration window (first run)")
+  if not has_user_preferences then
+    append_debug_log("Ready to show configuration window (no preferences)")
   else
     if init_results.has_auth then
       is_authenticated = true
@@ -727,8 +673,7 @@ function activate()
   -- Check if we should auto-close
   checkInitializationStatus()
 
-  -- IMPORTANT: Initialize auto-update checking regardless of config state
-  -- This is the key fix - move this outside the network/config checks
+  -- Initialize auto-update checking
   update_debug_progress("Initializing auto-update system...")
   append_debug_log("Setting up automatic update checking...")
   initialize_auto_update()
@@ -737,24 +682,50 @@ function activate()
 end
 
 
--- Improved Curl methods with better timeout handling
+-- NEW FUNCTION: Check if user has language preferences set
+function check_user_has_language_preferences()
+  -- Check if user has any language preferences configured
+  local has_primary = openSub.option.language and openSub.option.language ~= ""
+  local has_secondary = openSub.option.language2 and openSub.option.language2 ~= ""
+  local has_tertiary = openSub.option.language3 and openSub.option.language3 ~= ""
+  
+  vlc.msg.dbg("[VLSub] Checking user language preferences:")
+  vlc.msg.dbg("[VLSub]   - Primary language: " .. (openSub.option.language or "none"))
+  vlc.msg.dbg("[VLSub]   - Secondary language: " .. (openSub.option.language2 or "none"))
+  vlc.msg.dbg("[VLSub]   - Tertiary language: " .. (openSub.option.language3 or "none"))
+  
+  local has_preferences = has_primary or has_secondary or has_tertiary
+  vlc.msg.dbg("[VLSub]   - Has language preferences: " .. tostring(has_preferences))
+  
+  return has_preferences
+end
+
+
+-- Also update the build command to be more Windows-friendly
 function Curl:_build_command(method, url, data)
-    local cmd = {
-        'curl -s -i'
-    }
+    local cmd = {}
+    
+    -- Start with basic curl command
+    table.insert(cmd, 'curl')
+    table.insert(cmd, '-s')  -- Silent mode
+    table.insert(cmd, '-i')  -- Include headers
     
     -- Always set a reasonable timeout
     local timeout = self.timeout or 30
-    table.insert(cmd, '--max-time ' .. timeout)
-    table.insert(cmd, '--connect-timeout 10')  -- Separate connection timeout
+    table.insert(cmd, '--max-time')
+    table.insert(cmd, tostring(timeout))
+    table.insert(cmd, '--connect-timeout')
+    table.insert(cmd, '10')  -- Separate connection timeout
     
     -- Add method
-    table.insert(cmd, '-X ' .. method)
+    table.insert(cmd, '-X')
+    table.insert(cmd, method)
 
     if self.follow_redirects then
         table.insert(cmd, '-L')
         if self.max_redirects then
-            table.insert(cmd, '--max-redirs ' .. self.max_redirects)
+            table.insert(cmd, '--max-redirs')
+            table.insert(cmd, tostring(self.max_redirects))
         end
     end
 
@@ -765,27 +736,36 @@ function Curl:_build_command(method, url, data)
 
     -- Add data for POST/PUT
     if data then
-        table.insert(cmd, '-d "' .. escape(data) .. '"')
+        table.insert(cmd, '-d')
+        table.insert(cmd, '"' .. escape(data) .. '"')
     end
 
     -- Add proxy if set
     if self.proxy then
-        table.insert(cmd, '--proxy "' .. escape(self.proxy) .. '"')
+        table.insert(cmd, '--proxy')
+        table.insert(cmd, '"' .. escape(self.proxy) .. '"')
     end
     
     -- Additional reliability options
-    table.insert(cmd, '--retry ' .. (self.retries or 2))
-    table.insert(cmd, '--retry-delay 1')
-    table.insert(cmd, '--retry-max-time ' .. (timeout * 2))
+    table.insert(cmd, '--retry')
+    table.insert(cmd, tostring(self.retries or 2))
+    table.insert(cmd, '--retry-delay')
+    table.insert(cmd, '1')
+    table.insert(cmd, '--retry-max-time')
+    table.insert(cmd, tostring(timeout * 2))
     
     -- Handle SSL issues gracefully
     table.insert(cmd, '--insecure')  -- Allow self-signed certs if needed
+    
+    -- Disable progress meter and other potential output
+    table.insert(cmd, '--no-progress-meter')  -- Available in newer curl versions
     
     -- Add URL last
     table.insert(cmd, '"' .. escape(url) .. '"')
 
     return table.concat(cmd, " ")
 end
+
 
 -- Function to get the last update check timestamp (FIXED)
 function get_last_update_check()
@@ -1520,9 +1500,12 @@ end
 
 
 
--- IP-based geolocation detection using api.myip.com
+-- MODIFIED: IP-based geolocation detection - only called when no preferences exist
 function detect_ip_based_locale(detected_locales)
+  -- This function should only be called from detect_user_locale() 
+  -- when user has no preferences set
   vlc.msg.dbg("[VLSub] Attempting IP-based geolocation detection...")
+  append_debug_log("Performing IP geolocation lookup...")
   
   local ip_api_url = "https://api.myip.com"
   
@@ -1536,17 +1519,20 @@ function detect_ip_based_locale(detected_locales)
   
   if not res then
     vlc.msg.dbg("[VLSub] IP geolocation: No response from API")
+    append_debug_log("IP detection failed - no response")
     return
   end
-  
-if not res or res.status ~= 200 then
-  local status = (res and res.status) or "N/A"
-  vlc.msg.dbg("[VLSub] IP geolocation: API request failed with status: " .. status)
-  return
-end
+
+  if not res or res.status ~= 200 then
+    local status = (res and res.status) or "N/A"
+    vlc.msg.dbg("[VLSub] IP geolocation: API request failed with status: " .. status)
+    append_debug_log("IP detection failed - status " .. status)
+    return
+  end
 
   if not res.body or res.body == "" then
     vlc.msg.dbg("[VLSub] IP geolocation: Empty response body")
+    append_debug_log("IP detection failed - empty response")
     return
   end
   
@@ -1554,6 +1540,7 @@ end
   local ok, ip_data = pcall(json.decode, res.body, 1, true)
   if not ok or not ip_data then
     vlc.msg.dbg("[VLSub] IP geolocation: Failed to parse response: " .. (res.body or "no body"))
+    append_debug_log("IP detection failed - parse error")
     return
   end
   
@@ -1566,6 +1553,7 @@ end
   
   if country_code and country_code ~= "" then
     vlc.msg.dbg("[VLSub] Detected country from IP: " .. country_name .. " (" .. country_code .. ")")
+    append_debug_log("IP location: " .. country_name .. " (" .. country_code .. ")")
     
     -- Map country codes to primary languages
     local country_language_map = {
@@ -1611,6 +1599,7 @@ end
     local primary_language = country_language_map[country_code]
     if primary_language then
       vlc.msg.dbg("[VLSub] Mapped country " .. country_code .. " to primary language: " .. primary_language)
+      append_debug_log("Language suggestion from IP: " .. primary_language)
       table.insert(detected_locales, {source = "ip_geolocation", locale = primary_language})
       
       -- For some countries, add country-specific locale
@@ -1619,11 +1608,14 @@ end
       vlc.msg.dbg("[VLSub] Also added country-specific locale: " .. country_specific)
     else
       vlc.msg.dbg("[VLSub] No language mapping found for country: " .. country_code)
+      append_debug_log("No language mapping for country: " .. country_code)
     end
   else
     vlc.msg.dbg("[VLSub] No country code in IP geolocation response")
+    append_debug_log("IP detection failed - no country code")
   end
 end
+
 
 
 -- Helper function to force user to stay in config until authenticated
@@ -2736,7 +2728,7 @@ function getenv_lang()
   end
 end
 
--- Modified apply_config function to update authentication status
+-- Modified apply_config function to preserve success messages
 function apply_config()
   -- Handle dropdown selections - get the actual language code from the stored mapping
   for select_id, v in pairs(select_conf) do
@@ -2854,9 +2846,30 @@ function apply_config()
           setMessage(success_tag("Config saved and login successful! You can now close this window."))
         end
         
-        -- Refresh the interface to show the enabled close button
-        vlc.msg.dbg("[VLSub] Authentication successful, refreshing config interface")
-        show_conf() -- Refresh the config window to show the enabled close button
+        -- FIXED: Don't refresh the interface - just update the close button state
+        vlc.msg.dbg("[VLSub] Authentication successful, updating interface without refresh")
+        
+        -- Update the close button to be enabled (if it exists)
+        -- Remove the old disabled close button label and add enabled button
+        if dlg then
+          -- Try to update just the close button area without full refresh
+          local close_button_exists = false
+          
+          -- Check if we can add the close button (this might fail if button already exists)
+          local success, err = pcall(function()
+            dlg:add_button(
+              "❌ " .. lang["int_close"],
+              show_main, 4, 11, 1, 1)
+          end)
+          
+          if success then
+            vlc.msg.dbg("[VLSub] Successfully added close button")
+          else
+            vlc.msg.dbg("[VLSub] Close button may already exist: " .. tostring(err))
+          end
+          
+          dlg:update()
+        end
       end
     else
       is_authenticated = false
@@ -4638,6 +4651,7 @@ openSub.loginWithRestAPI = function()
     return true
   end
   
+  log_api_endpoint("LOGIN", config.login_api_url, "POST", "Authenticate with OpenSubtitles.com")  
   vlc.msg.dbg("[VLSub] Attempting login for: " .. openSub.option.os_username)
   
   local login_data = {
@@ -5617,6 +5631,9 @@ openSub.downloadFromNewAPI = function(item)
 
     vlc.msg.dbg("[VLSub] Downloading subtitle file ID: " .. item.FileID)
     setMessage(openSub.actionLabel..": "..progressBarContent(50))
+
+    log_api_endpoint("DOWNLOAD", "api.opensubtitles.com/api/v1/download", "POST", 
+                   "Download subtitle file ID: " .. (item.FileID or "unknown"))
 
     -- Make the download request using curl wrapper
     local client = Curl.new()
@@ -7256,6 +7273,7 @@ end
 
 
 
+-- Enhanced network connectivity test with tracking
 function test_network_connectivity()
   update_debug_network("Testing network connectivity...")
   
@@ -7266,9 +7284,14 @@ function test_network_connectivity()
     "https://httpbin.org/get"
   }
   
+  vlc.msg.warn("[VLSub Network] Starting connectivity tests...")
+  append_debug_log("🔍 Starting network tests...")
+  
   for i, url in ipairs(test_urls) do
     update_debug_network("Testing connection " .. i .. "/" .. #test_urls .. "...")
     append_debug_log("Testing: " .. url)
+    
+    vlc.msg.warn("[VLSub Network] Test " .. i .. "/" .. #test_urls .. " → " .. url)
     
     local test_client = Curl.new()
     test_client:set_aggressive_timeouts()
@@ -7276,29 +7299,28 @@ function test_network_connectivity()
     test_client:set_retries(0)  -- No retries for speed
     
     local start_time = os.clock()
-    local res = test_client:get(url)
+    local res = test_client:get(url)  -- This will now be tracked by the enhanced request method
     local end_time = os.clock()
     local elapsed_ms = math.floor((end_time - start_time) * 1000)
     
     if res and res.status and res.status >= 200 and res.status < 400 then
       update_debug_network("Connection OK (responded in " .. elapsed_ms .. "ms)")
-      append_debug_log("Network test passed: " .. url .. " (" .. elapsed_ms .. "ms)")
+      append_debug_log("✅ Network test PASSED")
+      vlc.msg.warn("[VLSub Network] Test PASSED - Network connectivity confirmed")
       return true
     else
-      append_debug_log("Network test failed: " .. url .. " (" .. elapsed_ms .. "ms)")
+      append_debug_log("❌ Network test FAILED")
+      vlc.msg.warn("[VLSub Network] Test FAILED for " .. url)
     end
   end
   
-update_debug_network("⚠️  OFFLINE MODE - LIMITED FUNCTIONALITY")
-append_debug_log("⚠️  WARNING: No internet connection detected!")
-append_debug_log("⚠️  This extension requires internet access to:")
-append_debug_log("   • Search and download subtitles")
-append_debug_log("   • Authenticate with OpenSubtitles.com")
-append_debug_log("   • Access subtitle database")
-append_debug_log("⚠️  Please connect to internet for full functionality")
-networkTestsFailed = true
-return false
+  update_debug_network("⚠️  OFFLINE MODE - LIMITED FUNCTIONALITY")
+  append_debug_log("⚠️  WARNING: No internet connection detected!")
+  vlc.msg.warn("[VLSub Network] ALL TESTS FAILED - No internet connection")
+  networkTestsFailed = true
+  return false
 end
+
 
 function checkInitializationStatus()
   -- Don't check until initialization is complete
@@ -7458,11 +7480,30 @@ function Curl:_build_command(method, url, data)
     return table.concat(cmd, " ")
 end
 
+
+-- Enhanced execute command with better tracking
 function Curl:_execute_command(command)
     local attempt = 0
     local result
 
+    -- Fix for Windows: prevent visible command windows
+    if openSub.conf.os == "win" then
+        -- On Windows, use cmd /c with window hiding flags
+        command = 'cmd /c "' .. command .. '" 2>nul'
+    else
+        -- On Unix/Linux/macOS, redirect stderr to avoid noise
+        command = command .. ' 2>/dev/null'
+    end
+
     while attempt <= self.retries do
+        -- Log retry attempts if needed
+        if attempt > 0 then
+            vlc.msg.warn("[VLSub Retry] Attempt " .. (attempt + 1) .. "/" .. (self.retries + 1))
+            if debug_log_rows and #debug_log_rows > 0 then
+                append_debug_log("🔄 Retry " .. (attempt + 1) .. "/" .. (self.retries + 1))
+            end
+        end
+        
         local handle = io.popen(command)
         local output = handle:read("*a")
         local success, _, exit_code = handle:close()
@@ -7473,8 +7514,67 @@ function Curl:_execute_command(command)
         attempt = attempt + 1
     end
 
+    -- Log if all retries failed
+    if attempt > self.retries and (not result or result == "") then
+        vlc.msg.err("[VLSub Error] All retry attempts failed for curl command")
+        if debug_log_rows and #debug_log_rows > 0 then
+            append_debug_log("❌ All retries failed")
+        end
+    end
+
     return result
 end
+
+-- Helper function to track specific API endpoints
+function log_api_endpoint(endpoint_name, url, method, description)
+    local log_message = "🔗 API Call: " .. endpoint_name .. " (" .. description .. ")"
+    vlc.msg.warn("[VLSub API] " .. log_message)
+    
+    if debug_log_rows and #debug_log_rows > 0 then
+        append_debug_log("🔗 " .. endpoint_name .. " API")
+    end
+end
+
+-- Alternative enhanced version with better Windows handling
+function Curl:_execute_command_enhanced(command)
+    local attempt = 0
+    local result
+
+    while attempt <= self.retries do
+        local final_command
+        
+        if openSub.conf.os == "win" then
+            -- Multiple approaches for Windows to hide console windows
+            
+            -- Method 1: Use cmd /c with null redirection (most compatible)
+            final_command = 'cmd /c "' .. command .. '" >nul 2>nul'
+            
+            -- Method 2: Try PowerShell with hidden window (if you want to use this instead)
+            -- final_command = 'powershell -WindowStyle Hidden -ExecutionPolicy Bypass -Command "& {' .. command .. '}" 2>$null'
+            
+            -- Method 3: Use start with minimized window (another option)
+            -- final_command = 'start /min /wait cmd /c "' .. command .. '" >nul 2>nul'
+            
+        else
+            -- Unix/Linux/macOS: just redirect stderr
+            final_command = command .. ' 2>/dev/null'
+        end
+        
+        local handle = io.popen(final_command)
+        if handle then
+            local output = handle:read("*a")
+            local success, _, exit_code = handle:close()
+            result = output
+            if success or exit_code == 0 then
+                break
+            end
+        end
+        attempt = attempt + 1
+    end
+
+    return result
+end
+
 
 function Curl:_parse_response(raw)
     if self.verbose then
@@ -7574,14 +7674,80 @@ function Curl:_parse_response(raw)
     }
 end
 
+-- Enhanced Curl wrapper with request tracking for debugging
 function Curl:request(method, url, data)
+    -- TRACK ALL INTERNET REQUESTS
+    local start_time = os.clock()
+    local request_id = math.random(1000, 9999)
+    
+    -- Log request start with warning level for visibility
+    local log_message = "🌐 HTTP " .. method .. " → " .. url
+    if data and #data > 0 then
+        log_message = log_message .. " (data: " .. #data .. " bytes)"
+    end
+    log_message = log_message .. " [ID:" .. request_id .. "]"
+    
+    vlc.msg.warn("[VLSub Request] " .. log_message)
+    
+    -- Also add to debug log if available
+    if debug_log_rows and #debug_log_rows > 0 then
+        append_debug_log("🌐 " .. method .. " " .. url .. " [" .. request_id .. "]")
+    end
+    
+    -- Build and execute the command
     local cmd = self:_build_command(method, url, data)
     if self.verbose then
-        print("[curl_wrapper] Executing command: " .. cmd)
+        vlc.msg.warn("[VLSub Request] Executing: " .. cmd)
     end
+    
     local raw = self:_execute_command(cmd)
-    return self:_parse_response(raw)
+    local response = self:_parse_response(raw)
+    
+    -- Calculate request duration
+    local end_time = os.clock()
+    local duration_ms = math.floor((end_time - start_time) * 1000)
+    
+    -- Log response with status and timing
+    local response_log = "📡 HTTP " .. method .. " ← " .. url
+    if response.status then
+        response_log = response_log .. " (status: " .. response.status .. ")"
+    else
+        response_log = response_log .. " (status: FAILED)"
+    end
+    response_log = response_log .. " in " .. duration_ms .. "ms [ID:" .. request_id .. "]"
+    
+    if response.body and #response.body > 0 then
+        response_log = response_log .. " (response: " .. #response.body .. " bytes)"
+    end
+    
+    vlc.msg.warn("[VLSub Response] " .. response_log)
+    
+    -- Add response to debug log with status indicator
+    if debug_log_rows and #debug_log_rows > 0 then
+        local status_icon = "✅"
+        if not response.status or response.status >= 400 then
+            status_icon = "❌"
+        elseif response.status >= 300 then
+            status_icon = "⚠️"
+        end
+        append_debug_log(status_icon .. " " .. (response.status or "FAIL") .. " " .. duration_ms .. "ms [" .. request_id .. "]")
+    end
+    
+    -- Log any errors or unusual responses
+    if not response.status then
+        vlc.msg.err("[VLSub Error] No response status for " .. url .. " [ID:" .. request_id .. "]")
+    elseif response.status >= 400 then
+        vlc.msg.err("[VLSub Error] HTTP " .. response.status .. " for " .. url .. " [ID:" .. request_id .. "]")
+        if response.body and #response.body < 500 then
+            vlc.msg.err("[VLSub Error] Error body: " .. response.body)
+        end
+    elseif response.status >= 300 then
+        vlc.msg.warn("[VLSub Redirect] HTTP " .. response.status .. " for " .. url .. " [ID:" .. request_id .. "]")
+    end
+    
+    return response
 end
+
 
 function Curl:get(url)
     return self:request("GET", url)
