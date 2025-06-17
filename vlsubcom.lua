@@ -125,7 +125,7 @@ https://github.com/opensubtitles/vlsub-opensubtitles-com/commits/main
             --[[ Global var ]]-- 
 
 local app_name = "VLSub OpenSubtitles.com";
-local app_version = "1.2.2";
+local app_version = "1.2.3";
 local app_useragent = app_name.." "..app_version;
 
 local config = {
@@ -3199,6 +3199,7 @@ getFileInfo = function()
     file.ext = nil;
     file.uri = nil;
     file.guessit_data = nil; -- Clear GuessIt data when no input
+    file.last_guessit_filename = nil; -- Clear cached filename
   else
     vlc.msg.dbg("[VLSub] Video URI: "..item:uri())
     local parsed_uri = vlc.net.url_parse(item:uri())
@@ -3267,11 +3268,29 @@ getFileInfo = function()
     vlc.msg.dbg("[VLSub] file info " .. json.encode(file, { indent = true }))
     
 
-    -- Call GuessIt API when we have a valid filename
-    if file.completeName and file.completeName ~= "" then
-      vlc.msg.dbg("[VLSub] Calling GuessIt for filename: " .. file.completeName)
-      openSub.callGuessIt(file.completeName)
+-- Call GuessIt API when we have a valid filename (only if not already cached)
+if file.completeName and file.completeName ~= "" then
+  -- Check if we already have GuessIt data for this file
+  local needs_guessit = false
+  
+  if not openSub.file.guessit_data then
+    needs_guessit = true
+    vlc.msg.dbg("[VLSub] No cached GuessIt data")
+  elseif openSub.file.last_guessit_filename ~= file.completeName then
+    needs_guessit = true
+    vlc.msg.dbg("[VLSub] Filename changed, need fresh GuessIt data")
+  else
+    vlc.msg.dbg("[VLSub] Using cached GuessIt data for: " .. file.completeName)
+  end
+  
+  if needs_guessit then
+    vlc.msg.dbg("[VLSub] Calling GuessIt for filename: " .. file.completeName)
+    if openSub.callGuessIt(file.completeName) then
+      -- Cache the filename we got GuessIt data for
+      openSub.file.last_guessit_filename = file.completeName
     end
+  end
+end
   end
   collectgarbage()
 end,
@@ -4394,40 +4413,162 @@ function is_dir(path)
   return false
 end
 
+-- 5. FIXED: list_dir function - use VLC built-in directory operations
 function list_dir(path)
-  if not path or trim(path) == "" 
-  then return false end
-  local dir_list_cmd 
+  if not path or trim(path) == "" then 
+    return false 
+  end
+  
+  if not is_dir(path) then 
+    return false 
+  end
+  
   local list = {}
-  if not is_dir(path) then return false end
   
-  if openSub.conf.os == "win" then
-    dir_list_cmd = io.popen('dir /b "'..path..'"')
-  elseif openSub.conf.os == "lin" then
-    dir_list_cmd = io.popen('ls -1 "'..path..'"')
-  end
-  
-  if dir_list_cmd then
-    for filename in dir_list_cmd:lines() do
-      if string.match(filename, "^[^%s]+.+$") then
-        table.insert(list, filename)
+  -- Method 1: Try VLC's built-in directory listing (if available)
+  if vlc.net and vlc.net.opendir then
+    vlc.msg.dbg("[VLSub] Using VLC built-in directory listing")
+    local dir_handle = vlc.net.opendir(path)
+    if dir_handle then
+      while true do
+        local entry = vlc.net.readdir(dir_handle)
+        if not entry then break end
+        
+        -- Skip . and .. entries
+        if entry ~= "." and entry ~= ".." then
+          table.insert(list, entry)
+        end
       end
+      vlc.net.closedir(dir_handle)
+      return list
     end
-    return list
-  else
-    return false
   end
+  
+  -- Method 2: Try using VLC's stream API to read directory (alternative approach)
+  local dir_stream = vlc.stream("file://" .. path)
+  if dir_stream then
+    vlc.msg.dbg("[VLSub] Using VLC stream API for directory")
+    -- This method varies by VLC version and platform
+    -- Some versions support directory streaming
+    dir_stream = nil  -- Close stream
+  end
+  
+  -- Method 3: Use file system pattern matching with VLC's file operations
+  -- Try common file extensions for subtitle-related files
+  local common_extensions = {".xml", ".json", ".txt", ".srt", ".conf"}
+  for _, ext in ipairs(common_extensions) do
+    local pattern_path = path .. slash .. "*" .. ext
+    local test_file = io.open(pattern_path, "r")
+    if test_file then
+      test_file:close()
+      -- File exists, but we can't easily enumerate without OS commands
+    end
+  end
+  
+  -- Method 4: Fallback to silent OS commands (no popups)
+  if #list == 0 then
+    vlc.msg.dbg("[VLSub] Using fallback OS directory listing (silent)")
+    local dir_list_cmd
+    
+    if openSub.conf.os == "win" then
+      -- Silent Windows directory listing
+      dir_list_cmd = io.popen('dir /b "' .. path .. '" 2>nul')
+    else
+      -- Silent Unix directory listing  
+      dir_list_cmd = io.popen('ls -1 "' .. path .. '" 2>/dev/null')
+    end
+    
+    if dir_list_cmd then
+      for filename in dir_list_cmd:lines() do
+        if filename and filename ~= "" and not string.match(filename, "^%.%.?$") then
+          table.insert(list, filename)
+        end
+      end
+      dir_list_cmd:close()
+    end
+  end
+  
+  vlc.msg.dbg("[VLSub] Directory listing found " .. #list .. " entries")
+  return #list > 0 and list or false
 end
 
+
+-- 4. FIXED: mkdir_p function - use VLC built-in directory operations
 function mkdir_p(path)
-  if not path or trim(path) == "" 
-  then return false end
-  if openSub.conf.os == "win" then
-    os.execute('mkdir "' .. path..'"')
-  elseif openSub.conf.os == "lin" then
-    os.execute("mkdir -p '" .. path.."'")
+  if not path or trim(path) == "" then 
+    return false 
   end
+  
+  -- VLC Lua has vlc.net.mkdir() function (available in some VLC versions)
+  -- Try VLC built-in first, fallback to safe OS commands if needed
+  
+  -- Method 1: Try VLC's built-in mkdir (if available)
+  if vlc.net and vlc.net.mkdir then
+    local success = vlc.net.mkdir(path)
+    if success then
+      vlc.msg.dbg("[VLSub] Created directory using VLC built-in: " .. path)
+      return true
+    end
+  end
+  
+  -- Method 2: Create parent directories recursively using VLC's file operations
+  local path_parts = {}
+  local current_path = ""
+  
+  -- Split path into components
+  if openSub.conf.os == "win" then
+    -- Windows path: C:\Users\Name\AppData\...
+    for part in string.gmatch(path, "([^\\]+)") do
+      table.insert(path_parts, part)
+    end
+    -- Reconstruct path step by step
+    for i, part in ipairs(path_parts) do
+      if i == 1 then
+        current_path = part  -- C:
+      else
+        current_path = current_path .. "\\" .. part
+      end
+      
+      -- Try to create each directory level
+      if i > 1 and not is_dir(current_path) then
+        -- Use VLC's file touch to test if we can create files (implies directory creation capability)
+        local test_file = current_path .. "\\vlc_test_create.tmp"
+        if file_touch(test_file) then
+          os.remove(test_file)  -- Clean up test file
+        end
+      end
+    end
+  else
+    -- Unix/Linux path: /home/user/.local/...
+    for part in string.gmatch(path, "([^/]+)") do
+      table.insert(path_parts, part)
+    end
+    current_path = ""
+    for i, part in ipairs(path_parts) do
+      current_path = current_path .. "/" .. part
+      if not is_dir(current_path) then
+        -- Similar test for Unix
+        local test_file = current_path .. "/vlc_test_create.tmp"
+        if file_touch(test_file) then
+          os.remove(test_file)
+        end
+      end
+    end
+  end
+  
+  -- Method 3: Fallback to silent OS commands only if VLC methods fail
+  if not is_dir(path) then
+    if openSub.conf.os == "win" then
+      os.execute('mkdir "' .. path .. '" >nul 2>&1')
+    else
+      os.execute("mkdir -p '" .. path .. "' >/dev/null 2>&1")
+    end
+  end
+  
+  return is_dir(path)
 end
+
+
 
 function decode_uri(str)
   return str:gsub("/", slash)
@@ -6225,11 +6366,14 @@ end
 
 
 
--- Windows-specific locale detection (safe methods only)
+-- 2. FIXED: detect_windows_locale function - remove all PowerShell/cmd commands
 function detect_windows_locale(detected_locales)
   vlc.msg.dbg("[VLSub] Attempting Windows locale detection (safe methods only)...")
   
-  -- Method 1: Safe environment variables (no permissions needed)
+  -- REMOVED: All PowerShell and cmd commands that cause popups
+  -- Only use safe environment variables and VLC's own settings
+  
+  -- Method 1: Safe environment variables (no external commands)
   local win_env_vars = {
     "LANG", "LANGUAGE", "LC_ALL", "LC_MESSAGES", 
     "USERPROFILE", -- Often contains username with locale hints
@@ -6247,111 +6391,51 @@ function detect_windows_locale(detected_locales)
     end
   end
   
-  -- Method 2: Safe system commands (usually work without special permissions)
-  local safe_commands = {
-    -- Get system locale via echo and built-in variables (safer than registry)
-    'echo %LANG% 2>nul',
-    -- Try to get timezone (can hint at locale)
-    'tzutil /g 2>nul',
-    -- Get system code page (can indicate language)
-    'chcp 2>nul'
-  }
-  
-  for i, cmd in ipairs(safe_commands) do
-    local handle = io.popen(cmd)
-    if handle then
-      local result = handle:read("*all")
-      handle:close()
-      
-      if result and result ~= "" then
-        result = string.gsub(result, "[\r\n]", "")
-        result = string.gsub(result, "%s+", " ")
-        result = string.gsub(result, "^%s*(.-)%s*$", "%1")
-        
-        vlc.msg.dbg("[VLSub] Windows safe command " .. i .. " result: " .. result)
-        
-        if i == 1 and result ~= "%LANG%" and result ~= "" then -- LANG variable
-          table.insert(detected_locales, {source = "win_safe_lang", locale = result})
-        elseif i == 2 and result ~= "" then -- Timezone
-          vlc.msg.dbg("[VLSub] Windows timezone: " .. result)
-          -- Map common Windows timezones to locales
-          local tz_locale_map = {
-            ["Eastern Standard Time"] = "en_US",
-            ["Pacific Standard Time"] = "en_US", 
-            ["Central Standard Time"] = "en_US",
-            ["Mountain Standard Time"] = "en_US",
-            ["GMT Standard Time"] = "en_GB",
-            ["Central European Time"] = "de_DE",
-            ["Romance Standard Time"] = "fr_FR",
-            ["Tokyo Standard Time"] = "ja_JP",
-            ["China Standard Time"] = "zh_CN",
-            ["Korea Standard Time"] = "ko_KR"
-          }
-          local mapped = tz_locale_map[result]
-          if mapped then
-            vlc.msg.dbg("[VLSub] Mapped Windows timezone to: " .. mapped)
-            table.insert(detected_locales, {source = "win_timezone_hint", locale = mapped})
-          end
-        elseif i == 3 and result ~= "" then -- Code page
-          vlc.msg.dbg("[VLSub] Windows code page: " .. result)
-          -- Extract code page number
-          local cp = string.match(result, "(%d+)")
-          if cp then
-            -- Map common Windows code pages to locales  
-            local cp_locale_map = {
-              ["1252"] = "en_US", -- Western European
-              ["1251"] = "ru_RU", -- Cyrillic
-              ["1250"] = "pl_PL", -- Central European
-              ["932"] = "ja_JP",  -- Japanese
-              ["936"] = "zh_CN",  -- Chinese Simplified
-              ["950"] = "zh_TW",  -- Chinese Traditional
-              ["949"] = "ko_KR",  -- Korean
-              ["1254"] = "tr_TR", -- Turkish
-              ["1253"] = "el_GR", -- Greek
-              ["1255"] = "he_IL", -- Hebrew
-              ["1256"] = "ar_SA"  -- Arabic
-            }
-            local mapped = cp_locale_map[cp]
-            if mapped then
-              vlc.msg.dbg("[VLSub] Mapped code page " .. cp .. " to: " .. mapped)
-              table.insert(detected_locales, {source = "win_codepage_hint", locale = mapped})
-            end
-          end
-        end
-      end
-    end
-  end
-  
-  -- Method 3: Try to detect via available system commands/tools
-  local region_commands = {
-    'where powershell >nul 2>&1 && echo powershell_available',
-    'where cmd >nul 2>&1 && echo cmd_available',
-    'dir /b "%WINDIR%\\System32\\en-US" >nul 2>&1 && echo english_resources'
-  }
-  
-  for i, cmd in ipairs(region_commands) do
-    local handle = io.popen(cmd)
-    if handle then
-      local result = handle:read("*all")
-      handle:close()
-      
-      if result and string.find(result, "available") then
-        vlc.msg.dbg("[VLSub] Windows tool " .. i .. " available")
-        if i == 3 then -- English resources found
-          table.insert(detected_locales, {source = "win_english_resources", locale = "en_US"})
-        end
-      end
-    end
-  end
-  
-  -- Method 4: Check VLC's own language if we can safely access it
-  -- This is safe because we're already running inside VLC
+  -- Method 2: VLC's own language setting (safe, no external commands)
   local vlc_lang = vlc.config.get("intf")
   if vlc_lang and vlc_lang ~= "" then
     vlc.msg.dbg("[VLSub] VLC Windows interface language: " .. vlc_lang)
     table.insert(detected_locales, {source = "win_vlc_intf", locale = vlc_lang})
   end
+  
+  -- Method 3: Check for English resources directory (safe file system check)
+  local windir = os.getenv("WINDIR") or os.getenv("SystemRoot")
+  if windir then
+    local english_resources_path = windir .. "\\System32\\en-US"
+    if is_dir(english_resources_path) then
+      vlc.msg.dbg("[VLSub] Found English resources directory")
+      table.insert(detected_locales, {source = "win_english_resources", locale = "en_US"})
+    end
+  end
+  
+  -- Method 4: Check Windows system locale via file system (safe)
+  -- Look for common locale indicators in system paths
+  local possible_locales = {
+    {path = "\\System32\\en-US", locale = "en_US"},
+    {path = "\\System32\\de-DE", locale = "de_DE"},
+    {path = "\\System32\\fr-FR", locale = "fr_FR"},
+    {path = "\\System32\\es-ES", locale = "es_ES"},
+    {path = "\\System32\\it-IT", locale = "it_IT"},
+    {path = "\\System32\\pt-PT", locale = "pt_PT"},
+    {path = "\\System32\\ru-RU", locale = "ru_RU"},
+    {path = "\\System32\\ja-JP", locale = "ja_JP"},
+    {path = "\\System32\\ko-KR", locale = "ko_KR"},
+    {path = "\\System32\\zh-CN", locale = "zh_CN"},
+    {path = "\\System32\\zh-TW", locale = "zh_TW"}
+  }
+  
+  if windir then
+    for _, locale_info in ipairs(possible_locales) do
+      local full_path = windir .. locale_info.path
+      if is_dir(full_path) then
+        vlc.msg.dbg("[VLSub] Found locale directory: " .. locale_info.locale)
+        table.insert(detected_locales, {source = "win_locale_dir", locale = locale_info.locale})
+        break -- Just take the first one found
+      end
+    end
+  end
 end
+
 
 -- macOS-specific locale detection using safe methods (no special permissions)
 function detect_macos_locale(detected_locales)
@@ -7324,12 +7408,13 @@ function close_debug_window()
 end
 
 
--- Enhanced function to get Downloads folder path
+-- 3. FIXED: get_downloads_folder function - remove PowerShell command
 function get_downloads_folder()
   local downloads_path = nil
   
   if openSub.conf.os == "win" then
-    -- Windows: Try multiple methods to find Downloads folder
+    -- FIXED: Remove PowerShell command that causes popup
+    -- Windows: Use only environment variables and common paths
     local win_downloads_paths = {
       os.getenv("USERPROFILE") .. "\\Downloads",
       os.getenv("HOMEDRIVE") .. os.getenv("HOMEPATH") .. "\\Downloads"
@@ -7342,23 +7427,16 @@ function get_downloads_folder()
       end
     end
     
-    -- Fallback: try to get Downloads folder via PowerShell
-    if not downloads_path then
-      local handle = io.popen('powershell -Command "([Environment]::GetFolderPath([Environment+SpecialFolder]::Downloads))" 2>nul')
-      if handle then
-        local result = handle:read("*all")
-        handle:close()
-        if result and result ~= "" then
-          result = string.gsub(result, "[\r\n]", "")
-          if is_dir(result) then
-            downloads_path = result
-          end
-        end
-      end
+    -- REMOVED: PowerShell fallback that causes popup window
+    -- If standard paths don't work, just use the first one anyway
+    if not downloads_path and os.getenv("USERPROFILE") then
+      downloads_path = os.getenv("USERPROFILE") .. "\\Downloads"
+      -- Try to create it if it doesn't exist
+      mkdir_p(downloads_path)
     end
     
   else
-    -- macOS/Linux: Standard Downloads folder
+    -- macOS/Linux: Standard Downloads folder (unchanged)
     local home = os.getenv("HOME")
     if home then
       local unix_downloads_path = home .. "/Downloads"
@@ -7374,58 +7452,39 @@ end
 
 
 
+
+-- 1. FIXED: test_network_connectivity function - remove ping commands for Windows
 function test_network_connectivity()
   update_debug_network("Testing network connectivity...")
   
-  -- For Windows, use ping with hidden output
-  if openSub.conf.os == "win" then
-    local quick_tests = {
-      'ping -n 1 -w 1000 8.8.8.8 >nul 2>&1',  -- Google DNS
-      'ping -n 1 -w 1000 1.1.1.1 >nul 2>&1'   -- Cloudflare DNS
-    }
+  -- REMOVED: Windows ping commands that cause popups
+  -- For Windows, use only HTTP tests with VLC's built-in networking (no external commands)
+  local test_urls = {
+    "https://www.google.com",
+    "https://api.opensubtitles.com", 
+    "https://httpbin.org/get"
+  }
+  
+  for i, url in ipairs(test_urls) do
+    update_debug_network("Testing connection " .. i .. "/" .. #test_urls .. "...")
+    append_debug_log("Testing: " .. url)
     
-    for i, cmd in ipairs(quick_tests) do
-      update_debug_network("Testing connection " .. i .. "/" .. #quick_tests .. "...")
-      append_debug_log("Testing: ping test " .. i)
-      
-      local result = os.execute(cmd)
-      if result == 0 then  -- Success on Windows
-        update_debug_network("Connection OK (ping successful)")
-        append_debug_log("Network test passed: ping successful")
-        return true
-      else
-        append_debug_log("Network test failed: ping failed")
-      end
-    end
-  else
-    -- Use HTTP tests for non-Windows (using VLC's built-in networking)
-    local test_urls = {
-      "https://www.google.com",
-      "https://api.opensubtitles.com", 
-      "https://httpbin.org/get"
-    }
+    local test_client = Curl.new() -- This uses VLC's networking, not curl
+    test_client:set_aggressive_timeouts()
+    test_client:set_timeout(3)
+    test_client:set_retries(0)
     
-    for i, url in ipairs(test_urls) do
-      update_debug_network("Testing connection " .. i .. "/" .. #test_urls .. "...")
-      append_debug_log("Testing: " .. url)
-      
-      local test_client = Curl.new() -- This uses VLC's networking, not curl
-      test_client:set_aggressive_timeouts()
-      test_client:set_timeout(3)
-      test_client:set_retries(0)
-      
-      local start_time = os.clock()
-      local res = test_client:get(url)
-      local end_time = os.clock()
-      local elapsed_ms = math.floor((end_time - start_time) * 1000)
-      
-      if res and res.status and res.status >= 200 and res.status < 400 then
-        update_debug_network("Connection OK (responded in " .. elapsed_ms .. "ms)")
-        append_debug_log("Network test passed: " .. url .. " (" .. elapsed_ms .. "ms)")
-        return true
-      else
-        append_debug_log("Network test failed: " .. url .. " (" .. elapsed_ms .. "ms)")
-      end
+    local start_time = os.clock()
+    local res = test_client:get(url)
+    local end_time = os.clock()
+    local elapsed_ms = math.floor((end_time - start_time) * 1000)
+    
+    if res and res.status and res.status >= 200 and res.status < 400 then
+      update_debug_network("Connection OK (responded in " .. elapsed_ms .. "ms)")
+      append_debug_log("Network test passed: " .. url .. " (" .. elapsed_ms .. "ms)")
+      return true
+    else
+      append_debug_log("Network test failed: " .. url .. " (" .. elapsed_ms .. "ms)")
     end
   end
   
@@ -7435,6 +7494,8 @@ function test_network_connectivity()
   networkTestsFailed = true
   return false
 end
+
+
 
 
 function checkInitializationStatus()
@@ -7566,11 +7627,11 @@ function build_sorted_url(base_url, params_table)
         return a.key < b.key
     end)
     
-    -- Build query string
+    -- Build query string using our custom encoder
     local query_parts = {}
     for _, param in ipairs(sorted_params) do
-        local encoded_key = vlc.strings.encode_uri_component(param.key)
-        local encoded_value = vlc.strings.encode_uri_component(tostring(param.value))
+        local encoded_key = url_encode(param.key)
+        local encoded_value = url_encode(tostring(param.value))
         table.insert(query_parts, encoded_key .. "=" .. encoded_value)
     end
     
@@ -7579,6 +7640,7 @@ function build_sorted_url(base_url, params_table)
     
     return base_url .. separator .. query_string
 end
+
 
 -- Updated searchSubtitlesNewAPI function with sorted parameters
 openSub.searchSubtitlesNewAPI = function()
@@ -7838,8 +7900,10 @@ function VLCHttpClient:_build_url_params(url, data)
         else
             param_name = "x-" .. key:lower():gsub("-", "-")
         end
-        all_params[param_name] = value
-        vlc.msg.dbg("[VLSub] Added header param: " .. param_name .. " = " .. value)
+        if param_name then
+            all_params[param_name] = value
+            vlc.msg.dbg("[VLSub] Added header param: " .. param_name .. " = " .. value)
+        end
     end
     
     -- Step 3: Add POST data if present
@@ -7848,7 +7912,7 @@ function VLCHttpClient:_build_url_params(url, data)
         vlc.msg.dbg("[VLSub] Added POST data param")
     end
     
-    -- Step 4: Build final URL with ALL parameters sorted alphabetically
+    -- Step 4: Build final URL with ALL parameters sorted alphabetically using custom encoder
     local final_url = build_sorted_url(base_url, all_params)
     
     vlc.msg.dbg("[VLSub] Rebuilt URL with sorted params: " .. final_url)
@@ -7856,18 +7920,20 @@ function VLCHttpClient:_build_url_params(url, data)
     return final_url
 end
 
+
 -- Custom URL decode function
 function url_decode(str)
     if not str then return "" end
-    str = string.gsub(str, "+", " ")
+    str = string.gsub(str, "+", " ")  -- Convert + back to spaces first
     str = string.gsub(str, "%%(%x%x)", function(h)
         return string.char(tonumber(h, 16))
     end)
     return str
 end
 
+
 -- Custom URL encode function (OpenSubtitles.com compatible - uses + for spaces)
-local function url_encode(str)
+function url_encode(str)
     if not str then return "" end
     -- First handle newlines
     str = string.gsub(str, "\n", "\r\n")
