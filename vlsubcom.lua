@@ -125,7 +125,7 @@ https://github.com/opensubtitles/vlsub-opensubtitles-com/commits/main
             --[[ Global var ]]-- 
 
 local app_name = "VLSub OpenSubtitles.com";
-local app_version = "1.2.1";
+local app_version = "1.2.2";
 local app_useragent = app_name.." "..app_version;
 
 local config = {
@@ -5210,6 +5210,9 @@ end
 
 -- Enhanced download_subtitles_v2 function with better no-video handling
 function download_subtitles_v2()
+  -- Refresh file info to get current playing item's directory
+  openSub.getFileInfo()
+  
   -- Check if we have any results first
   local hasResults = false
   
