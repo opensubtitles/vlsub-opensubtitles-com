@@ -50,7 +50,19 @@ curl -sSL https://raw.githubusercontent.com/opensubtitles/vlsub-opensubtitles-co
 Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser; iwr -useb https://raw.githubusercontent.com/opensubtitles/vlsub-opensubtitles-com/main/scripts/install.ps1 | iex
 ```
 
-### Method 2: Manual Installation
+### Method 2: Arch User Repository (Arch Linux)
+
+**With paru:**
+```bash
+paru -S vlsub-opensubtitles-com-git
+```
+
+**With yay:**
+```bash
+yay -S vlsub-opensubtitles-com-git
+```
+
+### Method 3: Manual Installation
 
 1. **Download** the latest `vlsubcom.lua` from [Releases](https://github.com/opensubtitles/vlsub-opensubtitles-com/releases)
 2. **Copy** to your VLC extensions directory:
