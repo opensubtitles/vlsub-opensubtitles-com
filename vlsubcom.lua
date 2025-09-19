@@ -125,7 +125,7 @@ https://github.com/opensubtitles/vlsub-opensubtitles-com/commits/main
             --[[ Global var ]]-- 
 
 local app_name = "VLSub OpenSubtitles.com";
-local app_version = "1.2.2";
+local app_version = "1.2.3";
 local app_useragent = app_name.." "..app_version;
 
 local config = {
@@ -429,6 +429,10 @@ local previous_window = "main" -- Default to main window
 
 -- Add global variable to track authentication status
 local is_authenticated = false
+
+-- Add global variables for dual-screen dialog sizing support
+local dual_screen_detected = nil  -- nil = not detected yet, true/false = detected
+local dialog_sizing_applied = false
 
 local debug_dlg = nil
 local initialization_complete = false
@@ -894,8 +898,8 @@ function show_update_dialog(latest_version, release_notes, download_url)
   
   -- Close current dialog and show update dialog
   close_dlg()
-  
-  dlg = vlc.dialog("VLSub Update Available - " .. latest_version)
+
+  dlg = create_sized_dialog("VLSub Update Available - " .. latest_version)
   
   -- Row 1: Update notification header with link and version info in compact format
   dlg:add_label("<a href='https://github.com/opensubtitles/vlsub-opensubtitles-com'><b>VLSub Update Available</b></a> (" .. update_config.current_version .. " => " .. latest_version .. ")", 1, 1, 6, 1)
@@ -963,7 +967,7 @@ function show_update_dialog(latest_version, release_notes, download_url)
   end, 5, 15, 1, 1)
   
   if dlg then
-    dlg:show()
+    show_dialog_with_sizing_fix(dlg)
   end
 end
 
@@ -1598,6 +1602,14 @@ end
 
 -- Modified interface_main function - update the help button to pass window context
 function interface_main()
+  -- Apply dual-screen layout adjustments if detected
+  if detect_dual_screen_linux() then
+    vlc.msg.dbg("[VLSub] Applying dual-screen layout constraints")
+    -- Add invisible spacer columns to constrain window width
+    dlg:add_label("", 7, 1, 1, 1) -- Column 7 spacer
+    dlg:add_label("", 8, 1, 1, 1) -- Column 8 spacer
+  end
+
   -- Row 1: Title field and Search by Hash button
   dlg:add_label(lang["int_title"]..":", 1, 1, 1, 1)
   input_table['title'] = dlg:add_text_input(
@@ -1668,6 +1680,14 @@ function interface_main()
 end
 
 function interface_config()
+  -- Apply dual-screen layout adjustments if detected
+  if detect_dual_screen_linux() then
+    vlc.msg.dbg("[VLSub] Applying dual-screen config layout constraints")
+    -- Add invisible spacer columns to constrain window width
+    dlg:add_label("", 5, 1, 1, 1) -- Column 5 spacer
+    dlg:add_label("", 6, 1, 1, 1) -- Column 6 spacer
+  end
+
   -- Row 1: OpenSubtitles username
   dlg:add_label(lang["int_os_username"]..":", 1, 1, 1, 1)
   input_table['os_username'] = dlg:add_text_input(
@@ -1772,6 +1792,14 @@ end
 
 -- Modified interface_help function with improved content
 function interface_help()
+  -- Apply dual-screen layout adjustments if detected
+  if detect_dual_screen_linux() then
+    vlc.msg.dbg("[VLSub] Applying dual-screen help layout constraints")
+    -- Add invisible spacer columns to constrain window width
+    dlg:add_label("", 7, 1, 1, 1) -- Column 7 spacer
+    dlg:add_label("", 8, 1, 1, 1) -- Column 8 spacer
+  end
+
   -- Row 1: Search Methods
   dlg:add_label("SEARCH METHODS:", 1, 1, 6, 1)
   dlg:add_label("Hash Search: Uses video file fingerprint for exact matches", 1, 2, 6, 1)
@@ -1817,24 +1845,120 @@ function interface_help()
 end
 
 
+-- Function to detect dual-screen setup and Linux environment
+function detect_dual_screen_linux()
+  if dual_screen_detected ~= nil then
+    return dual_screen_detected -- Return cached result
+  end
+
+  dual_screen_detected = false
+
+  -- Only run detection on Linux
+  if openSub.conf.os ~= "linux" then
+    vlc.msg.dbg("[VLSub] Not Linux - skipping dual-screen detection")
+    return false
+  end
+
+  vlc.msg.dbg("[VLSub] Detecting dual-screen setup on Linux...")
+
+  -- Check for X11 environment variables that indicate dual screen
+  local display = os.getenv("DISPLAY") or ""
+  local xdg_session_type = os.getenv("XDG_SESSION_TYPE") or ""
+
+  -- Basic detection based on common dual-screen indicators
+  if display ~= "" and (string.find(display, ":") or string.find(display, ".")) then
+    vlc.msg.dbg("[VLSub] X11 display detected: " .. display)
+
+    -- Try to detect screen information via xrandr (common on Linux)
+    local xrandr_result = ""
+    pcall(function()
+      local handle = io.popen("xrandr --query 2>/dev/null | grep ' connected' | wc -l")
+      if handle then
+        xrandr_result = handle:read("*a") or ""
+        handle:close()
+
+        local screen_count = tonumber(xrandr_result:match("%d+"))
+        if screen_count and screen_count > 1 then
+          vlc.msg.dbg("[VLSub] Dual-screen detected via xrandr: " .. screen_count .. " screens")
+          dual_screen_detected = true
+        end
+      end
+    end)
+  end
+
+  -- Fallback detection methods
+  if not dual_screen_detected then
+    -- Check if we're in KDE (mentioned in the bug report)
+    local kde_env = os.getenv("KDE_SESSION_VERSION") or os.getenv("KDE_FULL_SESSION") or ""
+    if kde_env ~= "" then
+      vlc.msg.dbg("[VLSub] KDE desktop environment detected")
+      -- In KDE, assume potential dual-screen issues
+      dual_screen_detected = true
+    end
+  end
+
+  if dual_screen_detected then
+    vlc.msg.dbg("[VLSub] Dual-screen Linux setup detected - will apply dialog sizing fixes")
+  else
+    vlc.msg.dbg("[VLSub] Single screen or non-problematic setup detected")
+  end
+
+  return dual_screen_detected
+end
+
+-- Function to create a dialog with dual-screen sizing awareness
+function create_sized_dialog(title)
+  local dialog = vlc.dialog(title)
+
+  -- Apply sizing fixes if dual-screen Linux is detected
+  if detect_dual_screen_linux() and dialog then
+    vlc.msg.dbg("[VLSub] Applying dual-screen dialog sizing fix")
+    dialog_sizing_applied = true
+
+    -- Note: VLC Lua dialog API doesn't have direct size control, but we can
+    -- influence sizing through strategic layout constraints in interface functions
+  end
+
+  return dialog
+end
+
+-- Enhanced dialog display function with dual-screen awareness
+function show_dialog_with_sizing_fix(dialog)
+  if not dialog then
+    return
+  end
+
+  if detect_dual_screen_linux() then
+    vlc.msg.dbg("[VLSub] Showing dialog with dual-screen sizing awareness")
+
+    -- Small delay to let layout settle before showing
+    local start_time = os.clock()
+    while (os.clock() - start_time) < 0.05 do
+      -- Brief 50ms delay
+    end
+  end
+
+  dialog:show()
+end
+
 function trigger_menu(dlg_id)
   if dlg_id == 1 then
     close_dlg()
-    dlg = vlc.dialog(
+    dlg = create_sized_dialog(
       openSub.conf.useragent)
     interface_main()
   elseif dlg_id == 2 then
     close_dlg()
-    dlg = vlc.dialog(
+    dlg = create_sized_dialog(
       openSub.conf.useragent..': '..lang["int_configuration"])
     interface_config()
   elseif dlg_id == 3 then
     close_dlg()
-    dlg = vlc.dialog(
+    dlg = create_sized_dialog(
       openSub.conf.useragent..': '..lang["int_help"])
     interface_help()
   end
-  collectgarbage() --~ !important	
+  collectgarbage() --~ !important
 end 
 
 -- Enhanced show_main function with automatic search
@@ -1966,7 +2090,7 @@ function show_debug_window()
   debug_messages = {}
   debug_log_rows = {} -- Array for individual log rows
   
-  debug_dlg = vlc.dialog("VLSub - Initializing...")
+  debug_dlg = create_sized_dialog("VLSub - Initializing...")
   
   -- Create debug interface (6 columns, 16 rows)
   debug_dlg:add_label("VLSub is starting up...", 1, 1, 6, 1)
@@ -2010,7 +2134,7 @@ function show_debug_window()
     vlc.deactivate() 
   end, 4, 16, 2, 1)
   
-  debug_dlg:show()
+  show_dialog_with_sizing_fix(debug_dlg)
   collectgarbage()
 end
 
@@ -2554,10 +2678,10 @@ function check_config()
   lang = options.translation -- just a short cut
   
   if not vlc.net or not vlc.net.poll then
-    dlg = vlc.dialog(
+    dlg = create_sized_dialog(
       openSub.conf.useragent..': '..lang["mess_error"])
     interface_no_support()
-    dlg:show()
+    show_dialog_with_sizing_fix(dlg)
     return false
   end
   
