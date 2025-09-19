@@ -2063,10 +2063,6 @@ function display_select(select_id)
     -- Then add all languages in original order with flags
     for k, l in ipairs(conf) do
       local displayText = l[2] or "" -- language name
-      local flag = getLanguageFlag(l[1]) or ""
-      if flag ~= "" then
-        displayText = displayText .. " " .. flag
-      end
       input_table[select_id]:add_value(displayText, k)
     end
     return
@@ -2077,11 +2073,7 @@ function display_select(select_id)
   for k, l in ipairs(conf) do
     if option and option == l[1] then
       -- Put selected language first with flag
-      local flag = getLanguageFlag(l[1])
       local displayText = l[2] -- language name
-      if flag ~= "" then
-        displayText = displayText .. " " .. flag
-      end
       input_table[select_id]:add_value(displayText, k)
       selected_found = true
       break
@@ -2096,11 +2088,7 @@ function display_select(select_id)
   -- Add all other languages in original order with flags
   for k, l in ipairs(conf) do
     if not option or option ~= l[1] then
-      local flag = getLanguageFlag(l[1])
       local displayText = l[2] -- language name
-      if flag ~= "" then
-        displayText = displayText .. " " .. flag
-      end
       input_table[select_id]:add_value(displayText, k)
     end
   end
@@ -2306,13 +2294,8 @@ end
 
 -- Updated buildSubtitleDisplayText function without language brackets
 function buildSubtitleDisplayText(item, langCode)
-  local flag = getLanguageFlag(langCode)
-
   -- Build display text starting with flag (if available)
   local displayText = ""
-  if flag ~= "" then
-    displayText = flag .. " "
-  end
 
   -- Add filename/release name
   displayText = displayText .. (item.SubFileName or "???")
@@ -5341,199 +5324,6 @@ function debugLanguages()
   for i, lang in ipairs(openSub.conf.languages) do
     vlc.msg.dbg("[VLSub] " .. i .. ": " .. lang[1] .. " = " .. lang[2])
   end
-end
-
-
--- Language code to Unicode flag mapping
-local language_flags = {
-  -- Major languages
-  ["en"] = "🇺🇸", -- English (US flag)
-  ["eng"] = "🇺🇸", -- English
-  ["fr"] = "🇫🇷", -- French
-  ["fre"] = "🇫🇷", -- French
-  ["de"] = "🇩🇪", -- German
-  ["ger"] = "🇩🇪", -- German
-  ["es"] = "🇪🇸", -- Spanish
-  ["spa"] = "🇪🇸", -- Spanish
-  ["it"] = "🇮🇹", -- Italian
-  ["ita"] = "🇮🇹", -- Italian
-  ["pt"] = "🇵🇹", -- Portuguese
-  ["por"] = "🇵🇹", -- Portuguese
-  ["pt-br"] = "🇧🇷", -- Portuguese (Brazil)
-  ["pob"] = "🇧🇷", -- Portuguese (Brazil)
-  ["pt-pt"] = "🇵🇹", -- Portuguese (Portugal)
-  ["ru"] = "🇷🇺", -- Russian
-  ["rus"] = "🇷🇺", -- Russian
-  ["zh"] = "🇨🇳", -- Chinese
-  ["chi"] = "🇨🇳", -- Chinese
-  ["zh-cn"] = "🇨🇳", -- Chinese (Simplified)
-  ["zh-tw"] = "🇹🇼", -- Chinese (Traditional)
-  ["zh-ca"] = "🇭🇰", -- Chinese (Cantonese)
-  ["ja"] = "🇯🇵", -- Japanese
-  ["jpn"] = "🇯🇵", -- Japanese
-  ["ko"] = "🇰🇷", -- Korean
-  ["kor"] = "🇰🇷", -- Korean
-  ["ar"] = "🇸🇦", -- Arabic
-  ["ara"] = "🇸🇦", -- Arabic
-  ["hi"] = "🇮🇳", -- Hindi
-  ["hin"] = "🇮🇳", -- Hindi
-
-  -- European languages
-  ["nl"] = "🇳🇱", -- Dutch
-  ["dut"] = "🇳🇱", -- Dutch
-  ["sv"] = "🇸🇪", -- Swedish
-  ["swe"] = "🇸🇪", -- Swedish
-  ["no"] = "🇳🇴", -- Norwegian
-  ["nor"] = "🇳🇴", -- Norwegian
-  ["da"] = "🇩🇰", -- Danish
-  ["dan"] = "🇩🇰", -- Danish
-  ["fi"] = "🇫🇮", -- Finnish
-  ["fin"] = "🇫🇮", -- Finnish
-  ["pl"] = "🇵🇱", -- Polish
-  ["pol"] = "🇵🇱", -- Polish
-  ["cs"] = "🇨🇿", -- Czech
-  ["cze"] = "🇨🇿", -- Czech
-  ["sk"] = "🇸🇰", -- Slovak
-  ["slo"] = "🇸🇰", -- Slovak
-  ["hu"] = "🇭🇺", -- Hungarian
-  ["hun"] = "🇭🇺", -- Hungarian
-  ["ro"] = "🇷🇴", -- Romanian
-  ["rum"] = "🇷🇴", -- Romanian
-  ["bg"] = "🇧🇬", -- Bulgarian
-  ["bul"] = "🇧🇬", -- Bulgarian
-  ["hr"] = "🇭🇷", -- Croatian
-  ["hrv"] = "🇭🇷", -- Croatian
-  ["sr"] = "🇷🇸", -- Serbian
-  ["scc"] = "🇷🇸", -- Serbian
-  ["bs"] = "🇧🇦", -- Bosnian
-  ["bos"] = "🇧🇦", -- Bosnian
-  ["sl"] = "🇸🇮", -- Slovenian
-  ["slv"] = "🇸🇮", -- Slovenian
-  ["mk"] = "🇲🇰", -- Macedonian
-  ["mac"] = "🇲🇰", -- Macedonian
-  ["me"] = "🇲🇪", -- Montenegrin
-  ["el"] = "🇬🇷", -- Greek
-  ["ell"] = "🇬�", -- Greek
-  ["tr"] = "🇹🇷", -- Turkish
-  ["tur"] = "🇹🇷", -- Turkish
-
-  -- Other European
-  ["is"] = "🇮🇸", -- Icelandic
-  ["ice"] = "🇮🇸", -- Icelandic
-  ["ga"] = "🇮🇪", -- Irish
-  ["gle"] = "🇮🇪", -- Irish
-  ["cy"] = "🏴󠁧󠁢󠁷󠁬󠁳󠁿", -- Welsh
-  ["wel"] = "🏴󠁧󠁢󠁷󠁬󠁳󠁿", -- Welsh
-  ["eu"] = "🏴󠁥󠁳󠁰󠁶󠁿", -- Basque
-  ["baq"] = "🏴󠁥󠁳󠁰󠁶󠁿", -- Basque (using Basque Country flag)
-  ["ca"] = "🏴󠁥󠁳󠁣󠁴󠁿", -- Catalan
-  ["cat"] = "🏴󠁥󠁳󠁣󠁴󠁿", -- Catalan
-  ["gl"] = "🏴󠁥󠁳󠁧󠁡󠁿", -- Galician
-  ["glg"] = "🏴󠁥󠁳󠁧󠁡󠁿", -- Galician
-
-  -- Asian languages
-  ["th"] = "🇹🇭", -- Thai
-  ["tha"] = "🇹🇭", -- Thai
-  ["vi"] = "🇻🇳", -- Vietnamese
-  ["vie"] = "🇻🇳", -- Vietnamese
-  ["id"] = "🇮🇩", -- Indonesian
-  ["ind"] = "🇮🇩", -- Indonesian
-  ["ms"] = "🇲🇾", -- Malay
-  ["may"] = "🇲🇾", -- Malay
-  ["tl"] = "🇵🇭", -- Tagalog
-  ["tgl"] = "🇵🇭", -- Tagalog
-  ["he"] = "🇮🇱", -- Hebrew
-  ["heb"] = "🇮🇱", -- Hebrew
-  ["fa"] = "🇮🇷", -- Persian
-  ["per"] = "🇮🇷", -- Persian
-  ["ur"] = "🇵🇰", -- Urdu
-  ["urd"] = "🇵🇰", -- Urdu
-  ["bn"] = "🇧🇩", -- Bengali
-  ["ben"] = "🇧🇩", -- Bengali
-  ["ta"] = "🇱🇰", -- Tamil
-  ["tam"] = "🇱🇰", -- Tamil
-  ["te"] = "🇮🇳", -- Telugu
-  ["tel"] = "🇮🇳", -- Telugu
-  ["kn"] = "🇮🇳", -- Kannada
-  ["kan"] = "🇮🇳", -- Kannada
-  ["ml"] = "🇮🇳", -- Malayalam
-  ["mal"] = "🇮🇳", -- Malayalam
-  ["mr"] = "🇮🇳", -- Marathi
-  ["mar"] = "🇮🇳", -- Marathi
-
-  -- African languages
-  ["af"] = "🇿🇦", -- Afrikaans
-  ["afr"] = "🇿🇦", -- Afrikaans
-  ["sw"] = "🇰🇪", -- Swahili
-  ["swa"] = "🇰🇪", -- Swahili
-  ["am"] = "🇪🇹", -- Amharic
-  ["amh"] = "🇪🇹", -- Amharic
-  ["so"] = "🇸🇴", -- Somali
-  ["som"] = "🇸🇴", -- Somali
-
-  -- Americas
-  ["ea"] = "🇲🇽", -- Spanish (Latin America)
-  ["sp"] = "🇪🇸", -- Spanish (Spain)
-  ["pm"] = "🇲🇿", -- Portuguese (Mozambique)
-
-  -- Other languages
-  ["eo"] = "🏳️", -- Esperanto (neutral flag)
-  ["epo"] = "🏳️", -- Esperanto
-  ["la"] = "🇻🇦", -- Latin (Vatican)
-  ["lat"] = "🇻🇦", -- Latin
-
-  -- Nordic/Baltic
-  ["et"] = "🇪🇪", -- Estonian
-  ["est"] = "🇪🇪", -- Estonian
-  ["lv"] = "🇱🇻", -- Latvian
-  ["lav"] = "🇱🇻", -- Latvian
-  ["lt"] = "🇱🇹", -- Lithuanian
-  ["lit"] = "🇱🇹", -- Lithuanian
-
-  -- Eastern European
-  ["uk"] = "🇺🇦", -- Ukrainian
-  ["ukr"] = "🇺🇦", -- Ukrainian
-  ["be"] = "🇧🇾", -- Belarusian
-  ["bel"] = "🇧🇾", -- Belarusian
-  ["kk"] = "🇰🇿", -- Kazakh
-  ["kaz"] = "🇰🇿", -- Kazakh
-  ["uz"] = "🇺🇿", -- Uzbek
-  ["uzb"] = "🇺🇿", -- Uzbek
-  ["ky"] = "🇰🇬", -- Kyrgyz
-  ["kir"] = "🇰🇬", -- Kyrgyz
-  ["tg"] = "🇹🇯", -- Tajik
-  ["tgk"] = "🇹🇯", -- Tajik
-  ["tm"] = "🇹🇲", -- Turkmen
-  ["tuk"] = "🇹🇲", -- Turkmen
-  ["az"] = "🇦🇿", -- Azerbaijani
-  ["aze"] = "🇦🇿", -- Azerbaijani
-  ["az-az"] = "🇦🇿", -- Azerbaijani
-  ["az-zb"] = "🇦🇿", -- South Azerbaijani
-  ["hy"] = "🇦🇲", -- Armenian
-  ["arm"] = "🇦🇲", -- Armenian
-  ["ka"] = "🇬🇪", -- Georgian
-  ["geo"] = "🇬🇪", -- Georgian
-
-  -- Additional variants
-  ["sq"] = "🇦🇱", -- Albanian
-  ["alb"] = "🇦🇱", -- Albanian
-  ["mt"] = "🇲🇹", -- Maltese
-  ["mlt"] = "🇲🇹", -- Maltese
-  ["mk"] = "🇲🇰", -- Macedonian
-  ["ze"] = "🇨🇳" -- Chinese bilingual
-}
-
--- Function to get flag for language code
-function getLanguageFlag(langCode)
-  if not langCode or langCode == "" then
-    return ""
-  end
-
-  -- Convert to lowercase for matching
-  local code = string.lower(langCode)
-
-  -- Return flag if found, empty string if not
-  return language_flags[code] or ""
 end
 
 
