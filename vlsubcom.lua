@@ -125,7 +125,7 @@ https://github.com/opensubtitles/vlsub-opensubtitles-com/commits/main
             --[[ Global var ]]--
 
 local app_name = "VLSub OpenSubtitles.com";
-local app_version = "1.2.3";
+local app_version = "1.2.4";
 local app_useragent = app_name.." "..app_version;
 
 local config = {
@@ -5446,6 +5446,7 @@ openSub.searchSubtitlesByHashNewAPI = function()
 
     if res and res.status == 200 and res.body then
         vlc.msg.dbg("[VLSub] Hash search API request successful, status: " .. res.status)
+        vlc.msg.dbg("[VLSub] Response body length: " .. string.len(res.body) .. " bytes")
         local ok, parsed_data = pcall(json.decode, res.body, 1, true)
         if ok and parsed_data and parsed_data.data then
             openSub.itemStore = openSub.convertNewAPIResponse(parsed_data.data)
@@ -5459,7 +5460,11 @@ openSub.searchSubtitlesByHashNewAPI = function()
                 setMessage(error_tag(lang["mess_no_res"]))
             end
         else
-            vlc.msg.err("[VLSub] Failed to parse hash search API response: " .. (res.body or "no body"))
+            if not ok then
+                vlc.msg.err("[VLSub] JSON decode error: " .. tostring(parsed_data))
+            end
+            vlc.msg.err("[VLSub] Failed to parse hash search API response")
+            vlc.msg.dbg("[VLSub] Response body (first 500 chars): " .. string.sub(res.body or "", 1, 500))
             openSub.itemStore = {} -- Set to empty table
             setMessage(error_tag(lang["mess_no_res"]))
         end
@@ -7602,6 +7607,7 @@ openSub.searchSubtitlesByHashNewAPI = function()
 
     if res and res.status == 200 and res.body then
         vlc.msg.dbg("[VLSub] Hash search API request successful, status: " .. res.status)
+        vlc.msg.dbg("[VLSub] Response body length: " .. string.len(res.body) .. " bytes")
         local ok, parsed_data = pcall(json.decode, res.body, 1, true)
         if ok and parsed_data and parsed_data.data then
             openSub.itemStore = openSub.convertNewAPIResponse(parsed_data.data)
@@ -7615,7 +7621,11 @@ openSub.searchSubtitlesByHashNewAPI = function()
                 setMessage(error_tag(lang["mess_no_res"]))
             end
         else
-            vlc.msg.err("[VLSub] Failed to parse hash search API response: " .. (res.body or "no body"))
+            if not ok then
+                vlc.msg.err("[VLSub] JSON decode error: " .. tostring(parsed_data))
+            end
+            vlc.msg.err("[VLSub] Failed to parse hash search API response")
+            vlc.msg.dbg("[VLSub] Response body (first 500 chars): " .. string.sub(res.body or "", 1, 500))
             openSub.itemStore = {} -- Set to empty table
             setMessage(error_tag(lang["mess_no_res"]))
         end
