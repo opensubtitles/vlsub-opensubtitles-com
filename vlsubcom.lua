@@ -525,6 +525,25 @@ function activate()
     append_debug_log("JSON module loaded successfully")
   end
 
+  -- Check dkjson version and compatibility
+  if is_first_run_detected then
+    update_debug_progress("Checking dkjson compatibility...")
+  end
+  vlc.msg.dbg("[VLSub] Checking dkjson version: " .. tostring(json.version))
+  if not check_dkjson_compatibility() then
+    vlc.msg.err("[VLSub] Incompatible dkjson version detected")
+    if is_first_run_detected then
+      update_debug_status("ERROR: Incompatible dkjson version")
+      append_debug_log("CRITICAL: dkjson version too old - cannot parse floats")
+    end
+    show_dkjson_error_dialog()
+    criticalFailure = true
+    return false
+  end
+  if is_first_run_detected then
+    append_debug_log("dkjson compatibility check passed (version: " .. tostring(json.version) .. ")")
+  end
+
   -- Config check (always needed)
   if is_first_run_detected then
     update_debug_progress("Checking configuration...")
@@ -2370,6 +2389,52 @@ end
 
 
             --[[ Config & interface localization]]--
+
+-- Check if dkjson version is compatible (can parse floats properly)
+-- dkjson 2.1-2.3 have a bug where floats cannot be parsed in certain locales
+-- This was fixed in version 2.4 (released 2013-09-28)
+-- See: https://github.com/opensubtitles/vlsub-opensubtitles-com/issues/11#issuecomment-3391889129
+function check_dkjson_compatibility()
+  if not json then
+    vlc.msg.err("[VLSub] JSON module not loaded")
+    return false
+  end
+
+  -- Test if we can parse floats properly
+  local test_json = '{"fps":0.0}'
+  local ok, parsed_data = pcall(json.decode, test_json, 1, true)
+
+  if not ok or not parsed_data then
+    vlc.msg.err("[VLSub] dkjson cannot parse floats - version too old")
+    vlc.msg.err("[VLSub] Current version: " .. tostring(json.version))
+    vlc.msg.err("[VLSub] Required: dkjson 2.4 or newer")
+    return false
+  end
+
+  vlc.msg.dbg("[VLSub] dkjson compatibility check passed")
+  return true
+end
+
+-- Show error dialog for incompatible dkjson version
+function show_dkjson_error_dialog()
+  local error_dlg = vlc.dialog("VLSub - Incompatible dkjson Version")
+
+  error_dlg:add_label("<b>VLSub cannot start due to incompatible dkjson version</b>", 1, 1, 4, 1)
+  error_dlg:add_label("", 1, 2, 4, 1)
+  error_dlg:add_label("Your VLC installation includes an old version of dkjson (JSON parser)", 1, 3, 4, 1)
+  error_dlg:add_label("that cannot parse floating point numbers properly.", 1, 4, 4, 1)
+  error_dlg:add_label("", 1, 5, 4, 1)
+  error_dlg:add_label("<b>Current version:</b> " .. tostring(json.version or "unknown"), 1, 6, 4, 1)
+  error_dlg:add_label("<b>Required version:</b> 2.4 or newer", 1, 7, 4, 1)
+  error_dlg:add_label("", 1, 8, 4, 1)
+  error_dlg:add_label("<b>Solution:</b>", 1, 9, 4, 1)
+  error_dlg:add_label("Please upgrade VLC to version 3.0.22 or newer.", 1, 10, 4, 1)
+  error_dlg:add_label("", 1, 11, 4, 1)
+  error_dlg:add_label("For more information, visit:", 1, 12, 4, 1)
+  error_dlg:add_label("<a href='https://github.com/opensubtitles/vlsub-opensubtitles-com/issues/11#issuecomment-3391889129'>GitHub Issue #11</a>", 1, 13, 4, 1)
+  error_dlg:add_label("", 1, 14, 4, 1)
+  error_dlg:add_button("Close", function() error_dlg:delete() end, 2, 15, 2, 1)
+end
 
 function check_config()
   -- Make a copy of english translation to use it as default
