@@ -125,7 +125,7 @@ https://github.com/opensubtitles/vlsub-opensubtitles-com/commits/main
             --[[ Global var ]]--
 
 local app_name = "VLSub OpenSubtitles.com";
-local app_version = "1.2.4";
+local app_version = "1.2.5";
 local app_useragent = app_name.." "..app_version;
 
 local config = {
@@ -2400,14 +2400,31 @@ function check_dkjson_compatibility()
     return false
   end
 
-  -- Test if we can parse floats properly
-  local test_json = '{"fps":0.0}'
-  local ok, parsed_data = pcall(json.decode, test_json, 1, true)
+  local version_str = tostring(json.version or "unknown")
+  vlc.msg.dbg("[VLSub] Testing dkjson compatibility, version: " .. version_str)
 
-  if not ok or not parsed_data then
+  -- Test integer parsing first (should always work)
+  local int_json = '{"fps":25}'
+  local ok_int, parsed_int = pcall(json.decode, int_json, 1, true)
+
+  if ok_int and parsed_int then
+    vlc.msg.dbg("[VLSub] Integer parsing test passed")
+  else
+    vlc.msg.err("[VLSub] Integer parsing test failed: " .. tostring(parsed_int))
+    return false
+  end
+
+  -- Test float parsing (this fails on old dkjson versions)
+  local float_json = '{"fps":25.0}'
+  local ok_float, parsed_float = pcall(json.decode, float_json, 1, true)
+
+  if ok_float and parsed_float then
+    vlc.msg.dbg("[VLSub] Float parsing test passed")
+  else
+    vlc.msg.err("[VLSub] Float parsing test failed: " .. tostring(parsed_float))
     vlc.msg.err("[VLSub] dkjson cannot parse floats - version too old")
-    vlc.msg.err("[VLSub] Current version: " .. tostring(json.version))
-    vlc.msg.err("[VLSub] Required: dkjson 2.4 or newer")
+    vlc.msg.err("[VLSub] Current version: " .. version_str)
+    vlc.msg.err("[VLSub] Required: dkjson 2.4 or newer (with float parsing support)")
     return false
   end
 
@@ -2419,21 +2436,21 @@ end
 function show_dkjson_error_dialog()
   local error_dlg = vlc.dialog("VLSub - Incompatible dkjson Version")
 
-  error_dlg:add_label("<b>VLSub cannot start due to incompatible dkjson version</b>", 1, 1, 4, 1)
-  error_dlg:add_label("", 1, 2, 4, 1)
-  error_dlg:add_label("Your VLC installation includes an old version of dkjson (JSON parser)", 1, 3, 4, 1)
-  error_dlg:add_label("that cannot parse floating point numbers properly.", 1, 4, 4, 1)
-  error_dlg:add_label("", 1, 5, 4, 1)
-  error_dlg:add_label("<b>Current version:</b> " .. tostring(json.version or "unknown"), 1, 6, 4, 1)
-  error_dlg:add_label("<b>Required version:</b> 2.4 or newer", 1, 7, 4, 1)
-  error_dlg:add_label("", 1, 8, 4, 1)
-  error_dlg:add_label("<b>Solution:</b>", 1, 9, 4, 1)
-  error_dlg:add_label("Please upgrade VLC to version 3.0.22 or newer.", 1, 10, 4, 1)
-  error_dlg:add_label("", 1, 11, 4, 1)
-  error_dlg:add_label("For more information, visit:", 1, 12, 4, 1)
-  error_dlg:add_label("<a href='https://github.com/opensubtitles/vlsub-opensubtitles-com/issues/11#issuecomment-3391889129'>GitHub Issue #11</a>", 1, 13, 4, 1)
-  error_dlg:add_label("", 1, 14, 4, 1)
-  error_dlg:add_button("Close", function() error_dlg:delete() end, 2, 15, 2, 1)
+  error_dlg:add_label("<b>VLSub cannot start due to incompatible dkjson version</b>", 1, 1, 6, 1)
+  error_dlg:add_label("", 1, 2, 6, 1)
+  error_dlg:add_label("Your VLC installation includes an old version of dkjson (JSON parser)", 1, 3, 6, 1)
+  error_dlg:add_label("that cannot parse floating point numbers properly.", 1, 4, 6, 1)
+  error_dlg:add_label("", 1, 5, 6, 1)
+  error_dlg:add_label("<b>Current version:</b> " .. tostring(json.version or "unknown"), 1, 6, 6, 1)
+  error_dlg:add_label("<b>Required version:</b> 2.4 or newer", 1, 7, 6, 1)
+  error_dlg:add_label("", 1, 8, 6, 1)
+  error_dlg:add_label("<b>Solution:</b>", 1, 9, 6, 1)
+  error_dlg:add_label("Please upgrade VLC to version 3.0.22 or newer.", 1, 10, 6, 1)
+  error_dlg:add_label("", 1, 11, 6, 1)
+  error_dlg:add_label("For more information, visit:", 1, 12, 6, 1)
+  error_dlg:add_label("<a href='https://github.com/opensubtitles/vlsub-opensubtitles-com/issues/11#issuecomment-3391889129'>GitHub Issue #11</a>", 1, 13, 6, 1)
+  error_dlg:add_label("", 1, 14, 6, 1)
+  error_dlg:add_button("Close", function() error_dlg:delete() end, 3, 15, 2, 1)
 end
 
 function check_config()
