@@ -3,8 +3,8 @@
 A modern VLC extension for downloading subtitles from **OpenSubtitles.com** using their latest REST API.
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
-[![GitHub release](https://img.shields.io/github/v/release/opensubtitles/vlsub-opensubtitles-com?style=flat-square)](https://github.com/opensubtitles/vlsub-opensubtitles-com/releases)
-[![GitHub downloads](https://img.shields.io/github/downloads/opensubtitles/vlsub-opensubtitles-com/total.svg)](https://github.com/opensubtitles/vlsub-opensubtitles-com/releases)
+[![GitHub release](https://img.shields.io/github/v/release/opensubtitles/vlsub-opensubtitles-com)](https://github.com/opensubtitles/vlsub-opensubtitles-com/releases)
+[![GitHub downloads](https://img.shields.io/github/downloads/opensubtitles/vlsub-opensubtitles-com/total)](https://github.com/opensubtitles/vlsub-opensubtitles-com/releases)
 
 > **Note**: This extension is specifically for **OpenSubtitles.com** (not .org) and uses their modern REST API with enhanced features and better performance.
 
