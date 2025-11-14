@@ -57,6 +57,10 @@ dev_notes.md
 .env
 .env.local
 
+# Claude Code AI assistant files
+CLAUDE.md
+.claude/
+
 # Documentation build files
 docs/_build/
 docs/.doctrees/
