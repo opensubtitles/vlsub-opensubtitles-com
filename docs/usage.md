@@ -199,7 +199,7 @@ Results show various quality indicators:
 
 For TV series episodes:
 1. Use consistent naming (e.g., `Show.S01E01.mkv`)
-2. Search by name with season/episode
+2. Search with season/episode
 3. Results will include series-specific matches
 
 ### Custom Metadata
