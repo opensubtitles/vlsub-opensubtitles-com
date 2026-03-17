@@ -147,11 +147,38 @@ local update_config = {
   last_check_file = "last_update_check.json"
 }
 
+-- Supported API sorting fields for /subtitles endpoint
+local subtitle_sort_by_options = {
+  {"language", "Language"},
+  {"download_count", "Downloads"},
+  {"new_download_count", "New downloads"},
+  {"hearing_impaired", "Hearing impaired"},
+  {"hd", "HD"},
+  {"fps", "FPS"},
+  {"votes", "Votes"},
+  {"points", "Points"},
+  {"ratings", "Ratings"},
+  {"from_trusted", "Trusted"},
+  {"foreign_parts_only", "Foreign parts only"},
+  {"ai_translated", "AI translated"},
+  {"machine_translated", "Machine translated"},
+  {"upload_date", "Upload date"},
+  {"release", "Release"},
+  {"comments", "Comments"}
+}
+
+local subtitle_sort_direction_options = {
+  {"desc", "Desc"},
+  {"asc", "Asc"}
+}
+
 -- First, update the options structure to support 3 languages
 local options = {
   language = nil,
   language2 = nil,  -- Second language
   language3 = nil,  -- Third language
+  sortBy = nil,     -- API order_by
+  sortDirection = "desc", -- API order_direction
   downloadBehaviour = 'save',
   langExt = true,
   removeTag = false,
@@ -1741,36 +1768,43 @@ function interface_main()
 
   -- Row 6: Third language
   dlg:add_label(lang["int_third_lang"]..":", 1, 6, 1, 1)
-  input_table['language3'] =  dlg:add_dropdown(2, 6, 4, 1)
+  input_table['language3'] = dlg:add_dropdown(2, 6, 4, 1)
 
-  -- Row 7: Results list label
-  dlg:add_label("Search Results:", 1, 7, 6, 1)
+  -- Row 7: Sorting controls
+  dlg:add_label("Sort by:", 1, 7, 1, 1)
+  input_table['sort_by'] = dlg:add_dropdown(2, 7, 3, 1)
+  input_table['sort_direction'] = dlg:add_dropdown(5, 7, 1, 1)
 
-  -- Row 8: Results list
-  input_table['mainlist'] = dlg:add_list(1, 8, 6, 1)
+  -- Row 8: Results list label
+  dlg:add_label("Search Results:", 1, 8, 6, 1)
 
-  -- Row 9: Status message
+  -- Row 9: Results list
+  input_table['mainlist'] = dlg:add_list(1, 9, 6, 1)
+
+  -- Row 10: Status message
   input_table['message'] = nil
-  input_table['message'] = dlg:add_label('Ready for search', 1, 9, 6, 1)
+  input_table['message'] = dlg:add_label('Ready for search', 1, 10, 6, 1)
 
-  -- Row 10: Action buttons - MODIFIED HELP BUTTON
+  -- Row 11: Action buttons - MODIFIED HELP BUTTON
   dlg:add_button(
-    "📥 Download", download_subtitles_v2, 1, 10, 1, 1)
-
-  dlg:add_button(
-    "🔗 Link", open_subtitle_link, 2, 10, 1, 1)
+    "📥 Download", download_subtitles_v2, 1, 11, 1, 1)
 
   dlg:add_button(
-    "⚙️ Config", show_conf, 5, 10, 1, 1)
+    "🔗 Link", open_subtitle_link, 2, 11, 1, 1)
+
+  dlg:add_button(
+    "⚙️ Config", show_conf, 5, 11, 1, 1)
   dlg:add_button(
     "❓ Help",
     function() show_help("main") end, -- Pass "main" to indicate source window
-    6, 10, 1, 1)
+    6, 11, 1, 1)
 
   -- Set up language dropdowns
   assoc_select_conf('language', 'language', openSub.conf.languages, 2, lang["int_all"])
   assoc_select_conf('language2', 'language2', openSub.conf.languages, 2, 'None')
   assoc_select_conf('language3', 'language3', openSub.conf.languages, 2, 'None')
+  assoc_select_conf('sort_by', 'sortBy', openSub.conf.sortByOptions, 2, 'Default')
+  assoc_select_conf('sort_direction', 'sortDirection', openSub.conf.sortDirectionOptions, 2)
 
   -- Only call display_subtitles if we actually have search results to display
   if openSub.itemStore and type(openSub.itemStore) == "table" and #openSub.itemStore > 0 then
@@ -3113,7 +3147,9 @@ openSub = {
     useragent = app_useragent,
     translations_avail = {},
     downloadBehaviours = nil,
-    languages = sub_languages
+    languages = sub_languages,
+    sortByOptions = subtitle_sort_by_options,
+    sortDirectionOptions = subtitle_sort_direction_options
   },
   option = options,
   session = {
@@ -5079,6 +5115,8 @@ openSub.searchSubtitlesByIMDB = function(imdbId)
   openSub.actionLabel = lang["action_search"]
   setMessage(openSub.actionLabel..": "..progressBarContent(0))
 
+  applySubtitleSortingSelection()
+
   -- Ensure we have valid session
   if not openSub.checkSession() then
     vlc.msg.err("[VLSub] Failed to establish session")
@@ -5106,6 +5144,11 @@ openSub.searchSubtitlesByIMDB = function(imdbId)
     if openSub.option.debugLogging then
       vlc.msg.dbg("[VLSub] Searching in languages: " .. openSub.movie.sublanguageid)
     end
+  end
+
+  if openSub.option.sortBy and openSub.option.sortBy ~= "" then
+    params["order_by"] = openSub.option.sortBy
+    params["order_direction"] = (openSub.option.sortDirection == "asc") and "asc" or "desc"
   end
 
   -- Build URL with sorted parameters
@@ -5842,6 +5885,31 @@ function getSelectedLanguages()
     vlc.msg.dbg("[VLSub] Final language string: " .. result)
   end
   return result
+end
+
+-- Read /subtitles sorting options from main-window controls.
+function applySubtitleSortingSelection()
+  local sort_by_options = openSub.conf.sortByOptions or {}
+  local sort_dir_options = openSub.conf.sortDirectionOptions or {}
+
+  local sort_by_value = input_table["sort_by"] and input_table["sort_by"]:get_value() or 0
+  if sort_by_value > 0 and sort_by_options[sort_by_value] then
+    openSub.option.sortBy = sort_by_options[sort_by_value][1]
+  else
+    openSub.option.sortBy = nil
+  end
+
+  local sort_dir_value = input_table["sort_direction"] and input_table["sort_direction"]:get_value() or 0
+  if sort_dir_value > 0 and sort_dir_options[sort_dir_value] then
+    openSub.option.sortDirection = sort_dir_options[sort_dir_value][1]
+  elseif not openSub.option.sortDirection or openSub.option.sortDirection == "" then
+    openSub.option.sortDirection = "desc"
+  end
+
+  -- Direction is meaningful only if order_by is provided.
+  if not openSub.option.sortBy then
+    openSub.option.sortDirection = "desc"
+  end
 end
 
 -- Also add this debug function to check what languages are available
@@ -7965,6 +8033,8 @@ openSub.searchSubtitlesNewAPI = function()
   openSub.actionLabel = lang["action_search"]
   setMessage(openSub.actionLabel..": "..progressBarContent(0))
 
+  applySubtitleSortingSelection()
+
   -- Ensure we have valid session
   if not openSub.checkSession() then
     vlc.msg.err("[VLSub] Failed to establish session")
@@ -8010,6 +8080,11 @@ openSub.searchSubtitlesNewAPI = function()
     if openSub.option.debugLogging then
       vlc.msg.dbg("[VLSub] Including episode: " .. openSub.movie.episodeNumber)
     end
+  end
+
+  if openSub.option.sortBy and openSub.option.sortBy ~= "" then
+    params["order_by"] = openSub.option.sortBy
+    params["order_direction"] = (openSub.option.sortDirection == "asc") and "asc" or "desc"
   end
 
   -- Build URL with sorted parameters
@@ -8081,6 +8156,8 @@ openSub.searchSubtitlesByHashNewAPI = function()
     openSub.actionLabel = lang["action_search"]
     setMessage(openSub.actionLabel..": "..progressBarContent(0))
 
+    applySubtitleSortingSelection()
+
     -- Ensure we have valid session
     if not openSub.checkSession() then
         vlc.msg.err("[VLSub] Failed to establish session")
@@ -8122,6 +8199,11 @@ openSub.searchSubtitlesByHashNewAPI = function()
         if openSub.option.debugLogging then
           vlc.msg.dbg("[VLSub] Searching in languages: " .. openSub.movie.sublanguageid)
         end
+    end
+
+    if openSub.option.sortBy and openSub.option.sortBy ~= "" then
+        params["order_by"] = openSub.option.sortBy
+        params["order_direction"] = (openSub.option.sortDirection == "asc") and "asc" or "desc"
     end
 
     -- Build URL with sorted parameters
