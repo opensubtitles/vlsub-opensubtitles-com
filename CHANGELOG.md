@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Subtitles starting with ASS override tags** ([#40](https://github.com/opensubtitles/vlsub-opensubtitles-com/issues/40)): subtitle files whose content begins with a curly-brace tag such as `{\an8}` or `{\pos(...)}` no longer download corrupted/truncated. The raw subtitle body from the CDN link was being passed through the JSON response cleaner, which extracted only the first balanced `{...}` block and discarded the rest. The HTTP client now supports a "raw" mode enabled only for the subtitle-file download, preserving the body byte-for-byte; JSON API calls remain unchanged.
+
 ## [1.2.9] - 2026-06-09
 
 ### Fixed
