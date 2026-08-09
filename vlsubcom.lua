@@ -6241,6 +6241,7 @@ openSub.downloadFromNewAPI = function(item)
             local download_client = Curl.new()
             download_client:set_timeout(60)
             download_client:set_retries(3)
+            download_client:set_raw(true)  -- subtitle body must not be JSON-cleaned
 
             local subtitle_res = download_client:get(download_response.link)
             if not subtitle_res then
@@ -7944,6 +7945,12 @@ function VLCHttpClient.new()
     self.headers = {}
     self.timeout = 30
     self.retries = 2
+    self.raw = false
+    return self
+end
+
+function VLCHttpClient:set_raw(flag)
+    self.raw = flag and true or false
     return self
 end
 
@@ -8647,8 +8654,8 @@ function VLCHttpClient:_make_request_stream(method, url, data)
         response_data = response_data .. chunk
         bytes_read = bytes_read + #chunk
 
-        -- Early break if we detect end of JSON
-        if string.find(chunk, "}$") and string.find(response_data, "^{") then
+        -- Early break if we detect end of JSON (skip for raw subtitle downloads)
+        if not self.raw and string.find(chunk, "}$") and string.find(response_data, "^{") then
             vlc.msg.dbg("[VLSub] Detected complete JSON, stopping read")
             break
         end
@@ -8658,7 +8665,12 @@ function VLCHttpClient:_make_request_stream(method, url, data)
                 string.format("%.2f", (os.clock() - start_time)) .. " seconds")
 
     if bytes_read > 0 then
-        local cleaned_body = clean_response_body(response_data, {})
+        local cleaned_body
+        if self.raw then
+            cleaned_body = response_data
+        else
+            cleaned_body = clean_response_body(response_data, {})
+        end
         return {
             status = 200,
             headers = {},
@@ -8928,7 +8940,20 @@ function VLCHttpClient:_make_request_tcp(method, url, data)
                     end
 
                     -- Clean the response body to handle chunked encoding and other artifacts
-                    local cleaned_body = clean_response_body(body, headers)
+                    local cleaned_body
+                    if self.raw then
+                        -- Raw mode (subtitle download): only decode chunked transfer,
+                        -- never apply JSON extraction which corrupts subtitle content
+                        -- that begins with tags like {\an8}.
+                        local te = headers and headers["transfer-encoding"]
+                        if te and string.lower(te) == "chunked" then
+                            cleaned_body = decode_chunked_body(body)
+                        else
+                            cleaned_body = body
+                        end
+                    else
+                        cleaned_body = clean_response_body(body, headers)
+                    end
 
                     if openSub.option.debugLogging then
                       vlc.msg.dbg("[VLSub] Cleaned body: " .. string.len(cleaned_body) .. " bytes")
