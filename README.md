@@ -40,18 +40,30 @@ A modern VLC extension for downloading subtitles from **OpenSubtitles.com** usin
 
 ## 🚀 Installation
 
+### Prerequisites
+- **VLC Media Player** 3.0+ ([download](https://www.videolan.org/vlc/))
+- **curl** (pre-installed on most systems; Windows 10+ includes it)
+
 ### Method 1: One-line Installation (Recommended)
+
+> ⚠️ **Security Note**: Review scripts before running. You can inspect them at:
+> - [install.sh](scripts/install.sh) (macOS/Linux)
+> - [install.ps1](scripts/install.ps1) (Windows)
 
 **macOS/Linux:**
 ```bash
 curl -sSL https://raw.githubusercontent.com/opensubtitles/vlsub-opensubtitles-com/main/scripts/install.sh | bash
 ```
 
+**Windows (PowerShell as Administrator):**
 
-**Windows (PowerShell):**
 *Press `Windows + R` → type `powershell` → Enter, then run:*
 ```powershell
-Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser; iwr -useb https://raw.githubusercontent.com/opensubtitles/vlsub-opensubtitles-com/main/scripts/install.ps1 | iex
+# First, allow script execution (one-time setup)
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+
+# Then install
+iwr -useb https://raw.githubusercontent.com/opensubtitles/vlsub-opensubtitles-com/main/scripts/install.ps1 | iex
 ```
 
 ### Method 2: Arch User Repository (Arch Linux)
@@ -69,21 +81,34 @@ yay -S vlsub-opensubtitles-com-git
 ### Method 3: Manual Installation
 
 1. **Download** the latest `vlsubcom.lua` from [Releases](https://github.com/opensubtitles/vlsub-opensubtitles-com/releases)
-2. **Copy** to your VLC extensions directory:
+2. **Copy** to your VLC extensions directory (create if it doesn't exist):
    - **Windows**: `%APPDATA%\vlc\lua\extensions\`
    - **macOS**: `~/Library/Application Support/org.videolan.vlc/lua/extensions/`
    - **Linux**: `~/.local/share/vlc/lua/extensions/`
+   
+   **Create directory if needed:**
+   ```bash
+   # Linux
+   mkdir -p ~/.local/share/vlc/lua/extensions/
+   
+   # macOS
+   mkdir -p ~/Library/Application\ Support/org.videolan.vlc/lua/extensions/
+   ```
+
+> **Note for Flatpak/Snap VLC users**: Extension paths differ for sandboxed installations. Check your VLC data directory.
+
 3. **Restart** VLC Media Player
-4. **Access** the extension:
+4. **Verify** installation:
+   - Open VLC → **View** (Windows/Linux) or **VLC** menu (macOS)
+   - Look for "VLSub OpenSubtitles.com"
    - **Windows/Linux**: `View → VLSub OpenSubtitles.com`
-   - **macOS**: `VLC → Extensions → VLSub OpenSubtitles.com` (macOS puts Lua extensions under the **VLC** menu, not **View**)
+   - **macOS**: `VLC → Extensions → VLSub OpenSubtitles.com`
 
 ## 📋 Requirements
 
 - **VLC Media Player** 3.0 or newer
 - **OpenSubtitles.com account** ([free registration](https://www.opensubtitles.com/newuser))
 - **Internet connection** for searching and downloading
-- **curl** command-line tool (for downloads - usually pre-installed)
 
 ## 🎬 Usage
 
