@@ -60,6 +60,7 @@ dev_notes.md
 # Claude Code AI assistant files
 CLAUDE.md
 .claude/
+graphify-out/
 
 # Documentation build files
 docs/_build/

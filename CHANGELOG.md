@@ -7,8 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-09-19
+
 ### Fixed
+- **Login failing with "status: 302" behind proxies and filtered networks** ([#45](https://github.com/opensubtitles/vlsub-opensubtitles-com/issues/45)): HTTP response header names are now looked up case-insensitively, as required by RFC 7230 §3.2. Redirects were only followed when the header arrived as `Location`, so an intercepting proxy or captive portal sending lowercase `location:` left the redirect unfollowed and surfaced the raw `302` as a login error. The same case sensitivity affected `Content-Length` and `Transfer-Encoding`.
+- **Redirect targets containing percent-encoded characters**: a redirect to a path with `%20` or `%2F` corrupted the rewritten request, because percent signs in the replacement text were interpreted as capture references. Query strings are also preserved across redirects now.
 - **Subtitles starting with ASS override tags** ([#40](https://github.com/opensubtitles/vlsub-opensubtitles-com/issues/40)): subtitle files whose content begins with a curly-brace tag such as `{\an8}` or `{\pos(...)}` no longer download corrupted/truncated. The raw subtitle body from the CDN link was being passed through the JSON response cleaner, which extracted only the first balanced `{...}` block and discarded the rest. The HTTP client now supports a "raw" mode enabled only for the subtitle-file download, preserving the body byte-for-byte; JSON API calls remain unchanged.
+
+### Changed
+- **Clearer diagnosis when the network intercepts API requests**: any redirect reaching the UI now reports that the network is redirecting HTTP requests and that a proxy, VPN, captive portal or content filter is intercepting port 80, instead of showing a bare status code. Searches that come back empty for the same reason say so rather than reporting a plain "No result".
 
 ## [1.2.9] - 2026-06-09
 

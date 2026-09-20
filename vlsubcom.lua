@@ -126,7 +126,7 @@ https://github.com/opensubtitles/vlsub-opensubtitles-com/commits/main
 
 -- local app_name = "VLSub";
 local app_name = "VLSub OpenSubtitles.com";  
-local app_version = "1.2.9";
+local app_version = "1.3.0";
 local app_useragent = app_name.." v"..app_version;
 
 local config = {
@@ -1947,9 +1947,10 @@ function interface_help()
   -- Row 20: Links
   dlg:add_label("", 1, 20, 6, 1) -- Spacer
   dlg:add_label("<a href='https://www.opensubtitles.com/en/support_us/'>Support OpenSubtitles</a> - thank you very much", 1, 21, 6, 1)
+  dlg:add_label("<a href='https://github.com/opensubtitles/vlsub-opensubtitles-com'>GitHub: opensubtitles/vlsub-opensubtitles-com</a> - source, issues, releases", 1, 22, 6, 1)
 
-  -- Row 22: Close button with icon
-  dlg:add_label("", 1, 22, 6, 1) -- Spacer
+  -- Row 23: Close button with icon
+  dlg:add_label("", 1, 23, 6, 1) -- Spacer
   dlg:add_button("❌ Close",
     function()
       if previous_window == "config" then
@@ -1958,7 +1959,7 @@ function interface_help()
         show_main()
       end
     end,
-    3, 23, 2, 1)
+    3, 24, 2, 1)
 end
 
 
@@ -2252,6 +2253,10 @@ function display_subtitles()
   local mainlist = input_table["mainlist"]
   mainlist:clear()
 
+  -- Consume the transport diagnosis for this search only
+  local transportError = openSub.lastTransportError
+  openSub.lastTransportError = nil
+
   -- Safe check for no results - FIXED to avoid string/number comparison error
   local hasNoResults = false
   local hasResults = false
@@ -2299,6 +2304,12 @@ function display_subtitles()
       if openSub.movie.title and openSub.movie.title ~= "" then
         message = message .. " and title '" .. openSub.movie.title .. "'"
       end
+    end
+
+    -- An empty result set caused by a hijacked request is not an empty result
+    -- set - say so instead of letting it read as "nothing matched".
+    if transportError then
+      message = message .. "<br/>" .. error_tag(transportError)
     end
 
     setMessage(message)
@@ -4266,6 +4277,20 @@ function error_tag(str)
     lang["mess_error"]..":</span> "..str..""
 end
 
+-- The API never redirects, so a redirect reaching the caller means something
+-- on the network rewrote the plain-HTTP request: captive portal, ISP or
+-- corporate proxy, content filter, or a VPN/antivirus web shield.
+-- 310 is the internal sentinel for "redirect limit reached".
+function network_redirect_message(status)
+  if status == 301 or status == 302 or status == 303
+  or status == 307 or status == 308 or status == 310 then
+    return "network is redirecting HTTP requests (status "..tostring(status)..
+      ") - a proxy, VPN, captive portal or content filter is intercepting "..
+      "port 80. Disable it or connect through another network."
+  end
+  return nil
+end
+
 function warning_tag(str)
   return "<span style='color:#ffc107;font-weight:bold;'>"..
     "Warning"..":</span> "..str..""
@@ -4429,11 +4454,11 @@ local function http_req_once(host, port, request, protocol, tls_warned, redirect
 				end
 
 				status = tonumber(header["statuscode"]) or 0;
-				contentLength = tonumber(header["Content-Length"]);
+				contentLength = tonumber(header["content-length"]);
 				if not contentLength then
-					contentLength = tonumber(header["X-Uncompressed-Content-Length"])
+					contentLength = tonumber(header["x-uncompressed-content-length"])
 				end
-				TransferEncoding = trim(header["Transfer-Encoding"]);
+				TransferEncoding = trim(header["transfer-encoding"]);
 				chunked = (TransferEncoding=="chunked");
 				buf = body or "";
 				body = "";
@@ -4507,11 +4532,11 @@ local function http_req_once(host, port, request, protocol, tls_warned, redirect
 			end
 
 			status = tonumber(header["statuscode"]) or 0;
-			contentLength = tonumber(header["Content-Length"]);
+			contentLength = tonumber(header["content-length"]);
 			if not contentLength then
-				contentLength = tonumber(header["X-Uncompressed-Content-Length"])
+				contentLength = tonumber(header["x-uncompressed-content-length"])
 			end
-			TransferEncoding = trim(header["Transfer-Encoding"]);
+			TransferEncoding = trim(header["transfer-encoding"]);
 			chunked = (TransferEncoding=="chunked");
 			buf = body or "";
 			body = body or ""
@@ -4552,16 +4577,19 @@ local function http_req_once(host, port, request, protocol, tls_warned, redirect
 
 	-- Handle redirects
 	if (status == 301 or status == 302 or status == 307 or status == 308)
-	and header and header["Location"] then
+	and header and header["location"] then
 		if redirects >= MAX_REDIRECTS then
 			vlc.msg.err("[VLSub] HTTP redirect limit reached for host " .. tostring(host))
 			close_socket()
 			return 310, ""
 		end
-		local location = trim(header["Location"])
-		local host_redirect, path_redirect, _, proto_redirect = parse_url(location)
+		local location = trim(header["location"])
+		local host_redirect, path_redirect, opts_redirect, proto_redirect = parse_url(location)
 		host_redirect = host_redirect or host
 		path_redirect = path_redirect or location
+		if opts_redirect and opts_redirect ~= "" then
+			path_redirect = path_redirect .. "?" .. opts_redirect
+		end
 		local new_protocol = proto_redirect or protocol
 		local new_port = port
 		if proto_redirect == "https" then
@@ -4579,9 +4607,14 @@ local function http_req_once(host, port, request, protocol, tls_warned, redirect
 			vlc.msg.dbg("[VLSub]   New path: " .. tostring(path_redirect))
 		end
 
+		-- Percent signs in the replacement text are gsub capture references,
+		-- so percent-encoded redirect targets (%20, %2F) must be escaped.
+		local path_replacement = string.gsub(path_redirect, "%%", "%%%%")
+		local host_replacement = string.gsub(host_redirect, "%%", "%%%%")
+
 		request = request
-		:gsub("^([^%s]+ )([^%s]+)", "%1"..path_redirect)
-		:gsub("(Host: )([^\n]*)", "%1"..host_redirect)
+		:gsub("^([^%s]+ )([^%s]+)", "%1"..path_replacement)
+		:gsub("(Host: )([^\n]*)", "%1"..host_replacement)
 		close_socket()
 		return http_req_once(host_redirect, new_port, request, new_protocol, tls_notice_shown, redirects + 1)
 	end
@@ -4652,6 +4685,9 @@ function http_req(host, port, request, protocol)
 	return status, body
 end
 
+-- Header names are stored lowercased because HTTP field names are
+-- case-insensitive (RFC 7230 3.2) and intercepting proxies/CDNs do send
+-- "location:" or "content-length:" in lowercase. Look keys up lowercase.
 function parse_header(data)
   local header = {}
 
@@ -4662,7 +4698,7 @@ function parse_header(data)
     if s == "" then
     header['statuscode'] = tonumber(string.sub(val, 1 , 3))
     else
-      header[name] = val
+      header[string.lower(name)] = val
     end
   end
   return header
@@ -5258,6 +5294,7 @@ openSub.searchSubtitlesByIMDB = function(imdbId)
     if res.body then
       vlc.msg.err("[VLSub] Error response: " .. res.body)
     end
+    openSub.lastTransportError = network_redirect_message(res.status)
     openSub.itemStore = "0"
   else
     vlc.msg.err("[VLSub] API request failed - no response")
@@ -5413,6 +5450,11 @@ openSub.loginWithRestAPI = function()
 
   if res.status ~= 200 then
     vlc.msg.err("[VLSub] Login failed with status: " .. res.status)
+    local redirect_mess = network_redirect_message(res.status)
+    if redirect_mess then
+      setError("Login failed - " .. redirect_mess)
+      return false
+    end
     if res.body then
       local ok, error_data = pcall(json.decode, res.body, 1, true)
       if ok and error_data and error_data.message then
@@ -8176,6 +8218,7 @@ openSub.searchSubtitlesNewAPI = function()
     if res.body then
       vlc.msg.err("[VLSub] Error response: " .. res.body)
     end
+    openSub.lastTransportError = network_redirect_message(res.status)
     openSub.itemStore = "0"
   else
     vlc.msg.err("[VLSub] API request failed - no response")
@@ -8349,7 +8392,13 @@ openSub.searchSubtitlesByHashNewAPI = function()
             vlc.msg.err("[VLSub] Hash search error response: " .. res.body)
         end
         openSub.itemStore = {} -- Set to empty table
-        setMessage(error_tag(lang["mess_error"] .. ": HTTP " .. res.status))
+        local redirect_mess = network_redirect_message(res.status)
+        if redirect_mess then
+            openSub.lastTransportError = redirect_mess
+            setMessage(error_tag(redirect_mess))
+        else
+            setMessage(error_tag(lang["mess_error"] .. ": HTTP " .. res.status))
+        end
     else
         vlc.msg.err("[VLSub] Hash search API request failed - no response")
         vlc.msg.dbg("[VLSub] Response object: " .. tostring(res))
