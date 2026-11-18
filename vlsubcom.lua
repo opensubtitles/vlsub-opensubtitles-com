@@ -5675,9 +5675,6 @@ openSub.saveAndLoadSubtitle = function(subtitle_content, item)
     -- Use search query as filename if no video loaded
     if openSub.movie.title and openSub.movie.title ~= "" then
       subfileName = openSub.movie.title
-      -- Clean filename for filesystem
-      subfileName = string.gsub(subfileName, "[<>:\"/\\|?*]", "_") -- Remove invalid characters
-      subfileName = string.gsub(subfileName, "%s+", "_") -- Replace spaces with underscores
     else
       local inputItem = openSub.getInputItem()
       if inputItem then
@@ -5687,6 +5684,14 @@ openSub.saveAndLoadSubtitle = function(subtitle_content, item)
         end
       end
     end
+  end
+
+  -- Sanitize filename for filesystem compatibility (Windows limits, forbidden chars, UTF-8)
+  -- This prevents errors when stream URLs contain long tokens or forbidden characters
+  local original_length = #subfileName
+  subfileName = sanitize_filename(subfileName, 180)
+  if original_length > 180 then
+    vlc.msg.dbg("[VLSub] Filename truncated from " .. original_length .. " to " .. #subfileName .. " characters")
   end
 
   if openSub.option.langExt then
@@ -7670,6 +7675,55 @@ end
 
 local function escape(str)
     return str:gsub('"', '\\"')
+end
+
+-- Sanitize filename for filesystem compatibility
+-- Handles Windows forbidden characters, length limits, and UTF-8 boundaries
+-- @param filename string - The filename to sanitize
+-- @param max_length number - Maximum length (default 180, leaves room for extensions)
+-- @return string - Sanitized filename safe for all platforms
+local function sanitize_filename(filename, max_length)
+  if not filename or filename == "" then
+    return "subtitle"
+  end
+
+  max_length = max_length or 180
+
+  -- Step 1: Remove trailing dots and spaces FIRST (Windows quirk - not allowed)
+  local sanitized = string.gsub(filename, "[%. ]+$", "")
+
+  -- Step 2: Replace Windows forbidden characters with underscores
+  -- Forbidden: < > : " / \ | ? *
+  sanitized = string.gsub(sanitized, "[<>:\"/\\|?*]", "_")
+
+  -- Step 3: Collapse multiple spaces/underscores into single underscore
+  sanitized = string.gsub(sanitized, "%s+", "_")
+  sanitized = string.gsub(sanitized, "_+", "_")
+
+  -- Step 4: Remove leading/trailing underscores
+  sanitized = string.gsub(sanitized, "^_+", "")
+  sanitized = string.gsub(sanitized, "_+$", "")
+
+  -- Step 5: Truncate to max_length if needed
+  if #sanitized > max_length then
+    sanitized = string.sub(sanitized, 1, max_length)
+
+    -- Step 6: Don't leave half of a multi-byte UTF-8 character at the cut
+    -- UTF-8 continuation bytes: 10xxxxxx (128-191, \128-\191)
+    -- UTF-8 start bytes: 11xxxxxx (192-255, \192-\255)
+    -- This pattern removes any incomplete UTF-8 sequence at the end
+    sanitized = string.gsub(sanitized, "[\192-\255][\128-\191]*$", "")
+
+    -- Remove trailing underscore if truncation left one
+    sanitized = string.gsub(sanitized, "_+$", "")
+  end
+
+  -- Step 7: Ensure we didn't create an empty filename
+  if sanitized == "" then
+    return "subtitle"
+  end
+
+  return sanitized
 end
 
 -- Enhanced show_appropriate_window with auto-search capability
