@@ -148,7 +148,6 @@
   "ui_json_module_loaded_successfully":"JSON-module geladen",
   "ui_language_auto":"Automatisch (systeemtaal)",
   "ui_language_detection":"TAAL & DETECTIE:",
-  "ui_language_english":"Engels",
   "ui_language_list_loaded_from_api":"Talenlijst geladen via de API",
   "ui_language_not_available":"Taal niet beschikbaar: %s",
   "ui_later":"⏰ Later",

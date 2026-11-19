@@ -148,7 +148,6 @@
   "ui_json_module_loaded_successfully":"JSON modulua ongi kargatu da",
   "ui_language_auto":"Automatikoa (sistemaren hizkuntza)",
   "ui_language_detection":"HIZKUNTZA ETA DETEKZIOA:",
-  "ui_language_english":"Ingelesa",
   "ui_language_list_loaded_from_api":"Hizkuntza-zerrenda APItik kargatu da",
   "ui_language_not_available":"Hizkuntza ez dago erabilgarri: %s",
   "ui_later":"⏰ Geroago",

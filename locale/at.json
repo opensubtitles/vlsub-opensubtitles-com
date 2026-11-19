@@ -148,7 +148,6 @@
   "ui_json_module_loaded_successfully":"El módulu JSON cargóse correutamente",
   "ui_language_auto":"Automática (llingua del sistema)",
   "ui_language_detection":"LLINGUA Y DETEICIÓN:",
-  "ui_language_english":"Inglés",
   "ui_language_list_loaded_from_api":"Cargóse la llista de llingües dende la API",
   "ui_language_not_available":"Llingua non disponible: %s",
   "ui_later":"⏰ Más sero",

@@ -148,7 +148,6 @@
   "ui_json_module_loaded_successfully":"Matagumpay na na-load ang JSON module",
   "ui_language_auto":"Awtomatiko (wika ng system)",
   "ui_language_detection":"WIKA AT PAG-DETECT:",
-  "ui_language_english":"Ingles",
   "ui_language_list_loaded_from_api":"Na-load ang listahan ng wika mula sa API",
   "ui_language_not_available":"Hindi available ang wika: %s",
   "ui_later":"⏰ Mamaya",

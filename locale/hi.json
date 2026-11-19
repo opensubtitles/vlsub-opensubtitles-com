@@ -148,7 +148,6 @@
   "ui_json_module_loaded_successfully":"JSON मॉड्यूल सफलतापूर्वक लोड हुआ",
   "ui_language_auto":"स्वचालित (सिस्टम की भाषा)",
   "ui_language_detection":"भाषा और पहचान:",
-  "ui_language_english":"अंग्रेज़ी",
   "ui_language_list_loaded_from_api":"भाषा सूची API से लोड हुई",
   "ui_language_not_available":"यह भाषा उपलब्ध नहीं है: %s",
   "ui_later":"⏰ बाद में",

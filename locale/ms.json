@@ -148,7 +148,6 @@
   "ui_json_module_loaded_successfully":"Modul JSON berjaya dimuatkan",
   "ui_language_auto":"Automatik (bahasa sistem)",
   "ui_language_detection":"BAHASA & PENGESANAN:",
-  "ui_language_english":"Inggeris",
   "ui_language_list_loaded_from_api":"Senarai bahasa dimuatkan daripada API",
   "ui_language_not_available":"Bahasa tidak tersedia: %s",
   "ui_later":"⏰ Kemudian",

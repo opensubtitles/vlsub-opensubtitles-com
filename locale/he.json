@@ -148,7 +148,6 @@
   "ui_json_module_loaded_successfully":"מודול JSON נטען בהצלחה",
   "ui_language_auto":"אוטומטי (שפת המערכת)",
   "ui_language_detection":"שפה וזיהוי:",
-  "ui_language_english":"אנגלית",
   "ui_language_list_loaded_from_api":"רשימת השפות נטענה מה-API",
   "ui_language_not_available":"השפה אינה זמינה: %s",
   "ui_later":"⏰ מאוחר יותר",

@@ -148,7 +148,6 @@
   "ui_json_module_loaded_successfully":"JSON-modulet er indlæst",
   "ui_language_auto":"Automatisk (systemsprog)",
   "ui_language_detection":"SPROG & REGISTRERING:",
-  "ui_language_english":"Engelsk",
   "ui_language_list_loaded_from_api":"Sproglisten er hentet fra API'et",
   "ui_language_not_available":"Sproget er ikke tilgængeligt: %s",
   "ui_later":"⏰ Senere",

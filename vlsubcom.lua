@@ -457,7 +457,6 @@ local strings = {
   ui_network_test_failed_ms = "Network test failed: %s (%sms)",
   ui_loading = "Loading",
   ui_interface_language = "Interface language",
-  ui_language_english = "English",
   ui_language_auto = "Automatic (system language)",
   ui_translation_not_available = "The translation for \"%s\" could not be downloaded. The interface stays as it is.",
   ui_translation_unreviewed = "(not reviewed)",
@@ -670,6 +669,44 @@ end
 local function on_macos()
   local dir = vlc.config.userdatadir() or ""
   return string.find(dir, "/Library/Application Support/", 1, true) ~= nil
+end
+
+-- Break a long line of label text with <br> so that no line is wider than
+-- `limit` columns. Tags are kept whole and count nothing; East Asian
+-- characters count two columns and may be broken anywhere.
+local function wrap_text(text, limit)
+  local function columns_of(char)
+    if string.sub(char, 1, 1) == "<" then return 0 end
+    local first = string.byte(char)
+    return (first >= 227 and first <= 237) and 2 or 1
+  end
+  local out, width, last_space = {}, 0, nil
+  local position = 1
+  while position <= #text do
+    local piece = string.match(text, "^<[^>]*>", position)
+      or string.match(text, "^[%z\1-\127\194-\244][\128-\191]*", position)
+      or string.sub(text, position, position)
+    local columns = columns_of(piece)
+    if columns > 0 and piece ~= " " and width + columns > limit then
+      if last_space then
+        -- break at the last space of this line; what followed it starts the next
+        out[last_space] = "<br>"
+        width = 0
+        for i = last_space + 1, #out do width = width + columns_of(out[i]) end
+        last_space = nil
+      end
+      if width + columns > limit and width > 0 then
+        -- no space to break at (Chinese, Japanese ...): break right here
+        out[#out + 1] = "<br>"
+        width = 0
+      end
+    end
+    out[#out + 1] = piece
+    if piece == " " then last_space = #out end
+    width = width + columns
+    position = position + #piece
+  end
+  return table.concat(out)
 end
 
 -- vlc.dialog(), with the macOS label problem handled in one place: the
@@ -1995,7 +2032,9 @@ function interface_config()
 
   -- English, automatic, then the reviewed translations known so far
   openSub.conf.interfaceLanguages = {
-    { "en", strings.ui_language_english },
+    -- every language under its own name, whatever the interface language:
+    -- someone who ended up in a language they cannot read must find theirs
+    { "en", "English" },
     { "auto", strings.ui_language_auto }
   }
   for _, language in ipairs(available_interface_languages()) do
@@ -2007,37 +2046,44 @@ end
 
 -- Modified interface_help function with improved content
 function interface_help()
+  -- macOS does not widen the window for a long label: it cuts the line off.
+  -- Wrap there; Qt sizes the window to its content and needs nothing.
+  local wrap = on_macos()
+  local function line(text)
+    return wrap and wrap_text(text, 64) or text
+  end
+
   -- Row 1: Search Methods
-  dlg:add_label(strings.ui_search_methods, 1, 1, 6, 1)
-  dlg:add_label(strings.ui_hash_search_uses_video_file_fingerprint_for, 1, 2, 6, 1)
-  dlg:add_label(strings.ui_name_search_uses_guessit_api_to_extract, 1, 3, 6, 1)
-  dlg:add_label(strings.ui_auto_fallback_from_hash_to_name_search, 1, 4, 6, 1)
+  dlg:add_label(line(strings.ui_search_methods), 1, 1, 6, 1)
+  dlg:add_label(line(strings.ui_hash_search_uses_video_file_fingerprint_for), 1, 2, 6, 1)
+  dlg:add_label(line(strings.ui_name_search_uses_guessit_api_to_extract), 1, 3, 6, 1)
+  dlg:add_label(line(strings.ui_auto_fallback_from_hash_to_name_search), 1, 4, 6, 1)
 
   -- Row 5: Language Features
   dlg:add_label("", 1, 5, 6, 1) -- Spacer
-  dlg:add_label(strings.ui_language_detection, 1, 6, 6, 1)
-  dlg:add_label(strings.ui_auto_detects_locale_from_system_settings_ip, 1, 7, 6, 1)
-  dlg:add_label(strings.ui_results_grouped_by_selected_languages_in_priorit, 1, 8, 6, 1)
-  dlg:add_label(strings.ui_choose_up_to_3_preferred_subtitle_languages, 1, 9, 6, 1)
+  dlg:add_label(line(strings.ui_language_detection), 1, 6, 6, 1)
+  dlg:add_label(line(strings.ui_auto_detects_locale_from_system_settings_ip), 1, 7, 6, 1)
+  dlg:add_label(line(strings.ui_results_grouped_by_selected_languages_in_priorit), 1, 8, 6, 1)
+  dlg:add_label(line(strings.ui_choose_up_to_3_preferred_subtitle_languages), 1, 9, 6, 1)
 
   -- Row 10: Technical Details
   dlg:add_label("", 1, 10, 6, 1) -- Spacer
-  dlg:add_label(strings.ui_technical_info, 1, 11, 6, 1)
-  dlg:add_label(strings.ui_guessit_api_extracts_movie_tv_metadata_from, 1, 12, 6, 1)
-  dlg:add_label(strings.ui_shows_quality_indicators_trusted_uploaders_downl, 1, 13, 6, 1)
-  dlg:add_label(strings.ui_windows_use_english_characters_in_file_paths, 1, 14, 6, 1)
+  dlg:add_label(line(strings.ui_technical_info), 1, 11, 6, 1)
+  dlg:add_label(line(strings.ui_guessit_api_extracts_movie_tv_metadata_from), 1, 12, 6, 1)
+  dlg:add_label(line(strings.ui_shows_quality_indicators_trusted_uploaders_downl), 1, 13, 6, 1)
+  dlg:add_label(line(strings.ui_windows_use_english_characters_in_file_paths), 1, 14, 6, 1)
 
   -- Row 15: Account & Download
   dlg:add_label("", 1, 15, 6, 1) -- Spacer
-  dlg:add_label(strings.ui_account_quotas, 1, 16, 6, 1)
-  dlg:add_label(strings.ui_free_opensubtitles_com_account_required_for_down, 1, 17, 6, 1)
-  dlg:add_label(strings.ui_extension_displays_your_rank_daily_quota_and, 1, 18, 6, 1)
-  dlg:add_label(strings.ui_select_subtitle_and_click_download_or_link, 1, 19, 6, 1)
+  dlg:add_label(line(strings.ui_account_quotas), 1, 16, 6, 1)
+  dlg:add_label(line(strings.ui_free_opensubtitles_com_account_required_for_down), 1, 17, 6, 1)
+  dlg:add_label(line(strings.ui_extension_displays_your_rank_daily_quota_and), 1, 18, 6, 1)
+  dlg:add_label(line(strings.ui_select_subtitle_and_click_download_or_link), 1, 19, 6, 1)
 
   -- Row 20: Links
   dlg:add_label("", 1, 20, 6, 1) -- Spacer
-  dlg:add_label(strings.ui_support_opensubtitles_thank_you_very_much, 1, 21, 6, 1)
-  dlg:add_label(strings.ui_github_opensubtitles_vlsub_opensubtitles_com_sou, 1, 22, 6, 1)
+  dlg:add_label(line(strings.ui_support_opensubtitles_thank_you_very_much), 1, 21, 6, 1)
+  dlg:add_label(line(strings.ui_github_opensubtitles_vlsub_opensubtitles_com_sou), 1, 22, 6, 1)
 
   -- Row 23: Close button with icon
   dlg:add_label("", 1, 23, 6, 1) -- Spacer

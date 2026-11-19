@@ -148,7 +148,6 @@
   "ui_json_module_loaded_successfully":"JSON మాడ్యూల్ విజయవంతంగా లోడ్ అయింది",
   "ui_language_auto":"స్వయంచాలకం (సిస్టమ్ భాష)",
   "ui_language_detection":"భాష & గుర్తింపు:",
-  "ui_language_english":"ఇంగ్లీష్",
   "ui_language_list_loaded_from_api":"API నుండి భాషల జాబితా లోడ్ అయింది",
   "ui_language_not_available":"భాష అందుబాటులో లేదు: %s",
   "ui_later":"⏰ తర్వాత",

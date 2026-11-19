@@ -148,7 +148,6 @@
   "ui_json_module_loaded_successfully":"โหลดโมดูล JSON สำเร็จ",
   "ui_language_auto":"อัตโนมัติ (ภาษาของระบบ)",
   "ui_language_detection":"ภาษาและการตรวจหา:",
-  "ui_language_english":"ภาษาอังกฤษ",
   "ui_language_list_loaded_from_api":"โหลดรายการภาษาจาก API แล้ว",
   "ui_language_not_available":"ภาษานี้ไม่พร้อมใช้งาน: %s",
   "ui_later":"⏰ ภายหลัง",

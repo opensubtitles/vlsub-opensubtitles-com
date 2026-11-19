@@ -148,7 +148,6 @@
   "ui_json_module_loaded_successfully":"JSON-moduuli ladattu",
   "ui_language_auto":"Automaattinen (järjestelmän kieli)",
   "ui_language_detection":"KIELI JA TUNNISTUS:",
-  "ui_language_english":"Englanti",
   "ui_language_list_loaded_from_api":"Kieliluettelo ladattu API:sta",
   "ui_language_not_available":"Kieli ei ole saatavilla: %s",
   "ui_later":"⏰ Myöhemmin",

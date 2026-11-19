@@ -148,7 +148,6 @@
   "ui_json_module_loaded_successfully":"ماژول JSON با موفقیت بارگیری شد",
   "ui_language_auto":"خودکار (زبان سیستم)",
   "ui_language_detection":"زبان و تشخیص:",
-  "ui_language_english":"انگلیسی",
   "ui_language_list_loaded_from_api":"فهرست زبان‌ها از API بارگیری شد",
   "ui_language_not_available":"این زبان در دسترس نیست: %s",
   "ui_later":"⏰ بعداً",

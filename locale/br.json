@@ -148,7 +148,6 @@
   "ui_json_module_loaded_successfully":"Karget mat eo bet ar mollad JSON",
   "ui_language_auto":"Emgefreek (yezh ar reizhiad)",
   "ui_language_detection":"YEZH HA DINOIÑ:",
-  "ui_language_english":"Saozneg",
   "ui_language_list_loaded_from_api":"Roll ar yezhoù karget diwar an API",
   "ui_language_not_available":"N'eo ket hegerz ar yezh: %s",
   "ui_later":"⏰ Diwezhatoc'h",

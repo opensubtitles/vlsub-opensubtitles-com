@@ -148,7 +148,6 @@
   "ui_json_module_loaded_successfully":"JSON մոդուլը հաջողությամբ բեռնվեց",
   "ui_language_auto":"Ինքնաշխատ (համակարգի լեզու)",
   "ui_language_detection":"ԼԵԶՈՒ ԵՎ ՈՐՈՇՈՒՄ՝",
-  "ui_language_english":"Անգլերեն",
   "ui_language_list_loaded_from_api":"Լեզուների ցանկը բեռնվեց API-ից",
   "ui_language_not_available":"Լեզուն հասանելի չէ՝ %s",
   "ui_later":"⏰ Ավելի ուշ",

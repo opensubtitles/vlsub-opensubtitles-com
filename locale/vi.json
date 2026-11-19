@@ -148,7 +148,6 @@
   "ui_json_module_loaded_successfully":"Đã nạp mô-đun JSON thành công",
   "ui_language_auto":"Tự động (ngôn ngữ hệ thống)",
   "ui_language_detection":"NGÔN NGỮ & PHÁT HIỆN:",
-  "ui_language_english":"Tiếng Anh",
   "ui_language_list_loaded_from_api":"Đã nạp danh sách ngôn ngữ từ API",
   "ui_language_not_available":"Ngôn ngữ này không khả dụng: %s",
   "ui_later":"⏰ Để sau",

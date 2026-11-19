@@ -148,7 +148,6 @@
   "ui_json_module_loaded_successfully":"A JSON modul sikeresen betöltve",
   "ui_language_auto":"Automatikus (a rendszer nyelve)",
   "ui_language_detection":"NYELV ÉS ÉSZLELÉS:",
-  "ui_language_english":"Angol",
   "ui_language_list_loaded_from_api":"A nyelvlista betöltve az API-ból",
   "ui_language_not_available":"Ez a nyelv nem érhető el: %s",
   "ui_later":"⏰ Később",

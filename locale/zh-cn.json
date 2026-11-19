@@ -148,7 +148,6 @@
   "ui_json_module_loaded_successfully":"JSON 模块加载成功",
   "ui_language_auto":"自动 (系统语言)",
   "ui_language_detection":"语言与检测:",
-  "ui_language_english":"英语",
   "ui_language_list_loaded_from_api":"已从 API 加载语言列表",
   "ui_language_not_available":"该语言不可用: %s",
   "ui_later":"⏰ 稍后",

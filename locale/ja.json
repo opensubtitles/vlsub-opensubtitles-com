@@ -148,7 +148,6 @@
   "ui_json_module_loaded_successfully":"JSON モジュールをロードしました",
   "ui_language_auto":"自動 (システムの言語)",
   "ui_language_detection":"言語と検出:",
-  "ui_language_english":"英語",
   "ui_language_list_loaded_from_api":"API から言語リストをロードしました",
   "ui_language_not_available":"この言語は利用できません: %s",
   "ui_later":"⏰ 後で",

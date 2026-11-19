@@ -148,7 +148,6 @@
   "ui_json_module_loaded_successfully":"Модулот JSON е успешно вчитан",
   "ui_language_auto":"Автоматски (јазик на системот)",
   "ui_language_detection":"ЈАЗИК И ОТКРИВАЊЕ:",
-  "ui_language_english":"Англиски",
   "ui_language_list_loaded_from_api":"Списокот со јазици е вчитан од API",
   "ui_language_not_available":"Јазикот не е достапен: %s",
   "ui_later":"⏰ Подоцна",

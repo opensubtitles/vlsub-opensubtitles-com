@@ -148,7 +148,6 @@
   "ui_json_module_loaded_successfully":"JSON-moodul laaditud",
   "ui_language_auto":"Automaatne (süsteemi keel)",
   "ui_language_detection":"KEEL JA TUVASTAMINE:",
-  "ui_language_english":"Inglise",
   "ui_language_list_loaded_from_api":"Keelte loend laaditud API-st",
   "ui_language_not_available":"Keel pole saadaval: %s",
   "ui_later":"⏰ Hiljem",

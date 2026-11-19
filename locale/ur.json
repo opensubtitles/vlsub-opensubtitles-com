@@ -148,7 +148,6 @@
   "ui_json_module_loaded_successfully":"JSON ماڈیول کامیابی سے لوڈ ہو گیا",
   "ui_language_auto":"خودکار (سسٹم کی زبان)",
   "ui_language_detection":"زبان اور شناخت:",
-  "ui_language_english":"انگریزی",
   "ui_language_list_loaded_from_api":"API سے زبانوں کی فہرست لوڈ ہو گئی",
   "ui_language_not_available":"زبان دستیاب نہیں: %s",
   "ui_later":"⏰ بعد میں",

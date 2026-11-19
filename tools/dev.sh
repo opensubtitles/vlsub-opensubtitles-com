@@ -7,6 +7,7 @@
 #   tools/dev.sh errors      show VLSub's Lua errors from the last run (exit 1 if any)
 #   tools/dev.sh requests    list the API requests made during the last run
 #   tools/dev.sh log         follow the VLSub lines of the log (Ctrl-C to stop)
+#   tools/dev.sh crash       after VLC quit by itself: end of the log and the newest crash report
 #   tools/dev.sh locale      interface translations: where they are fetched from, what
 #                            the last run fetched, what is stored, what the config says
 #   tools/dev.sh test        offline test suite (tests/run.sh)
@@ -116,6 +117,25 @@ case "${1:-help}" in
   requests)
     [ -f "$LOG" ] || { echo "no log yet - start VLC with: tools/dev.sh run"; exit 1; }
     grep -E "\[VLSub\] (GET|POST|PUT|DELETE) " "$LOG" | sed 's/.*\[VLSub\] //' | cut -c1-160
+    ;;
+  crash)
+    echo "== last VLSub / Lua lines of the log ($LOG):"
+    [ -f "$LOG" ] && grep -i -E "vlsub|lua" "$LOG" | tail -25 | cut -c1-220 || echo "   no log"
+    echo "== last 8 lines of the log, whatever they are:"
+    [ -f "$LOG" ] && tail -8 "$LOG" | cut -c1-220
+    REPORTS="$HOME/Library/Logs/DiagnosticReports"
+    if [ -d "$REPORTS" ]; then
+      NEWEST="$(ls -t "$REPORTS" 2>/dev/null | grep -i '^vlc' | head -1)"
+      if [ -n "$NEWEST" ]; then
+        echo "== newest crash report: $REPORTS/$NEWEST"
+        grep -m1 -n -E "Crashed Thread|\"faultingThread\"" "$REPORTS/$NEWEST" || true
+        grep -E -i "exception|termination|crashed|abort|assert" "$REPORTS/$NEWEST" | head -12 | cut -c1-220
+        echo "-- frames mentioning lua / extension / dialog / WebKit / AttributedString:"
+        grep -E -i "lua|extension|dialog|webkit|webcore|attributedstring|NSHTML" "$REPORTS/$NEWEST" | head -30 | cut -c1-220
+      else
+        echo "== no VLC crash report in $REPORTS (macOS writes it a few seconds after the crash)"
+      fi
+    fi
     ;;
   locale)
     BRANCH="$(git -C "$ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null || echo main)"

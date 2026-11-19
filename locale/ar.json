@@ -148,7 +148,6 @@
   "ui_json_module_loaded_successfully":"تم تحميل وحدة JSON بنجاح",
   "ui_language_auto":"تلقائي (لغة النظام)",
   "ui_language_detection":"اللغة والاكتشاف:",
-  "ui_language_english":"الإنجليزية",
   "ui_language_list_loaded_from_api":"تم تحميل قائمة اللغات من API",
   "ui_language_not_available":"اللغة غير متاحة: %s",
   "ui_later":"⏰ لاحقًا",

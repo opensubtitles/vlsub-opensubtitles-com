@@ -148,7 +148,6 @@
   "ui_json_module_loaded_successfully":"Modulul JSON a fost încărcat",
   "ui_language_auto":"Automat (limba sistemului)",
   "ui_language_detection":"LIMBĂ ȘI DETECTARE:",
-  "ui_language_english":"Engleză",
   "ui_language_list_loaded_from_api":"Lista de limbi a fost încărcată din API",
   "ui_language_not_available":"Limbă indisponibilă: %s",
   "ui_later":"⏰ Mai târziu",

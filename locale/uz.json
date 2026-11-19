@@ -148,7 +148,6 @@
   "ui_json_module_loaded_successfully":"JSON moduli muvaffaqiyatli yuklandi",
   "ui_language_auto":"Avtomatik (tizim tili)",
   "ui_language_detection":"TIL VA ANIQLASH:",
-  "ui_language_english":"Inglizcha",
   "ui_language_list_loaded_from_api":"Tillar ro'yxati API orqali yuklandi",
   "ui_language_not_available":"Til mavjud emas: %s",
   "ui_later":"⏰ Keyinroq",

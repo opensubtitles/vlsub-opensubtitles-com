@@ -148,7 +148,6 @@
   "ui_json_module_loaded_successfully":"Το άρθρωμα JSON φορτώθηκε επιτυχώς",
   "ui_language_auto":"Αυτόματα (γλώσσα συστήματος)",
   "ui_language_detection":"ΓΛΩΣΣΑ ΚΑΙ ΕΝΤΟΠΙΣΜΟΣ:",
-  "ui_language_english":"Αγγλικά",
   "ui_language_list_loaded_from_api":"Η λίστα γλωσσών φορτώθηκε από το API",
   "ui_language_not_available":"Η γλώσσα δεν είναι διαθέσιμη: %s",
   "ui_later":"⏰ Αργότερα",

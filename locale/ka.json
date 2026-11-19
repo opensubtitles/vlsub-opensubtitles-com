@@ -148,7 +148,6 @@
   "ui_json_module_loaded_successfully":"JSON-მოდული წარმატებით ჩაიტვირთა",
   "ui_language_auto":"ავტომატური (სისტემის ენა)",
   "ui_language_detection":"ენა და ამოცნობა:",
-  "ui_language_english":"ინგლისური",
   "ui_language_list_loaded_from_api":"ენების სია ჩაიტვირთა API-დან",
   "ui_language_not_available":"ენა მიუწვდომელია: %s",
   "ui_later":"⏰ მოგვიანებით",

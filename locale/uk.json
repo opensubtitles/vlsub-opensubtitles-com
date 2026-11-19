@@ -148,7 +148,6 @@
   "ui_json_module_loaded_successfully":"Модуль JSON успішно завантажено",
   "ui_language_auto":"Автоматично (мова системи)",
   "ui_language_detection":"МОВА І ВИЗНАЧЕННЯ:",
-  "ui_language_english":"Англійська",
   "ui_language_list_loaded_from_api":"Список мов завантажено з API",
   "ui_language_not_available":"Мова недоступна: %s",
   "ui_later":"⏰ Пізніше",

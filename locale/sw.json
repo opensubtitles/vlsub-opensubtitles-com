@@ -148,7 +148,6 @@
   "ui_json_module_loaded_successfully":"Moduli ya JSON imepakiwa",
   "ui_language_auto":"Kiotomatiki (lugha ya mfumo)",
   "ui_language_detection":"LUGHA NA UTAMBUZI:",
-  "ui_language_english":"Kiingereza",
   "ui_language_list_loaded_from_api":"Orodha ya lugha imepakiwa kutoka API",
   "ui_language_not_available":"Lugha haipatikani: %s",
   "ui_later":"⏰ Baadaye",

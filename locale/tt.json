@@ -148,7 +148,6 @@
   "ui_json_module_loaded_successfully":"JSON модуле уңышлы йөкләнде",
   "ui_language_auto":"Автоматик (система теле)",
   "ui_language_detection":"ТЕЛ ҺӘМ АЧЫКЛАУ:",
-  "ui_language_english":"Инглизчә",
   "ui_language_list_loaded_from_api":"Телләр исемлеге API-дан йөкләнде",
   "ui_language_not_available":"Тел юк: %s",
   "ui_later":"⏰ Соңрак",

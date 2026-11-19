@@ -148,7 +148,6 @@
   "ui_json_module_loaded_successfully":"Moduli JSON u ngarkua me sukses",
   "ui_language_auto":"Automatike (gjuha e sistemit)",
   "ui_language_detection":"GJUHA DHE ZBULIMI:",
-  "ui_language_english":"Anglisht",
   "ui_language_list_loaded_from_api":"Lista e gjuhëve u ngarkua nga API",
   "ui_language_not_available":"Gjuha nuk është e disponueshme: %s",
   "ui_later":"⏰ Më vonë",

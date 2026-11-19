@@ -148,7 +148,6 @@
   "ui_json_module_loaded_successfully":"បានផ្ទុកម៉ូឌុល JSON ដោយជោគជ័យ",
   "ui_language_auto":"ស្វ័យប្រវត្តិ (ភាសាប្រព័ន្ធ)",
   "ui_language_detection":"ភាសា និងការរកឃើញ:",
-  "ui_language_english":"អង់គ្លេស",
   "ui_language_list_loaded_from_api":"បានផ្ទុកបញ្ជីភាសាពី API",
   "ui_language_not_available":"ភាសានេះមិនមានទេ: %s",
   "ui_later":"⏰ ពេលក្រោយ",

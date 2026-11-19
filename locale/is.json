@@ -148,7 +148,6 @@
   "ui_json_module_loaded_successfully":"JSON-einingu hlaðið inn",
   "ui_language_auto":"Sjálfvirkt (tungumál kerfis)",
   "ui_language_detection":"TUNGUMÁL OG GREINING:",
-  "ui_language_english":"Enska",
   "ui_language_list_loaded_from_api":"Tungumálalisti sóttur frá API",
   "ui_language_not_available":"Tungumálið er ekki tiltækt: %s",
   "ui_later":"⏰ Seinna",

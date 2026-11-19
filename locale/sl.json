@@ -148,7 +148,6 @@
   "ui_json_module_loaded_successfully":"Modul JSON je uspešno naložen",
   "ui_language_auto":"Samodejno (jezik sistema)",
   "ui_language_detection":"JEZIK IN ZAZNAVANJE:",
-  "ui_language_english":"Angleščina",
   "ui_language_list_loaded_from_api":"Seznam jezikov je naložen iz API-ja",
   "ui_language_not_available":"Jezik ni na voljo: %s",
   "ui_later":"⏰ Pozneje",

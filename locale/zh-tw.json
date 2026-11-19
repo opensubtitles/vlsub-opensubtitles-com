@@ -148,7 +148,6 @@
   "ui_json_module_loaded_successfully":"JSON 模組載入成功",
   "ui_language_auto":"自動 (系統語言)",
   "ui_language_detection":"語言與偵測:",
-  "ui_language_english":"英語",
   "ui_language_list_loaded_from_api":"已從 API 載入語言清單",
   "ui_language_not_available":"無法使用此語言: %s",
   "ui_later":"⏰ 稍後",

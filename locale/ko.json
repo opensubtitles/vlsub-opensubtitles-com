@@ -148,7 +148,6 @@
   "ui_json_module_loaded_successfully":"JSON 모듈을 불러왔습니다",
   "ui_language_auto":"자동 (시스템 언어)",
   "ui_language_detection":"언어 및 감지:",
-  "ui_language_english":"영어",
   "ui_language_list_loaded_from_api":"API에서 언어 목록을 불러왔습니다",
   "ui_language_not_available":"사용할 수 없는 언어입니다: %s",
   "ui_later":"⏰ 나중에",

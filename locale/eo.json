@@ -148,7 +148,6 @@
   "ui_json_module_loaded_successfully":"JSON-modulo sukcese ŝargita",
   "ui_language_auto":"Aŭtomata (lingvo de la sistemo)",
   "ui_language_detection":"LINGVO KAJ DETEKTADO:",
-  "ui_language_english":"Angla",
   "ui_language_list_loaded_from_api":"Lingvolisto ŝargita el la API",
   "ui_language_not_available":"Lingvo ne disponebla: %s",
   "ui_later":"⏰ Poste",

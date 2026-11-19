@@ -148,7 +148,6 @@
   "ui_json_module_loaded_successfully":"JSON මොඩියුලය සාර්ථකව පැටවිණි",
   "ui_language_auto":"ස්වයංක්‍රීය (පද්ධති භාෂාව)",
   "ui_language_detection":"භාෂාව සහ හඳුනාගැනීම:",
-  "ui_language_english":"ඉංග්‍රීසි",
   "ui_language_list_loaded_from_api":"භාෂා ලැයිස්තුව API වෙතින් පැටවිණි",
   "ui_language_not_available":"මෙම භාෂාව ලබා ගත නොහැක: %s",
   "ui_later":"⏰ පසුව",

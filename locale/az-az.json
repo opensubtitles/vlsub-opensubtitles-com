@@ -148,7 +148,6 @@
   "ui_json_module_loaded_successfully":"JSON modulu uğurla yükləndi",
   "ui_language_auto":"Avtomatik (sistem dili)",
   "ui_language_detection":"DİL VƏ AŞKARLAMA:",
-  "ui_language_english":"İngilis",
   "ui_language_list_loaded_from_api":"Dil siyahısı API-dən yükləndi",
   "ui_language_not_available":"Dil mövcud deyil: %s",
   "ui_later":"⏰ Sonra",

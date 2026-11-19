@@ -558,6 +558,60 @@ describe("interface language: VLC for macOS", function()
     eq(env.errors(), {})
   end)
 
+  it("the way back: 'English' is offered under that name in every interface language", function()
+    -- (it was translated - "Angličtina", "英語" - so someone who had picked a
+    -- language they cannot read could not find English again)
+    for _, code in ipairs({ "sk", "ja", "ru", "ar" }) do
+      local translation = json.decode(H.read_file(H.ROOT .. "/locale/" .. code .. ".json"))
+      local env = with_translation(code, translation)
+      local texts = config_window(env).language:_texts()
+      local found = false
+      for _, text in ipairs(texts) do if text == "English" then found = true end end
+      ok(found, code .. ": " .. table.concat(texts, " | "))
+    end
+  end)
+
+  it("help window: no line is wider than the window can show (long lines are wrapped)", function()
+    local function widest(text) -- in columns, per visible line
+      local most = 0
+      for part in (text:gsub("<br>", "\n") .. "\n"):gmatch("(.-)\n") do
+        local plain = part:gsub("<[^>]*>", "")
+        local columns = 0
+        for char in plain:gmatch("[%z\1-\127\194-\244][\128-\191]*") do
+          local first = char:byte()
+          columns = columns + ((first >= 227 and first <= 237) and 2 or 1)
+        end
+        if columns > most then most = columns end
+      end
+      return most
+    end
+    for _, language in ipairs(index.languages) do
+      local translation = json.decode(H.read_file(H.ROOT .. "/locale/" .. language.code .. ".json"))
+      local env = with_translation(language.code, translation, { macos = true })
+      trigger_menu(3)
+      for _, item in ipairs(visible_texts(env.ui())) do
+        if item.kind == "label" then
+          ok(widest(item.shown) <= 66, language.code .. ": " .. widest(item.shown) .. " columns: " .. item.shown)
+          ok(not item.shown:find("<br>%s*$"), "ends with a break: " .. item.shown)
+        end
+      end
+    end
+    -- nothing is lost by wrapping
+    local env = with_translation("sk", SLOVAK, { macos = true })
+    trigger_menu(3)
+    local all = {}
+    for _, item in ipairs(visible_texts(env.ui())) do all[#all + 1] = (item.shown:gsub("<br>", " ")) end
+    has(table.concat(all, "\n"), SLOVAK.ui_name_search_uses_guessit_api_to_extract)
+  end)
+
+  it("help window on Linux / Windows is not wrapped: Qt sizes the window to the text", function()
+    local env = with_translation("sk", SLOVAK)
+    trigger_menu(3)
+    for _, item in ipairs(visible_texts(env.ui())) do
+      if item.kind == "label" then ok(not item.raw:find("<br>", 1, true) or SLOVAK[item.raw], item.raw) end
+    end
+  end)
+
   it("Linux / Windows: label text is passed through untouched", function()
     local env = with_translation("sk", SLOVAK)
     for _, item in ipairs(visible_texts(env.ui())) do
