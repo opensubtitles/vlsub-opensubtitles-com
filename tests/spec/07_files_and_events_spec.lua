@@ -114,67 +114,6 @@ describe("helpers", function()
     ok(not is_window_path("/home/x"))
   end)
 
-  it("parse_header lower-cases names (proxies send any case)", function()
-    H.launch({ activate = false })
-    local h = parse_header("HTTP/1.1 302 Found\r\nlocation: /x\r\nCONTENT-LENGTH: 5\r\n")
-    eq(tonumber(h["statuscode"]), 302)
-    eq(trim(h["location"]), "/x", "values keep the line's CR; callers trim")
-    eq(tonumber(h["content-length"]), 5)
-  end)
-end)
-
-describe("legacy socket client (http_req, used for translation downloads)", function()
-  local function request() return "GET /x HTTP/1.1\r\nHost: example.test\r\n\r\n" end
-
-  it("Content-Length body spread over many recv() calls", function()
-    local env = H.launch()
-    openSub.actionLabel = "test"
-    env.server.segment = 100
-    local body = string.rep("0123456789", 50)
-    env.server:on("GET example.test/x", function()
-      return api.response(200, body, { ["Content-Type"] = "text/plain" })
-    end)
-    local status, got = http_req("example.test", 80, request())
-    eq(status, 200)
-    eq(got, body)
-  end)
-
-  it("chunked body, whole chunks per recv()", function()
-    local env = H.launch()
-    openSub.actionLabel = "test"
-    env.server:on("GET example.test/x", function()
-      return api.response(200, "hello world, chunked", { ["Content-Type"] = "text/plain" }, { chunked = 6 })
-    end)
-    local status, got = http_req("example.test", 80, request())
-    eq(status, 200)
-    eq(got, "hello world, chunked")
-  end)
-
-  it("chunked body whose chunks are split across recv() calls", function()
-      local env = H.launch()
-      openSub.actionLabel = "test"
-      env.server.segment = 50
-      env.server:on("GET example.test/x", function()
-        return api.response(200, "hello world, chunked", { ["Content-Type"] = "text/plain" }, { chunked = 6 })
-      end)
-      local status, got = http_req("example.test", 80, request())
-      eq(status, 200)
-      eq(got, "hello world, chunked")
-    end)
-
-  it("follows a redirect with a well-formed second request", function()
-      local env = H.launch()
-      openSub.actionLabel = "test"
-      env.server:on("GET example.test/x", function()
-        return api.response(302, "", { Location = "http://example.test/y%20z?q=1" })
-      end)
-      env.server:on("GET example.test/y%20z", function()
-        return api.response(200, "moved", { ["Content-Type"] = "text/plain" })
-      end)
-      local status, got = http_req("example.test", 80, request())
-      eq(status, 200)
-      eq(got, "moved")
-    end)
 end)
 
 describe("windows and VLC callbacks", function()

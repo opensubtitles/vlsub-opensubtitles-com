@@ -34,13 +34,7 @@ local VLC_API = {
 -- must be reached only behind a nil check; the tests below prove the guarded
 -- path works. Adding a name here needs such a test.
 local KNOWN_ABSENT = {
-  ["vlc.misc"] = "interfaces only - not loaded for extensions",
-  ["vlc.misc.mdate"] = "interfaces only",
-  ["vlc.misc.mwait"] = "interfaces only",
-  ["vlc.net.connect_ssl"] = "never existed in 3.0: raw sockets are plain TCP",
   ["vlc.net.mkdir"] = "does not exist (vlc.io.mkdir does, since 3.0.2)",
-  ["vlc.net.readdir"] = "does not exist: vlc.net.opendir returns the list itself",
-  ["vlc.net.closedir"] = "does not exist: vlc.net.opendir returns the list itself",
   ["vlc.item"] = "only set for playlist parser scripts",
 }
 
@@ -107,10 +101,7 @@ describe("VLC environment", function()
   it("works without vlc.misc (no mdate/mwait in extensions)", function()
     local env = H.launch()
     eq(env.vlc.misc, nil, "mock mirrors VLC: vlc.misc is nil")
-    safe_mwait(5)
-    local stamp, keep = ui_yield_if_needed(nil, 15)
-    eq(type(stamp), "number")
-    eq(keep, true)
+    ok(not H.read_file(H.SCRIPT):find("vlc%.misc"), "the extension does not reference vlc.misc")
   end)
 
   it("does not use Lua features newer than 5.1/5.2", function()
@@ -132,16 +123,6 @@ describe("VLC environment", function()
       ok(src:find(name .. ' = "http://api%.opensubtitles%.com/'), name .. " is plain http")
     end
   end)
-
-  it("list_dir() works with the real vlc.net.opendir", function()
-      local env = H.launch()
-      H.write_file(env.home .. "/a.txt", "x")
-      local list = list_dir(env.home)
-      eq(type(list), "table", "list_dir result")
-      local found = false
-      for _, name in ipairs(list) do if name == "a.txt" then found = true end end
-      ok(found, "a.txt listed")
-    end)
 end)
 
 describe("VLC mock fidelity (documents real VLC behaviour)", function()
