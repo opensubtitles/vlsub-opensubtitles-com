@@ -202,6 +202,8 @@ function H.launch(o)
     H.real_execute('mkdir -p "' .. env.dir .. '"')
     H.write_file(env.dir .. "/vlsub_conf.json", json.encode(default_config(o)))
     for name, content in pairs(o.files or {}) do
+      local sub = name:match("^(.*)/[^/]*$")
+      if sub then H.real_execute('mkdir -p "' .. env.dir .. "/" .. sub .. '"') end
       H.write_file(env.dir .. "/" .. name, content)
     end
   end

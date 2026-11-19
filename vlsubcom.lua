@@ -479,7 +479,13 @@ local strings = {
   ui_testing_connection_n_of = "Testing connection %s/%s...",
   ui_connection_ok_ms = "Connection OK (responded in %sms)",
   ui_network_test_passed_ms = "Network test passed: %s (%sms)",
-  ui_network_test_failed_ms = "Network test failed: %s (%sms)"
+  ui_network_test_failed_ms = "Network test failed: %s (%sms)",
+  ui_loading = "Loading",
+  ui_interface_language = "Interface language",
+  ui_language_english = "English",
+  ui_language_auto = "Automatic (system language)",
+  ui_translation_not_available = "The translation for \"%s\" could not be downloaded. The interface stays as it is.",
+  ui_translation_unreviewed = "(not reviewed)"
 }
 
 -- A message with values filled in: tr(key, a, b) uses the string stored
@@ -706,6 +712,12 @@ local function apply_detected_languages(detected_locale, log, progress)
     end
   end
 
+  -- A new installation follows the detected language for the interface too
+  if not openSub.option.interfaceLanguage then
+    openSub.option.interfaceLanguage = "auto"
+    openSub.option.detectedLanguage = map_to_opensubtitles_language(suggestions[1].language)
+  end
+
   progress(strings.ui_saving_auto_detected_settings)
   if save_config() then
     log(strings.ui_auto_detected_settings_saved)
@@ -773,6 +785,7 @@ function activate()
     return false
   end
   configurationPassed = true
+  pcall(load_interface_language) -- stored translation, no network
   log(strings.ui_configuration_check_passed)
 
   -- Subtitle languages: built-in list first, then cache or API
@@ -804,6 +817,11 @@ function activate()
       openSub.option.language = saved_user_pref
     end
     apply_detected_languages(detected_locale, log, progress)
+
+    -- Fetch the translation for that language, if there is a reviewed one
+    if not networkTestsFailed and wanted_interface_language() then
+      pcall(refresh_interface_language)
+    end
   end
 
   -- What is playing (needed for auto-search)
@@ -846,6 +864,11 @@ function activate()
   else
     show_appropriate_window()
     if should_check_for_updates() then
+      -- at most once a day we are online anyway: also keep the list of
+      -- translations (and the one in use) fresh, at most once a week
+      if interface_language_is_stale() then
+        pcall(refresh_interface_language)
+      end
       pcall(function()
         check_for_updates(false)
       end)
@@ -1790,47 +1813,51 @@ function interface_config()
   input_table['removeTag'] = dlg:add_dropdown(3, 8, 1, 1)
 
 
-  -- Row 9: Working directory (moved up from row 10)
+  -- Row 9: Interface language
+  dlg:add_label(strings.ui_interface_language..":", 1, 9, 2, 1)
+  input_table['interfaceLanguage'] = dlg:add_dropdown(3, 9, 1, 1)
+
+  -- Row 10: Working directory
   if openSub.conf.dirPath then
     if openSub.conf.os == "lin" then
-      dlg:add_label(lang["int_vlsub_work_dir"], 1, 9, 2, 1)
+      dlg:add_label(lang["int_vlsub_work_dir"], 1, 10, 2, 1)
     elseif openSub.conf.os == "win" then
       dlg:add_label(
         "<a href='file:///"..openSub.conf.dirPath.."'>"..
-        lang["int_vlsub_work_dir"].."</a>", 1, 9, 2, 1)
+        lang["int_vlsub_work_dir"].."</a>", 1, 10, 2, 1)
     else
       dlg:add_label(
         "<a href='"..openSub.conf.dirPath.."'>"..
-        lang["int_vlsub_work_dir"].."</a>", 1, 9, 2, 1)
+        lang["int_vlsub_work_dir"].."</a>", 1, 10, 2, 1)
     end
   else
-    dlg:add_label(lang["int_vlsub_work_dir"], 1, 9, 2, 1)
+    dlg:add_label(lang["int_vlsub_work_dir"], 1, 10, 2, 1)
   end
 
   input_table['dir_path'] = dlg:add_text_input(
-    openSub.conf.dirPath, 2, 9, 2, 1)
+    openSub.conf.dirPath, 2, 10, 2, 1)
 
-  -- Row 10: Status message (moved up from row 11)
+  -- Row 11: Status message
   input_table['message'] = nil
-  input_table['message'] = dlg:add_label('', 1, 10, 4, 1)
+  input_table['message'] = dlg:add_label('', 1, 11, 4, 1)
 
-  -- Row 11: Action buttons (moved up from row 12)
+  -- Row 12: Action buttons
   dlg:add_button(
     "💾 " .. lang["int_save"],
-    apply_config, 1, 11, 1, 1)
+    apply_config, 1, 12, 1, 1)
 
   dlg:add_button(
     "❓ " .. lang["int_help"],
     function() show_help("config") end,
-    2, 11, 1, 1)
+    2, 12, 1, 1)
 
   dlg:add_button(
     strings.ui_check_updates,
-    function() check_for_updates(true) end, 3, 11, 1, 1)
+    function() check_for_updates(true) end, 3, 12, 1, 1)
 
   dlg:add_button(
     "❌ " .. lang["int_close"],
-    show_main, 4, 11, 1, 1)
+    show_main, 4, 12, 1, 1)
 
   -- Setup dropdown values for existing dropdowns
   input_table['langExt']:add_value(
@@ -1847,6 +1874,16 @@ function interface_config()
   assoc_select_conf('default_language2', 'language2', openSub.conf.languages, 2, 'None')
   assoc_select_conf('default_language3', 'language3', openSub.conf.languages, 2, 'None')
   assoc_select_conf('downloadBehaviour', 'downloadBehaviour', openSub.conf.downloadBehaviours, 1)
+
+  -- English, automatic, then the reviewed translations known so far
+  openSub.conf.interfaceLanguages = {
+    { "en", strings.ui_language_english },
+    { "auto", strings.ui_language_auto }
+  }
+  for _, language in ipairs(available_interface_languages()) do
+    table.insert(openSub.conf.interfaceLanguages, language)
+  end
+  assoc_select_conf('interfaceLanguage', 'interfaceLanguage', openSub.conf.interfaceLanguages, 2)
 end
 
 
@@ -2451,6 +2488,234 @@ function show_dkjson_error_dialog()
   error_dlg:add_button(strings.ui_close_2, function() error_dlg:delete() end, 3, 22, 2, 1)
 end
 
+            --[[ Interface translations ]]--
+
+-- The script carries English only. Translations are JSON files in the
+-- project's repository (locale/<code>.json, see locale/README.md); the one
+-- the user needs is downloaded once, kept in <VLSub folder>/locale/ and
+-- refreshed at most once a week. English is the fallback for every single
+-- string, so a missing or damaged translation can never leave a label empty.
+local LOCALE_URL = os.getenv("VLSUB_LOCALE_URL")
+  or "https://raw.githubusercontent.com/opensubtitles/vlsub-opensubtitles-com/main/locale/"
+local LOCALE_REFRESH_SECONDS = 7 * 24 * 60 * 60
+
+local english_strings = {}
+for key, value in pairs(strings) do
+  english_strings[key] = value
+end
+
+local function count_matches(text, pattern)
+  return select(2, string.gsub(text, pattern, ""))
+end
+
+local function html_tags(text)
+  local found = {}
+  for tag in string.gmatch(text, "<[^>]+>") do
+    table.insert(found, tag)
+  end
+  table.sort(found)
+  return table.concat(found, "\n")
+end
+
+-- A downloaded file is not trusted. A translated string is used only if it
+-- cannot break the interface: known key, a string of sane length, the same
+-- %s placeholders, the same HTML tags (so no markup or link can be injected)
+-- and the same leading/trailing space as the English original.
+local function usable_translation(key, value)
+  local english = english_strings[key]
+  if not english or type(value) ~= "string" or value == "" then
+    return false
+  end
+  if #value > #english * 4 + 60 then
+    return false
+  end
+  local placeholders = count_matches(english, "%%s")
+  if count_matches(value, "%%s") ~= placeholders then
+    return false
+  end
+  if placeholders > 0 and string.find(string.gsub(value, "%%s", ""), "%", 1, true) then
+    return false
+  end
+  if html_tags(value) ~= html_tags(english) then
+    return false
+  end
+  if (string.sub(english, 1, 1) == " ") ~= (string.sub(value, 1, 1) == " ")
+  or (string.sub(english, -1) == " ") ~= (string.sub(value, -1) == " ") then
+    return false
+  end
+  return true
+end
+
+-- Switch the interface to `translation` (key -> text), or back to English
+-- with nil. Returns how many strings were taken from the translation.
+function apply_interface_strings(translation)
+  for key, value in pairs(english_strings) do
+    strings[key] = value
+  end
+  local used = 0
+  if type(translation) == "table" then
+    for key, value in pairs(translation) do
+      if usable_translation(key, value) then
+        strings[key] = value
+        used = used + 1
+      end
+    end
+  end
+  -- lists built from strings
+  if openSub.conf.downloadBehaviours then
+    SetDownloadBehaviours()
+  end
+  return used
+end
+
+local function locale_dir()
+  return openSub.conf.dirPath and (openSub.conf.dirPath .. slash .. "locale") or nil
+end
+
+local function read_locale_file(name)
+  local dir = locale_dir()
+  local file = dir and io.open(dir .. slash .. name, "rb")
+  if not file then
+    return nil
+  end
+  local content = file:read("*all")
+  file:close()
+  local ok, data = pcall(json.decode, content, 1, true)
+  return (ok and type(data) == "table") and data or nil
+end
+
+local function write_locale_file(name, data)
+  local dir = locale_dir()
+  if not dir then
+    return false
+  end
+  if not is_dir(dir) then
+    mkdir_p(dir)
+  end
+  local file = io.open(dir .. slash .. name, "wb")
+  if not file then
+    return false
+  end
+  file:write(json.encode(data))
+  file:close()
+  return true
+end
+
+-- GET a file of the repository's locale folder. https, no headers: this is
+-- the one kind of request vlc.stream is good at. Returns the decoded JSON
+-- object, or nil.
+local function fetch_locale_file(name)
+  local client = Curl.new()
+  client:set_raw(true)
+  client:set_timeout(15)
+  client:set_retries(0)
+  local res = client:get(LOCALE_URL .. name)
+  if not res or res.status ~= 200 or not res.body then
+    return nil
+  end
+  -- a translation is a few kilobytes; refuse anything absurd
+  if #res.body > 200000 then
+    return nil
+  end
+  local ok, data = pcall(json.decode, res.body, 1, true)
+  return (ok and type(data) == "table") and data or nil
+end
+
+-- Languages that may be offered: { {code, name}, ... } from the stored
+-- index. Only reviewed ("ready") translations, unless the config file has
+-- "translationPreview": true (for people reviewing a translation).
+function available_interface_languages()
+  local index = read_locale_file("index.json")
+  local languages = {}
+  if index and type(index.languages) == "table" then
+    for _, language in ipairs(index.languages) do
+      if type(language) == "table" and type(language.code) == "string"
+         and string.match(language.code, "^[a-z][a-z%-]+$")
+         and type(language.name) == "string" and language.name ~= ""
+         and #language.name <= 40 and not string.find(language.name, "[<>&]") then
+        if language.status == "ready" then
+          table.insert(languages, { language.code, language.name })
+        elseif openSub.option.translationPreview == true then
+          table.insert(languages, { language.code,
+            language.name .. " " .. english_strings.ui_translation_unreviewed })
+        end
+      end
+    end
+  end
+  return languages
+end
+
+-- The language code the interface should be in, or nil for English.
+-- "auto" follows the language detected on first run (the same detection
+-- that picks the subtitle languages).
+function wanted_interface_language()
+  local choice = openSub.option.interfaceLanguage
+  if choice == "auto" then
+    choice = openSub.option.detectedLanguage or openSub.option.language
+  end
+  if not choice or choice == "" or choice == "en" then
+    return nil
+  end
+  if not string.match(choice, "^[a-z][a-z%-]+$") then
+    return nil
+  end
+  return choice
+end
+
+local function is_offered(code)
+  for _, language in ipairs(available_interface_languages()) do
+    if language[1] == code then
+      return true
+    end
+  end
+  return false
+end
+
+-- Use the stored translation for the wanted language, if there is one.
+-- No network. Returns true when the interface is in the wanted language
+-- (which includes "English wanted").
+function load_interface_language()
+  local code = wanted_interface_language()
+  if not code then
+    apply_interface_strings(nil)
+    return true
+  end
+  local stored = read_locale_file(code .. ".json")
+  if stored and type(stored.strings) == "table" and is_offered(code) then
+    apply_interface_strings(stored.strings)
+    return true
+  end
+  apply_interface_strings(nil)
+  return false
+end
+
+-- Download the list of languages and, if one is wanted and offered, its
+-- translation; store both. One or two small https requests. Returns true
+-- when the wanted language is available afterwards.
+function refresh_interface_language()
+  local index = fetch_locale_file("index.json")
+  if index and type(index.languages) == "table" then
+    index.fetched = os.time()
+    write_locale_file("index.json", index)
+  end
+
+  local code = wanted_interface_language()
+  if code and is_offered(code) then
+    local translation = fetch_locale_file(code .. ".json")
+    if translation then
+      write_locale_file(code .. ".json", { fetched = os.time(), strings = translation })
+    end
+  end
+  return load_interface_language()
+end
+
+-- True when the stored list of languages is older than a week (or absent).
+function interface_language_is_stale()
+  local index = read_locale_file("index.json")
+  local fetched = index and tonumber(index.fetched) or 0
+  return (os.time() - fetched) > LOCALE_REFRESH_SECONDS
+end
+
 function check_config()
   if is_window_path(vlc.config.datadir()) then
     openSub.conf.os = "win"
@@ -2653,6 +2918,22 @@ end
 
 -- Modified apply_config function to always save configuration settings
 function apply_config()
+  local language_before = openSub.option.interfaceLanguage
+  local language_changed, language_missing = false, nil
+
+  -- After everything else: if the interface language was changed, rebuild
+  -- the window in the new language and put the result message back.
+  local function finish()
+    if not language_changed then
+      return
+    end
+    local message = input_table["message"] and input_table["message"]:get_text() or ""
+    trigger_menu(2)
+    if language_missing then
+      message = error_tag(tr("ui_translation_not_available", language_missing)) .. "<br>" .. message
+    end
+    setMessage(message)
+  end
   -- Handle dropdown selections - get the actual language code from the stored mapping
   for select_id, v in pairs(select_conf) do
     if input_table[select_id]
@@ -2752,6 +3033,13 @@ function apply_config()
     return
   end
 
+  -- A different interface language: fetch its translation now (the one
+  -- moment a download is expected by the user)
+  language_changed = (openSub.option.interfaceLanguage or "en") ~= (language_before or "en")
+  if language_changed and not refresh_interface_language() then
+    language_missing = wanted_interface_language()
+  end
+
 
   -- NOW HANDLE LOGIN VALIDATION (after config is saved)
   -- Check if we have credentials for login test
@@ -2759,7 +3047,7 @@ function apply_config()
     -- No credentials provided - still show success for saved settings
     setMessage(success_tag(strings.ui_configuration_saved_please_enter_opensubtitles_c))
     is_authenticated = false
-    return
+    return finish()
   end
 
   -- We have credentials, test login
@@ -2776,7 +3064,7 @@ function apply_config()
     is_authenticated = true
     -- Keep the successful message that was set by checkLoginAndUserInfo
     local current_message = input_table["message"]:get_text()
-    if current_message and string.find(current_message, "Success") then
+    if current_message and string.find(current_message, strings.mess_success, 1, true) then
       setMessage(current_message .. strings.ui_configuration_saved_you_can_now_close_this)
     else
       setMessage(success_tag(strings.ui_configuration_saved_and_login_successful_you_can))
@@ -2792,7 +3080,7 @@ function apply_config()
     local current_message = input_table["message"]:get_text()
 
     -- Check if there's already an error message from the login attempt
-    if current_message and (string.find(current_message, "Error") or string.find(current_message, "failed")) then
+    if current_message and (string.find(current_message, strings.mess_error, 1, true) or string.find(current_message, "failed")) then
       -- Append config saved notice to existing error message
       setMessage(current_message .. strings.ui_note_other_configuration_settings_were_saved_suc)
     else
@@ -2802,6 +3090,8 @@ function apply_config()
 
     dbg("Login failed but configuration was saved")
   end
+
+  finish()
 end
 
 
@@ -3685,7 +3975,7 @@ end
 
 function loading_tag(str)
   return "<span style='color:#6c757d;font-weight:bold;'>"..
-    "Loading"..":</span> "..str..""
+    strings.ui_loading..":</span> "..str..""
 end
 
 
@@ -4681,7 +4971,7 @@ openSub.downloadFromNewAPI = function(item, is_retry)
   if saved then
     -- saveAndLoadSubtitle has set a success message; append the quota to it
     local message = string.gsub(input_table["message"]:get_text(), "<[^>]*>", "")
-    message = string.gsub(message, "Success:%s*", "")
+    message = string.gsub(message, string.gsub(strings.mess_success, "%p", "%%%0") .. ":%s*", "")
     local quota = quota_text(used, remaining, reset_time)
     if quota ~= "" then
       message = message .. ". " .. quota .. "."

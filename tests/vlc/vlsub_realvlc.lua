@@ -303,6 +303,26 @@ else
   line("SKIP login + download (set VLSUB_USER and VLSUB_PASS to include them)")
 end
 
+step("interface language: fetch Slovak from the repository, window rebuilt in Slovak", function()
+  -- Slovak is still marked "review"; reviewers see it with translationPreview
+  openSub.option.translationPreview = true
+  trigger_menu(2)
+  -- the list of languages comes from the repository
+  check(refresh_interface_language() ~= nil, "refresh failed")
+  trigger_menu(2)
+  local language = ui():_at(3, 9, "dropdown")
+  line("     offered: " .. table.concat(language:_texts(), " | "))
+  language:_choose_text("^Sloven")
+  ui():_at(1, 12, "button"):_click()
+  line("     window: " .. ui().title)
+  line("     message: " .. message():gsub("<[^>]+>", ""))
+  check(ui().title:find("Nastavenie", 1, true), "the window is not in Slovak")
+  trigger_menu(1)
+  ui():_at(2, 1, "text_input"):set_text("zzz nothing here zzz")
+  ui():_at(6, 2, "button"):_click()
+  line("     message: " .. message():gsub("<[^>]+>", ""))
+end)
+
 step("deactivate()", function() deactivate() end)
 
 finish()

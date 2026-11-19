@@ -48,7 +48,20 @@ local EXCEPTIONS = {
                          requestMaxRetries = true },
   },
 }
+EXCEPTIONS[3] = {
+  name = "interface translations (phase 2)",
+  why = "new feature: an 'Interface language' row in the configuration window, the "
+     .. "interfaceLanguage / detectedLanguage settings, the stored locale/ files and the "
+     .. "requests that fetch them. With English in use everything else must be unchanged.",
+}
 local DROP_CONFIG_KEYS = EXCEPTIONS[2].drop_config_keys
+DROP_CONFIG_KEYS.interfaceLanguage = true
+DROP_CONFIG_KEYS.detectedLanguage = true
+
+local LOCALE_REQUEST = "raw.githubusercontent.com/opensubtitles/vlsub-opensubtitles-com/main/locale/"
+local function is_locale_request(text)
+  return text:find(LOCALE_REQUEST, 1, true) ~= nil
+end
 
 -- ------------------------------------------------------------ normalisation --
 local function canonical(v, indent)
@@ -108,6 +121,7 @@ local function snapshot(env, norm, cursor)
   snap.requests = {}
   for i = cursor.requests + 1, #env.server.requests do
     local r = env.server.requests[i]
+    if not is_locale_request(r.host .. r.path) then
     local headers = {}
     for _, h in ipairs(r.header_list) do headers[#headers + 1] = h[1] .. ": " .. h[2] end
     table.sort(headers) -- custom headers are emitted in table order, which is not behaviour
@@ -117,6 +131,7 @@ local function snapshot(env, norm, cursor)
       "body: " .. r.body,
       #r.problems > 0 and ("PROBLEMS: " .. table.concat(r.problems, "; ")) or "",
     }, "\n"))
+    end
   end
   cursor.requests = #env.server.requests
 
@@ -124,12 +139,32 @@ local function snapshot(env, norm, cursor)
   snap.windows = {}
   for index, d in ipairs(env.vlc._dialogs) do
     local w = { "#" .. index .. " " .. norm(d.title) .. (d.visible and " [visible]" or " [hidden]") }
+    -- Exception 3: the configuration window has one more row. Leave that row
+    -- out and number the remaining rows consecutively, in both recordings.
+    local is_config = d.title:find("Configuration", 1, true) ~= nil
+    local skip_row, rows, row_number = nil, {}, {}
+    if is_config then
+      for _, x in ipairs(d.widgets) do
+        if x.kind == "label" and x.text == "Interface language:" then skip_row = x.row end
+      end
+      for _, x in ipairs(d.widgets) do
+        if x.row and x.row ~= skip_row and not row_number[x.row] then
+          row_number[x.row] = true
+          rows[#rows + 1] = x.row
+        end
+      end
+      table.sort(rows)
+      for position, row in ipairs(rows) do row_number[row] = position end
+    end
     for _, x in ipairs(d.widgets) do
-      local line = string.format("%s @%s,%s %q", x.kind, tostring(x.col), tostring(x.row), norm(x.text or ""))
-      if x.kind == "check_box" then line = line .. " checked=" .. tostring(x.checked) end
-      w[#w + 1] = line
-      for _, v in ipairs(x.values) do
-        w[#w + 1] = "    " .. tostring(v.id) .. " " .. norm(v.text)
+      if not (is_config and x.row == skip_row and skip_row) then
+        local row = is_config and row_number[x.row] or x.row
+        local line = string.format("%s @%s,%s %q", x.kind, tostring(x.col), tostring(row), norm(x.text or ""))
+        if x.kind == "check_box" then line = line .. " checked=" .. tostring(x.checked) end
+        w[#w + 1] = line
+        for _, v in ipairs(x.values) do
+          w[#w + 1] = "    " .. tostring(v.id) .. " " .. norm(v.text)
+        end
       end
     end
     snap.windows[index] = table.concat(w, "\n")
@@ -139,6 +174,7 @@ local function snapshot(env, norm, cursor)
   snap.files = {}
   local p = H.real_popen('cd "' .. env.home .. '" && find . -type f | LC_ALL=C sort')
   for path in p:lines() do
+    if not path:find("/vlsub.com/locale/", 1, true) then
     local full = env.home .. "/" .. path:sub(3)
     local ls = H.real_popen('ls -l "' .. full .. '"')
     local mode = (ls:read("*l") or ""):sub(1, 10)
@@ -157,6 +193,7 @@ local function snapshot(env, norm, cursor)
       content = "<" .. #content .. " bytes>"
     end
     snap.files[#snap.files + 1] = norm(path) .. " " .. mode .. "\n" .. norm(content)
+    end
   end
   p:close()
 
@@ -170,13 +207,20 @@ local function snapshot(env, norm, cursor)
   snap.log = {}
   for i = cursor.log + 1, #env.vlc._log do
     local l = env.vlc._log[i]
-    if l.level ~= "dbg" then snap.log[#snap.log + 1] = l.level .. " " .. norm(l.msg) end
+    if l.level ~= "dbg" and not is_locale_request(l.msg) then
+      snap.log[#snap.log + 1] = l.level .. " " .. norm(l.msg)
+    end
   end
   cursor.log = #env.vlc._log
   snap.commands = {}
   for i = cursor.commands + 1, #env.commands do snap.commands[#snap.commands + 1] = norm(env.commands[i]) end
   cursor.commands = #env.commands
-  for i = cursor.executed + 1, #env.executed do snap.commands[#snap.commands + 1] = "exec " .. norm(env.executed[i]) end
+  for i = cursor.executed + 1, #env.executed do
+    -- creating the folder for stored translations is part of exception 3
+    if not env.executed[i]:find("vlsub.com[/\\]locale", 1, false) then
+      snap.commands[#snap.commands + 1] = "exec " .. norm(env.executed[i])
+    end
+  end
   cursor.executed = #env.executed
 
   return snap
@@ -295,5 +339,5 @@ end
 H.cleanup()
 print(string.format("\n%d sessions, %d steps compared on %s: %d identical, %d different",
   ran, steps, _VERSION, ran - failed, failed))
-print("agreed exceptions: " .. EXCEPTIONS[1].name .. "; " .. EXCEPTIONS[2].name)
+print("agreed exceptions: " .. EXCEPTIONS[1].name .. "; " .. EXCEPTIONS[2].name .. "; " .. EXCEPTIONS[3].name)
 os.exit(failed == 0 and 0 or 1)

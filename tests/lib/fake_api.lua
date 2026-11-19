@@ -306,6 +306,26 @@ function M.new(opts)
       assets = {} })
   end)
 
+  -- The repository's locale folder, as raw.githubusercontent.com serves it.
+  -- s.locale is { ["index.json"] = <text>, ["sk.json"] = <text>, ... }; by
+  -- default the real files of this checkout.
+  s.locale = {}
+  do
+    local dir = here .. "/../../locale/"
+    for _, name in ipairs({ "index.json", "sk.json" }) do
+      local f = io.open(dir .. name, "rb")
+      if f then s.locale[name] = f:read("*a") f:close() end
+    end
+  end
+  s:on("GET raw.githubusercontent.com/opensubtitles/vlsub-opensubtitles-com/main/locale/*", function(req, srv)
+    local name = req.path:match("([^/]+)$")
+    local content = srv.locale[name]
+    if not content then
+      return M.response(404, "404: Not Found", { ["Content-Type"] = "text/plain" })
+    end
+    return M.response(200, content, { ["Content-Type"] = "text/plain; charset=utf-8" })
+  end)
+
   s:on("GET api.myip.com/", function()
     return M.response(200, { ip = "203.0.113.7", country = "Slovakia", cc = "SK" })
   end)

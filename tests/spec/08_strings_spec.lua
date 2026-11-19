@@ -30,7 +30,9 @@ describe("interface strings", function()
     for key in src:gmatch('[^%w_.]tr%("([%a_][%w_]*)"') do
       if not defined[key] then missing[key] = true end
     end
-    for key in src:gmatch('message = "(ui_[%w_]*)"') do
+    -- keys kept in tables and looked up later: any quoted "ui_..." in the code
+    local code = src:gsub("\nlocal strings = %b{}", "", 1)
+    for key in code:gmatch('"(ui_[%w_]*)"') do
       if not defined[key] then missing[key] = true end
     end
     local names = {}

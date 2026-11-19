@@ -57,6 +57,13 @@ echo "checkout: $ROOT ($(git -C "$ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null)
 echo "timeout:  ${TIMEOUT}s   verbosity: $VERBOSE (-v, -vv for more)"
 echo
 
+# Translations are fetched from the repository. On a branch, fetch that
+# branch's locale/ folder (it must be pushed); on main this is the real URL.
+BRANCH="$(git -C "$ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null || echo main)"
+: "${VLSUB_LOCALE_URL:=https://raw.githubusercontent.com/opensubtitles/vlsub-opensubtitles-com/$BRANCH/locale/}"
+export VLSUB_LOCALE_URL
+echo "locale:   $VLSUB_LOCALE_URL"
+
 VLC_FLAGS=""
 [ "$VERBOSE" -ge 2 ] && VLC_FLAGS="--verbose=2"
 
