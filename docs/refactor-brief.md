@@ -123,9 +123,38 @@ exceptions that could change what a user sees or what is sent to the API.
 Work stays on `dev`. No merge to `main` and no release without an explicit
 instruction.
 
-## Not part of this refactor (possible later features)
+## Phase 2 - interface translations (after the refactor is verified)
 
-- Shipping interface translations inside the script. Feasible: the strings
-  table already exists and a language could be chosen from the detected
-  locale. It needs about 30 messages that are currently hard-coded in English
-  moved into the table first, and the translations themselves.
+Separate from the refactor on purpose: the refactor must be provably
+behaviour-neutral, and translations are a visible feature. Phase 2 starts only
+when the "Done when" list above is met.
+
+Facts (checked 2026-11-19):
+
+- The strings table has 63 keys. About 30 more messages are hard-coded in
+  English outside it.
+- The original VLSub project (`exebetche/vlsub`, which this extension derives
+  from) has human translations of the old keys in 22 languages
+  (`locale/*.xml`): baq cze dan dut ell eng fin fre ger heb hun ita pob pol por
+  rum scc slo spa swe tur ukr. Strings added since then exist in English only.
+
+Steps, each one safe on its own:
+
+1. **Move the hard-coded messages into the strings table.** English output
+   stays byte-identical, so the behaviour diff must still report `identical`.
+   This step is neutral and may be done as the last stage of the refactor.
+2. **Translation tables inside the script**, one per language, keyed like the
+   English table. A string missing in a language falls back to English, per
+   key, so an incomplete translation can never produce an empty label or a
+   crash.
+3. **Choosing the language**: an "Interface language" drop-down in the
+   configuration window with `Auto`, `English` and the shipped languages.
+4. **Tests**: every language table contains only known keys; placeholders and
+   HTML tags match the English string; every window builds in every language;
+   no label is nil or empty; switching language and back restores English
+   exactly; with English selected the behaviour diff is still `identical`.
+
+Decisions needed before phase 2 starts (see the conversation of 2026-11-19):
+which languages ship, what existing users get by default, and who reviews
+machine-translated strings.
+
