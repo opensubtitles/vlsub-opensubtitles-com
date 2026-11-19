@@ -3,8 +3,8 @@
 Goal: when no good subtitle exists in the user's language, VLSub offers an
 AI-made one, paid with the AI credits of the user's OpenSubtitles account.
 
-Status: **draft, waiting for decisions** (see "Open questions"). Nothing is
-implemented yet.
+Status: **decided 2026-11-19, ready to implement** (see "Decisions" and
+"Stages"). Nothing is implemented yet.
 
 API reference: `private/opensubtitles_openapi.json` (local only, excluded
 from git). Reference client: Kodi addon `service.subtitles.opensubtitles-com`,
@@ -87,7 +87,105 @@ From `docs/vlc-lua-environment.md`:
   be shown as a link in a label.
 - Every new text goes into the strings table and all 61 translations.
 
-## Proposed design (to confirm)
+## Decisions (user, 2026-11-19)
+
+- **Same mechanism as Kodi**: on-demand entries in the search results, the
+  ordinary download creates the translation. `/ai/translate` is not used.
+- **The server inserts on-demand entries only for whitelisted User-Agents**
+  (through a proxy on the API side). VLSub's User-Agent gets a **2.x**
+  version: this feature ships as **v2.0.0**, and the User-Agent
+  `VLSub OpenSubtitles.com v2.` is what the API whitelists. The format of
+  the User-Agent does not change (plain-HTTP access depends on its prefix).
+- **Spending credits**: the entry is clearly marked; clicking Download
+  spends. The balance is shown before and after. No second click.
+- **Live testing**: the CI test account gets AI credits
+  (`VLSUB_USER` / `VLSUB_PASS`).
+- Transcription and QR codes: out of scope.
+
+## Hard rules
+
+1. Everything that is not AI-related behaves exactly as v1.4.0: the
+   behaviour diff (baseline moved to v1.4.0 for this work, with the version
+   number neutral) reports `identical` for every existing session. New
+   sessions cover the new feature.
+2. **Credits are never spent without the user clicking Download on an entry
+   marked as AI on demand.** Not by auto-search, not by auto-download on
+   media change, not by a retry the user did not see announced, not when
+   the user is not logged in.
+3. A 34-digit id is never passed through a Lua number: it is read from the
+   raw response text and written back as the same digits.
+4. No request or response bodies, tokens or passwords in the log; the
+   checkout URL (it carries a per-user tag) is shown to the user, never
+   logged.
+5. One file; Lua 5.1 / 5.2 / 5.4, compiles on 5.5; only the VLC API of
+   `docs/vlc-lua-environment.md`; nothing read at load time; labels through
+   `new_dialog()`; every new text in the strings table and in all 61
+   `locale/*.json` (no fragments).
+6. VLC's window is frozen during a request. Before a long one a message is
+   shown ("Translating with AI, this can take a minute..."); a dead network
+   is still tried once only.
+7. The API specification stays local (`private/`, excluded from git).
+   Credentials only through environment variables / CI secrets.
+8. Work on `dev`. No merge to `main` and no release without an explicit
+   instruction.
+
+## Stages
+
+0. **Measure first** (needs the User-Agent whitelisted and credits on the
+   test account). With `curl`, as the extension would ask - plain HTTP,
+   User-Agent `VLSub OpenSubtitles.com v2.0.0`: a search that returns an
+   on-demand entry; `/ai/credits`; `/ai/credits/buy`; the on-demand
+   `/download` (how long it is held, the `wait_for_translation` redirect,
+   the final answer, what `remaining` and the credits do); the same with an
+   account without credits; the same without login. Record every answer as a
+   fixture (`tests/fixtures/raw/`), with tokens and the checkout tag
+   replaced. Write what was found into this file; where the server differs
+   from the Kodi addon's assumptions, follow the server.
+1. **Baseline**: freeze v1.4.0 as the behaviour baseline; `app_version`
+   becomes `2.0.0` on `dev`.
+2. **Search**: recognise on-demand entries (comment text or id longer than
+   10 digits), keep the id as text, mark them in the list ("AI on demand"),
+   list them after the existing subtitles of the same language. Existing
+   AI-translated uploads keep their current marking.
+3. **Download**: logged in only (otherwise a message that says so and
+   offers the configuration window); balance before (`/ai/credits`); the
+   long request with the wait / re-post rule (at most 3, 5 s apart, each
+   announced in the message line); result saved and loaded like any
+   subtitle; balance after. No credits: message with the balance and a link
+   to buy.
+4. **Account**: the configuration window shows the AI credit balance and a
+   "Buy AI credits" link when logged in (packages from `/ai/credits/buy`;
+   shown as links, cheapest first).
+5. **Never by itself**: auto-search may list on-demand entries; automatic
+   download skips them.
+6. **Texts**: strings table, 61 translations, help window line.
+7. **Tests**: fixtures from stage 0; the fake API plays: held request,
+   redirect-and-wait, success after re-post, no credits, not logged in,
+   401 during the wait, network dying mid-wait, id with 34 digits surviving
+   the round trip (asserted on the bytes sent); credits never spent in the
+   "never by itself" cases; macOS mock for the new labels; real-VLC run
+   (`tests/vlc/run.sh`) with the test account: search, on-demand download,
+   credits decrease.
+8. **Docs**: README section, CHANGELOG, `docs/vlc-lua-environment.md` if
+   VLC taught us something new.
+
+**Unattended rule**, as in the refactor: when something is unclear and the
+answer changes what a user pays or sees, it is not decided alone. It goes to
+"Open questions" below with the options, and the work continues with the
+rest.
+
+## Done when
+
+- stage 0 answers are written down here and recorded as fixtures
+- all tests pass on Lua 5.1 / 5.2 / 5.4 / 5.5, luacheck is clean
+- the behaviour diff against v1.4.0 is `identical` for every existing
+  session
+- `tests/vlc/run.sh` in real VLC gets an on-demand translation with the
+  test account and sees the credits go down
+- the user has tried it on macOS
+
+## Proposed design (decided: phase A)
+
 
 Phase A - **on-demand entries, as Kodi does**
 1. Search: recognise on-demand entries; keep the id as text; show them marked
@@ -114,15 +212,10 @@ identical when the feature is not used, real-VLC run with a test account.
 
 ## Open questions
 
-1. Which mechanism: phase A only (as Kodi), or also phase B?
-2. Search results in the live API showed no on-demand entry for three test
-   queries (anonymous, 2026-11-19). When does the server add them: only for
-   logged-in users, only with credits, only when nothing exists in that
-   language?
-3. A test account with some AI credits is needed to verify against the live
-   API (credentials through CI secrets / environment, never in the
-   repository).
-4. Spending credits: confirm every time, or a setting "translate with AI
-   without asking"?
-5. Release: this goes to `dev`; which version (1.5.0?) and when is decided
-   later.
+1. Blocked until done on the API side: the User-Agent
+   `VLSub OpenSubtitles.com v2.` whitelisted for on-demand entries, and AI
+   credits on the CI test account. Stage 0 cannot start before.
+2. When no on-demand entry is offered (language pair unsupported?), is
+   there anything to tell the user, or is it simply absent?
+3. Does an on-demand translation count against the daily download quota as
+   well as the credits?
