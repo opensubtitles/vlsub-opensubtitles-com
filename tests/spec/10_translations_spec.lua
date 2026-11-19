@@ -330,3 +330,50 @@ describe("interface language: a translation file is not trusted", function()
     has(labels(env.ui()), ENGLISH.int_os_username)
   end)
 end)
+
+describe("interface language: shipped translations", function()
+  local index = json.decode(H.read_file(H.ROOT .. "/locale/index.json"))
+
+  it("the extension accepts every string of every translation in locale/", function()
+    H.launch()
+    local rejected = {}
+    for _, language in ipairs(index.languages) do
+      local translation = json.decode(H.read_file(H.ROOT .. "/locale/" .. language.code .. ".json"))
+      local expected = 0
+      for _ in pairs(translation) do expected = expected + 1 end
+      local used = apply_interface_strings(translation)
+      if used ~= expected then
+        rejected[#rejected + 1] = language.code .. ": " .. (expected - used) .. " string(s) rejected"
+      end
+    end
+    apply_interface_strings(nil)
+    eq(rejected, {}, "the checker (tools/locale.lua) and the extension must agree")
+  end)
+
+  it("every language can be chosen in the configuration window when marked ready", function()
+    local ready = { format = 1, languages = {} }
+    for i, language in ipairs(index.languages) do
+      ready.languages[i] = { code = language.code, name = language.name, status = "ready" }
+    end
+    local server = api.new()
+    server.locale["index.json"] = json.encode(ready)
+    local env = H.launch({ server = server })
+    local offered = config_window(env).language:_texts()
+    eq(#offered, #index.languages + 2, "English, Automatic and every language")
+
+    -- pick three very different ones in turn
+    for _, code in ipairs({ "ja", "ar", "de" }) do
+      local c = config_window(env)
+      local translation = json.decode(H.read_file(H.ROOT .. "/locale/" .. code .. ".json"))
+      for _, entry in ipairs(env.ui():_at(3, 9, "dropdown").values) do
+        if openSub.conf.interfaceLanguages[entry.id] and openSub.conf.interfaceLanguages[entry.id][1] == code then
+          c.language:_choose(entry.id)
+        end
+      end
+      c.save:_click()
+      eq(env.saved_config().interfaceLanguage, code)
+      has(labels(env.ui()), translation.int_os_username)
+      eq(env.errors(), {}, code)
+    end
+  end)
+end)

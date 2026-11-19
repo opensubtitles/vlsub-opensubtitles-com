@@ -20,6 +20,7 @@ local mock = require("mock_vlc")
 local json = require("dkjson")
 
 local M = {}
+local real_popen = io.popen -- the harness replaces io.popen for the extension
 
 local here = debug.getinfo(1, "S").source:match("^@(.*)[/\\][^/\\]*$") or "."
 local FIXTURES = here .. "/../fixtures/raw/"
@@ -312,10 +313,14 @@ function M.new(opts)
   s.locale = {}
   do
     local dir = here .. "/../../locale/"
-    for _, name in ipairs({ "index.json", "sk.json" }) do
-      local f = io.open(dir .. name, "rb")
-      if f then s.locale[name] = f:read("*a") f:close() end
+    local listing = real_popen('ls -1 "' .. dir .. '" 2>/dev/null')
+    for name in listing:lines() do
+      if name:match("%.json$") then
+        local f = io.open(dir .. name, "rb")
+        if f then s.locale[name] = f:read("*a") f:close() end
+      end
     end
+    listing:close()
   end
   s:on("GET raw.githubusercontent.com/opensubtitles/vlsub-opensubtitles-com/main/locale/*", function(req, srv)
     local name = req.path:match("([^/]+)$")

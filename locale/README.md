@@ -65,12 +65,29 @@ VLSUB_LOCALE_URL=https://raw.githubusercontent.com/<you>/<fork>/<branch>/locale/
 
 ## Contributing
 
-1. Copy `en.json` to `<code>.json` and translate the values (or improve an
-   existing file).
-2. Add the language to `index.json` with `"status": "review"`.
-3. Run `tests/run.sh` - it reports any key, placeholder or tag that does not
-   match.
-4. Open a pull request.
+`tools/locale.lua` does the bookkeeping (plain Lua, nothing to install):
+
+```bash
+lua tools/locale.lua status              # all languages: coverage, problems, status
+lua tools/locale.lua new de "Deutsch" "German"   # start a language
+lua tools/locale.lua missing de          # what is left to translate, with the English text
+lua tools/locale.lua check de            # every rule above, with the exact string at fault
+lua tools/locale.lua ready de            # after a native speaker has read it: offer it to users
+lua tools/locale.lua review de           # take it back out
+lua tools/locale.lua export              # after changing English strings in vlsubcom.lua
+```
+
+1. `new` creates `locale/<code>.json` and the entry in `index.json`
+   (status `review`). To improve an existing translation, just edit its file.
+2. Translate. Keys may be left out; English is used for them.
+3. `check` until it reports 0 problems, then `tests/run.sh` (it also starts
+   the extension with your translation applied: all windows, a search, a
+   download and a first run).
+4. Open a pull request. A second pull request by (or confirmed by) a native
+   speaker runs `ready`.
+
+When English strings change in `vlsubcom.lua`: run `export`, then `status` -
+new keys show up as missing in every language, removed keys as "unknown key".
 
 Strings that look technical ("JSON module loaded successfully", "dkjson
 compatibility check passed") belong to the progress window shown on first run
