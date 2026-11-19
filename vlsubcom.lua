@@ -1274,10 +1274,13 @@ end
 
     -- Map country codes to primary languages
     local country_language_map = {
-      -- Major countries with their primary languages
-      US = "en", GB = "en", AU = "en", CA = "en", NZ = "en", IE = "en", ZA = "en",
-      DE = "de", AT = "de", CH = "de",
-      FR = "fr", BE = "fr", CH = "fr", CA = "fr",
+      -- Major countries with their primary languages. Multilingual countries
+      -- appear once: Canada counts as French, Switzerland as Italian and
+      -- Belgium (below) as Dutch. (They used to be listed under several
+      -- languages; in a Lua table the last entry is the one that counts.)
+      US = "en", GB = "en", AU = "en", NZ = "en", IE = "en", ZA = "en",
+      DE = "de", AT = "de",
+      FR = "fr", CA = "fr",
       ES = "es", MX = "es", AR = "es", CO = "es", PE = "es", VE = "es", CL = "es",
       IT = "it", CH = "it",
       PT = "pt", BR = "pt",
@@ -5028,9 +5031,10 @@ function detect_macos_locale(detected_locales)
 
       -- Simple timezone to locale mapping (very basic)
       local tz_locale_map = {
-        EST = "en_US", PST = "en_US", MST = "en_US", CST = "en_US",
+        EST = "en_US", PST = "en_US", MST = "en_US",
         CET = "en_GB", GMT = "en_GB", BST = "en_GB",
-        JST = "ja_JP", KST = "ko_KR", CST = "zh_CN"
+        JST = "ja_JP", KST = "ko_KR",
+        CST = "zh_CN" -- China Standard Time; US Central shares the abbreviation
       }
 
       local mapped_locale = tz_locale_map[tz_result]
