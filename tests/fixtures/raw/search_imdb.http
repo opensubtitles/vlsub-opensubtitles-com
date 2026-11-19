@@ -1,0 +1,15 @@
+HTTP/1.1 200 OK
+Date: Thu, 19 Nov 2026 05:23:24 GMT
+Content-Type: application/json
+Transfer-Encoding: chunked
+Connection: close
+RateLimit-Limit: 5
+RateLimit-Remaining: 1
+RateLimit-Reset: 1
+X-RateLimit-Remaining-Second: 1
+X-RateLimit-Limit-Second: 5
+
+468
+{"total_pages":1,"total_count":1,"per_page":50,"page":1,"data":[{"id":"4224334","type":"subtitle","attributes":{"subtitle_id":"4224334","language":"en","download_count":22643,"new_download_count":3052,"hearing_impaired":false,"hd":false,"fps":24.0,"votes":0,"ratings":0.0,"from_trusted":false,"foreign_parts_only":false,"upload_date":"2014-09-24T14:43:45Z","ai_translated":false,"nb_cd":1,"slug":"big_buck_bunny","machine_translated":false,"release":"big_buck_bunny","comments":"","legacy_subtitle_id":5833874,"legacy_uploader_id":250855,"uploader":{"uploader_id":38392,"name":"jogga","rank":"Application Developers"},"feature_details":{"feature_id":548792,"feature_type":"Movie","year":2008,"title":"Big Buck Bunny","movie_name":"2008 - Big Buck Bunny","imdb_id":1254207,"tmdb_id":10378},"url":"https://www.opensubtitles.com/en/subtitles/big_buck_bunny","related_links":[{"label":"All subtitles for big buck bunny","url":"https://www.opensubtitles.com/en/movies/big_buck_bunny","img_url":"https://s7.opensubtitles.com/features/2/9/7/548792.jpg"}],"files":[{"file_id":4311373,"cd_number":1,"file_name":"big_buck_bunny.eng"}]}}]}
+0
+

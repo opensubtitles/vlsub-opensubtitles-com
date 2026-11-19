@@ -1,0 +1,17 @@
+HTTP/1.1 301 Moved Permanently
+Date: Thu, 19 Nov 2026 05:23:24 GMT
+Content-Type: text/html
+Transfer-Encoding: chunked
+Connection: close
+Location: /api/v1/subtitles?languages=en&query=big+buck+bunny
+
+86
+<html>
+<head><title>301 Moved Permanently</title></head>
+<body>
+<center><h1>301 Moved Permanently</h1></center>
+</body>
+</html>
+
+0
+

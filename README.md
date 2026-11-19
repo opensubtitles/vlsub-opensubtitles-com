@@ -212,14 +212,27 @@ Tools → Preferences → Show settings: All → Advanced → Logger verbosity: 
 
 ## 🤝 Contributing
 
-We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
+We welcome contributions! Here's how to get started:
 
-### Development Setup
+- 📖 **[TESTING.md](TESTING.md)** — Quick start guide for testing on Mac/Linux/Windows
+- 📋 **[CONTRIBUTING.md](CONTRIBUTING.md)** — Full contribution guidelines
+- 🧪 **[tests/README.md](tests/README.md)** — Deep dive into the test suite
+
+### Quick Development Setup
 ```bash
 git clone https://github.com/opensubtitles/vlsub-opensubtitles-com.git
 cd vlsub-opensubtitles-com
-# Edit vlsubcom.lua
-# Test in VLC
+
+# Install test dependencies (macOS)
+brew install lua luacheck
+
+# Run tests (< 5 seconds)
+./tests/run.sh
+
+# Test in real VLC
+./tools/dev.sh link              # VLC loads your working copy
+./tools/dev.sh run movie.mkv     # Start VLC with debug logging
+./tools/dev.sh errors            # Check for errors
 ```
 
 ### Reporting Issues

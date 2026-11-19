@@ -1,0 +1,15 @@
+HTTP/1.1 200 OK
+Date: Thu, 19 Nov 2026 05:23:25 GMT
+Content-Type: application/json
+Transfer-Encoding: chunked
+Connection: close
+RateLimit-Limit: 5
+RateLimit-Remaining: 3
+RateLimit-Reset: 1
+X-RateLimit-Remaining-Second: 3
+X-RateLimit-Limit-Second: 5
+
+1d
+{"message":"Invalid file_id"}
+0
+

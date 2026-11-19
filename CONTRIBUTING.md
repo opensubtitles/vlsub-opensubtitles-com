@@ -120,6 +120,24 @@ end
 
 #### Testing
 
+> 👉 **Quick start:** See **[TESTING.md](TESTING.md)** for platform-specific setup (Mac/Linux/Windows) and step-by-step testing instructions.
+
+##### Automated Checks (required)
+
+```bash
+tests/run.sh            # syntax + luacheck + behaviour tests (offline, < 5 s)
+tests/vlc/run.sh        # the extension inside a real headless VLC, live API
+tools/dev.sh link       # make VLC load this checkout; then tools/dev.sh run / errors
+git config core.hooksPath .githooks   # optional: run tests/run.sh on commit
+```
+
+CI runs `tests/run.sh` on Lua 5.1, 5.2 and 5.4 and the release workflow will not publish if it fails.
+
+- Read [docs/vlc-lua-environment.md](docs/vlc-lua-environment.md) first: VLC's Lua is restricted and several `vlc.*` functions do not behave as their names suggest.
+- [tests/README.md](tests/README.md) explains the three test layers and how to write a test. Add one for every feature and every bug fix.
+- Defects that are known but not fixed yet are written as `known_bug(...)` tests; fixing one means changing it to `it(...)`.
+- `luacheck` (`apt install lua-check` / `luarocks install luacheck`) reports any use of an undefined name. If you intentionally introduce a global that is first assigned inside a function, list it in `.luacheckrc`.
+
 ##### Manual Testing Checklist
 - [ ] Extension loads without errors in VLC
 - [ ] Configuration window opens and saves settings

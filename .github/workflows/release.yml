@@ -63,6 +63,18 @@ jobs:
         echo "=== Version Updates ==="
         grep -n "app_version\|current_version\|user_agent.*VLSub" $SCRIPT_NAME || true
 
+    # Gate the release: nothing is committed, tagged or published unless the
+    # extension passes static analysis and the behaviour tests. (v1.3.1 shipped
+    # a call to an out-of-scope function because this step did not exist.)
+    - name: Lint and test extension
+      env:
+        REQUIRE_LUACHECK: '1'
+        LUA: lua5.2
+      run: |
+        sudo apt-get update -qq
+        sudo apt-get install -y -qq lua5.2 lua-check
+        tests/run.sh
+
     - name: Commit version changes
       run: |
         git config --local user.email "action@github.com"
@@ -160,7 +172,7 @@ jobs:
         fi
 
         echo "✅ Extension validation completed successfully"
-        echo "Note: Full syntax validation will occur when VLC loads the extension"
+        echo "Syntax, undefined-function analysis and behaviour tests ran in the 'Lint and test extension' step"
 
     - name: Create installation scripts
       run: |

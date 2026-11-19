@@ -1,0 +1,5 @@
+#!/bin/sh
+# Enable once per clone:  git config core.hooksPath .githooks
+if git diff --cached --name-only | grep -qE '^(vlsubcom\.lua|tests/|\.luacheckrc)'; then
+  exec tests/run.sh
+fi

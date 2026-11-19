@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.2] - 2026-11-19
+
+### Fixed
+- **Every subtitle download failing in 1.3.1** with `attempt to call global 'sanitize_filename' (a nil value)`: the filename sanitizer was declared ~2000 lines below the code that calls it and was out of scope there.
+- **VLC freezing when the network is down or a server does not answer**: a failed connection still yields a valid-looking socket in VLC, and the HTTP client then waited on it forever. Failed connections are now detected, and every request has a real deadline.
+- **First run freezing VLC for 25–40 seconds**: the IP-geolocation lookup used a service published on IPv6 only, and VLC cannot time such a request out. It is now only used when the system gives no locale at all (measured in VLC: first run 42 s → 3.5 s).
+- **First run aborting when google.com is unreachable** (offline, or networks where it is blocked).
+- **Main window not opening without the API language list**: the built-in list had a broken entry (Hebrew). It also lacked Bulgarian, Irish, Persian, Polish, Serbian and Swahili.
+- **A rejected session token was never replaced**: after a `401` the same token was reloaded from the cache and the search repeated until the API rate-limited it. The extension now logs in again once and retries; downloads do the same.
+- **`Invalid file_id` saved as a subtitle**: an API answer without a download link was written to the `.srt` file and loaded into the player.
+- **Wrong language on first run** for `pt_BR`, `pt_PT`, `zh_CN`, `zh_TW` (invalid codes `pt` / `zh` were saved) and for `LANG=C`.
+- **Language could not be set back to "All" / "None"** once one had been saved.
+- **Password and session token in VLC's log** when debug logging was enabled. Request and response bodies are no longer logged.
+- **Config and session cache readable by other local users**: both files are now created with owner-only permissions on Linux and macOS.
+- **Search results silently empty** for JSON containing `}` inside a string, and responses truncated after 100 transfer chunks.
+- **Rate limiting, server errors and bad credentials** on name and IMDb searches were all shown as "no result"; they now say what happened.
+- **`1080p` taken as the release year** when GuessIt was unavailable; GuessIt is also no longer queried again on every action after a failed lookup, and its cache file is written inside the VLSub folder.
+- **Main window not following the playing media**: VLC's `input_changed` callback called a missing `set_interface_main()` and `dlg:get_title()` (which VLC dialogs do not have) and raised a Lua error on every media change.
+- Missing functions that raised Lua errors when reached: `ui_yield_if_needed()`, `safe_mwait()`, `interface_no_support()`, `handle_temp_config_click()`; `list_dir()` used directory functions VLC does not provide.
+- Legacy socket client: chunked responses split across reads, and a malformed `Host` line after a redirect.
+- Compiles under Lua 5.5 (loop variables were being reassigned).
+
+### Added
+- **Test suite** (`tests/run.sh`, 203 tests on Lua 5.1/5.2/5.4/5.5): the unmodified extension is driven through its dialog against a mock that behaves like VLC 3.0's Lua API and a fake API server replaying recorded responses of the real one. Covers search (name, hash, IMDb, languages, sorting), login and session cache, settings, download, first-run language detection, the HTTP client's wire format and error handling.
+- **Real-VLC test** (`tests/vlc/run.sh`): runs the extension headless inside VLC against the live API.
+- **Static analysis** with `luacheck` (`.luacheckrc`): fails on any call to an undefined or out-of-scope function and on Lua features newer than 5.1.
+- `tools/dev.sh` to load a working copy into VLC and read its Lua errors; `docs/vlc-lua-environment.md` documenting what VLC's Lua can and cannot do.
+- CI runs the suite on every push and pull request, and the release workflow refuses to publish if it fails.
+
 ## [1.3.0] - 2026-09-19
 
 ### Fixed

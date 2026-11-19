@@ -1,0 +1,68 @@
+name: Test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Measured: the official macOS VLC 3.0.24 embeds Lua 5.1, Debian/Ubuntu's
+        # VLC 3.0.16 embeds 5.2. 5.4 is run as a stricter, newer interpreter.
+        lua: ['5.1', '5.2', '5.4']
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Lua ${{ matrix.lua }} and luacheck
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq lua${{ matrix.lua }} lua-check
+
+      - name: Syntax, static analysis and tests
+        env:
+          LUA: lua${{ matrix.lua }}
+          REQUIRE_LUACHECK: '1'
+        run: tests/run.sh
+
+  # Lua 5.5 is not what VLC embeds, but it is stricter (loop variables are
+  # read-only, for example), so it catches code that only happens to work.
+  lua-5-5:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build Lua 5.5
+        run: |
+          curl -sSL https://www.lua.org/ftp/lua-5.5.0.tar.gz | tar xz
+          make -s -C lua-5.5.0 linux
+          sudo install lua-5.5.0/src/lua /usr/local/bin/lua5.5
+          sudo install lua-5.5.0/src/luac /usr/local/bin/luac5.5
+          rm -rf lua-5.5.0
+      - name: Syntax and tests
+        env:
+          LUA: lua5.5
+        run: tests/run.sh
+
+  # The extension inside a real VLC, talking to the live API. Informational:
+  # it depends on the network, so it does not block merging.
+  real-vlc:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install VLC
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends vlc-bin vlc-plugin-base
+      - name: Run the extension headless in VLC
+        env:
+          VLSUB_USER: ${{ secrets.VLSUB_TEST_USER }}
+          VLSUB_PASS: ${{ secrets.VLSUB_TEST_PASS }}
+        run: tests/vlc/run.sh

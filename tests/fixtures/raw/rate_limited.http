@@ -1,0 +1,16 @@
+HTTP/1.1 429 Too Many Requests
+Date: Thu, 19 Nov 2026 05:23:24 GMT
+Content-Type: application/json; charset=utf-8
+Content-Length: 92
+Connection: close
+RateLimit-Reset: 1
+RateLimit-Limit: 5
+RateLimit-Remaining: 0
+Retry-After: 1
+X-RateLimit-Remaining-Second: 0
+X-RateLimit-Limit-Second: 5
+
+{
+  "message":"API rate limit exceeded",
+  "request_id":"9e124138dbdffa6e1e9fb20f94b89d20"
+}
