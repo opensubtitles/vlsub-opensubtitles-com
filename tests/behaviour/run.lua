@@ -65,6 +65,15 @@ EXCEPTIONS[4] = {
   -- string where 5.3+ walks it as an empty list)
   baseline_errors = { "attempt to index %(?a %a+ value", "bad argument #1 to 'ipairs'" },
 }
+EXCEPTIONS[5] = {
+  name = "an unreachable network is tried once",
+  why = "bug fix: every connection attempt on a dead network blocks VLC's window until "
+     .. "the system gives up, and v1.3.2 made up to three per request and went on with "
+     .. "the next request. Now a failed connection is not retried and requests in the "
+     .. "following 10 seconds are refused at once. Only these log lines are left out of "
+     .. "the comparison; windows, messages and files must still be the same.",
+  log_lines = { "failed: connect %(attempt %d+%)", "Not sent: the network was unreachable" },
+}
 local DROP_CONFIG_KEYS = EXCEPTIONS[2].drop_config_keys
 DROP_CONFIG_KEYS.interfaceLanguage = true
 DROP_CONFIG_KEYS.detectedLanguage = true
@@ -218,7 +227,11 @@ local function snapshot(env, norm, cursor)
   snap.log = {}
   for i = cursor.log + 1, #env.vlc._log do
     local l = env.vlc._log[i]
-    if l.level ~= "dbg" and not is_locale_request(l.msg) then
+    local unreachable = false
+    for _, pattern in ipairs(EXCEPTIONS[5].log_lines) do
+      if l.msg:find(pattern) then unreachable = true end
+    end
+    if l.level ~= "dbg" and not is_locale_request(l.msg) and not unreachable then
       snap.log[#snap.log + 1] = l.level .. " " .. norm(l.msg)
     end
   end
@@ -356,5 +369,5 @@ H.cleanup()
 print(string.format("\n%d sessions, %d steps compared on %s: %d identical, %d different",
   ran, steps, _VERSION, ran - failed, failed))
 print("agreed exceptions: " .. EXCEPTIONS[1].name .. "; " .. EXCEPTIONS[2].name .. "; " .. EXCEPTIONS[3].name
-  .. "; " .. EXCEPTIONS[4].name)
+  .. "; " .. EXCEPTIONS[4].name .. "; " .. EXCEPTIONS[5].name)
 os.exit(failed == 0 and 0 or 1)

@@ -525,6 +525,9 @@ function M.new(opts)
       local fd = next_fd
       next_fd = next_fd + 1
       if not server or not server:resolve(host, port) then
+        -- a dead network is not refused at once: VLC blocks until the system
+        -- gives up (server.blocks_for seconds, when a test sets it)
+        if server and server.blocks_for and M.wait then M.wait(server.blocks_for) end
         conns[fd] = { host = host, port = port, dead = true, open = false }
         vlc._failed_connects = vlc._failed_connects + 1
         return fd
@@ -636,7 +639,11 @@ function M.new(opts)
       while true do
         local u = url_parse(url)
         local port = (u.port ~= 0 and u.port) or (u.protocol == "https" and 443 or 80)
-        if not server:resolve(u.host, port) then return nil, "Error when opening stream" end
+        if not server:resolve(u.host, port) then
+          if server.blocks_for and M.wait then M.wait(server.blocks_for) end
+          vlc._failed_streams = (vlc._failed_streams or 0) + 1
+          return nil, "Error when opening stream"
+        end
         local target = (u.path or "/") .. (u.option and ("?" .. u.option) or "")
         -- This is ALL vlc.stream can send: a GET with VLC's own headers.
         local raw = "GET " .. target .. " HTTP/1.1\r\nHost: " .. u.host ..

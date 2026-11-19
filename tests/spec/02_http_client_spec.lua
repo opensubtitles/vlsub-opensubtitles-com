@@ -268,3 +268,75 @@ describe("HTTP client: https goes through vlc.stream", function()
     eq(Curl.new():get("https://secure.test/"), nil)
   end)
 end)
+
+
+-- "My internet is down, I save the settings and VLC is not responding."
+-- Nothing in VLC's Lua can cut a connection attempt short: on a dead network
+-- each one blocks the window until the system gives up. So the extension
+-- must make as few as possible. server.blocks_for = what one attempt costs.
+H.describe("network down: the window is blocked once, not again and again", function()
+  local it, eq, ok, has = H.it, H.eq, H.ok, H.has
+  local function attempts(env) return env.vlc._failed_connects + (env.vlc._failed_streams or 0) end
+
+  local function offline(o)
+    local env = H.launch(o)
+    env.server.offline = true
+    env.server.blocks_for = 30
+    env.vlc._failed_connects = 0
+    return env, H.waited()
+  end
+
+  it("Save: one connection attempt, then a clear message; the settings are saved", function()
+    local env, before = offline()
+    trigger_menu(2)
+    env.ui():_at(1, 12, "button"):_click()
+    eq(attempts(env), 1, "connection attempts")
+    eq(H.waited() - before, 30, "seconds the window was blocked")
+    has(env.message(), "no internet connection")
+    has(env.message(), "settings were saved")
+    ok(env.saved_config(), "config written")
+  end)
+
+  it("Save with a new interface language: the translation and the login are not both waited for", function()
+    local env, before = offline()
+    trigger_menu(2)
+    -- the list of languages was fetched while online
+    local d = env.ui()
+    openSub.option.interfaceLanguage = "en"
+    d:_at(3, 9, "dropdown"):_choose_text("^Automatic")
+    d:_at(1, 12, "button"):_click()
+    eq(attempts(env), 1, "connection attempts")
+    eq(H.waited() - before, 30)
+  end)
+
+  it("Search: hash, name fallback and GuessIt do not each wait for the dead network", function()
+    local dir = H.tmpdir()
+    local env, before = offline({ media = "file://" .. dir .. "/Big.Buck.Bunny.2008.mkv" })
+    local d = env.ui()
+    d:_at(2, 1, "text_input"):set_text("big buck bunny")
+    d:_button("Search$"):_click()
+    eq(attempts(env), 1, "connection attempts")
+    eq(H.waited() - before, 30)
+    ok(env.message() ~= "", "a message is shown")
+  end)
+
+  it("ten seconds later the next click tries again, and works when the network is back", function()
+    local env = offline()
+    local d = env.ui()
+    d:_at(2, 1, "text_input"):set_text("big buck bunny")
+    d:_button("Search$"):_click()
+    eq(attempts(env), 1)
+    env.server.offline = false
+    H.wait(11)
+    env.ui():_button("Search$"):_click()
+    ok(#env.results().values > 1, "results listed")
+  end)
+
+  it("one unreachable request is not retried", function()
+    local env = offline()
+    local client = H.find_local("Curl").new()
+    client:set_retries(3)
+    eq(client:get("http://api.opensubtitles.com/api/v1/infos/formats"), nil)
+    eq(attempts(env), 1)
+  end)
+end)

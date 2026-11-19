@@ -19,12 +19,16 @@ H.real_clock = os.clock
 -- 50 calls so a 15 second timeout takes a few hundred loop turns, not 15 s.
 H.real_time = os.time
 do
-  local calls = 0
+  local calls, waited = 0, 0
   os.time = function(t)
     if t then return H.real_time(t) end
     calls = calls + 1
-    return H.real_time() + math.floor(calls / 50)
+    return H.real_time() + math.floor(calls / 50) + waited
   end
+  -- Let `seconds` pass at once: what a blocking call costs (a connection
+  -- attempt on a dead network), or the user waiting before the next click.
+  function H.wait(seconds) waited = waited + seconds end
+  function H.waited() return waited end
 end
 H.real_getenv = os.getenv
 H.real_popen = io.popen
@@ -188,6 +192,7 @@ function H.launch(o)
   o = o or {}
   local env = { home = H.tmpdir() }
   mock.unsafe_closes = {}
+  mock.wait = H.wait
   if o.macos then -- VLC's folder on macOS; the mock then renders labels as macOS does
     env.home = env.home .. "/Library/Application Support/org.videolan.vlc"
     H.real_execute('mkdir -p "' .. env.home .. '"')

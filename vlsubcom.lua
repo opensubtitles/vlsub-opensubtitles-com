@@ -7049,14 +7049,29 @@ function socket_exchange(host, port, request, timeout_seconds)
     return table.concat(parts)
 end
 
+-- A connection that cannot be opened blocks VLC until the system gives up
+-- (name lookup, connect: seconds each, and nothing in VLC's Lua can cut it
+-- short). So when one fails, further requests are refused at once for a
+-- short while instead of freezing the window again and again, and the failed
+-- one is not retried: a second attempt at a dead network only doubles the
+-- wait. The next click after that tries again.
+local NETWORK_DOWN_SECONDS = 10
+network_down_until = 0
+
 function VLCHttpClient:_make_request_stream(method, url, data)
 
     -- Build final URL with minimal parameters to reduce URL length
     local final_url = self:_build_url_params(url, data)
 
     -- Single attempt with aggressive timeout
+    local asked_at = os.time()
     local stream = vlc.stream(final_url)
     if not stream then
+        -- nil is also an HTTP error status, which comes back quickly; a
+        -- network that is down takes VLC several seconds to give up on
+        if os.time() - asked_at >= 4 then
+            network_down_until = os.time() + NETWORK_DOWN_SECONDS
+        end
         return nil
     end
 
@@ -7167,6 +7182,10 @@ function VLCHttpClient:_make_request_tcp(method, url, data)
             if failure == "interrupted" then
                 return nil
             end
+            if failure == "connect" then
+                network_down_until = os.time() + NETWORK_DOWN_SECONDS
+                return nil
+            end
         elseif response_data == "" then
             vlc.msg.err("[VLSub] Empty response from server (attempt " .. attempt .. ")")
         else
@@ -7229,6 +7248,13 @@ end
 function VLCHttpClient:_make_request(method, url, data)
     -- Log the full URL for complete visibility
     vlc.msg.warn("[VLSub] " .. method .. " " .. url)
+
+    -- The network just proved to be down: do not block VLC's window again
+    -- for every further request of the same action (see network_down_until)
+    if os.time() < network_down_until then
+        vlc.msg.err("[VLSub] Not sent: the network was unreachable a moment ago")
+        return nil
+    end
 
     -- Parse URL to determine protocol
     local protocol = string.match(url, "^(https?)://")
