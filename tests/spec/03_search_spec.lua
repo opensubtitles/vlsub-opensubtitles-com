@@ -432,6 +432,18 @@ describe("search: API errors", function()
     eq(#w.list.values, 1)
   end)
 
+  known_bug("a JSON body that is not an object (true, 1, \"text\") does not raise",
+    "the search code indexes the decoded value without checking that it is a table; found by the behaviour sessions, left as is during the refactor",
+    function()
+      for _, body in ipairs({ "true", "1", '"text"' }) do
+        local env, w = start()
+        env.server:on(SUBTITLES, function() return api.response(200, body) end)
+        w.title:set_text("big buck bunny")
+        w.by_name:_click()
+        eq(#w.list.values, 1, "placeholder row for body " .. body)
+      end
+    end)
+
   it("unexpected shapes: missing files / attributes / uploader do not crash", function()
     local env, w = start()
     env.server:on(SUBTITLES, function()

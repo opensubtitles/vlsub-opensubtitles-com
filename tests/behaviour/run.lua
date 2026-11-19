@@ -1,0 +1,286 @@
+-- Behaviour diff: proves that the working copy of vlsubcom.lua behaves like
+-- the frozen baseline (tests/behaviour/baseline/vlsubcom.lua = v1.3.2).
+--
+--   lua tests/behaviour/run.lua                 all sessions
+--   lua tests/behaviour/run.lua download        sessions whose name contains "download"
+--   CANDIDATE=/path/to/other.lua lua tests/behaviour/run.lua    compare another file
+--
+-- Every session in sessions.lua is a scripted use of the extension (start it,
+-- click, type, ...). It is run twice, once per version, and everything a user
+-- or the outside world can observe is recorded after each step:
+--
+--   * every request: transport, method, URL, headers, body, in order
+--   * every window: title and each widget's kind, position, text and entries
+--   * the status message
+--   * every file under the sandbox: name, permissions, content
+--   * what VLC was told: subtitles added, config values, variables
+--   * info / warning / error log lines, shell commands, Lua errors
+--
+-- The two recordings must be equal. The only tolerated differences are the
+-- ones declared in EXCEPTIONS below (see docs/refactor-brief.md).
+
+local here = (arg and arg[0] or "tests/behaviour/run.lua"):match("^(.*)[/\\][^/\\]*$") or "."
+package.path = here .. "/../lib/?.lua;" .. here .. "/?.lua;" .. package.path
+local H = require("harness")
+local json = H.json
+
+local BASELINE = here .. "/baseline/vlsubcom.lua"
+local CANDIDATE = os.getenv("CANDIDATE") or (here .. "/../../vlsubcom.lua")
+
+-- --------------------------------------------------------------- exceptions --
+-- Agreed differences from v1.3.2. Each one is applied to BOTH recordings, so
+-- it can only hide the difference it names.
+local EXCEPTIONS = {
+  {
+    name = "debug log content",
+    why = "stage 2 reduces debug output; debug lines are not recorded at all",
+  },
+  {
+    name = "vlsub_conf.json no longer stores interface strings",
+    why = "only real settings are written; old files still load",
+    -- keys of the saved configuration that belong to the removed
+    -- interface-translation machinery
+    drop_config_keys = { translation = true, translations_avail = true, intLang = true },
+  },
+}
+local DROP_CONFIG_KEYS = EXCEPTIONS[2].drop_config_keys
+
+-- ------------------------------------------------------------ normalisation --
+local function canonical(v, indent)
+  indent = indent or ""
+  if type(v) ~= "table" then
+    if type(v) == "string" then return string.format("%q", v) end
+    if type(v) == "number" and v > 1.6e9 and v < 2.1e9 then return "<EPOCH>" end
+    return tostring(v)
+  end
+  local keys = {}
+  for k in pairs(v) do keys[#keys + 1] = k end
+  table.sort(keys, function(a, b)
+    if type(a) == type(b) then return a < b end
+    return type(a) < type(b)
+  end)
+  local out = {}
+  for _, k in ipairs(keys) do
+    out[#out + 1] = indent .. "  " .. tostring(k) .. " = " .. canonical(v[k], indent .. "  ")
+  end
+  if #out == 0 then return "{}" end
+  return "{\n" .. table.concat(out, "\n") .. "\n" .. indent .. "}"
+end
+
+local function make_normaliser(env)
+  local root = H.tmp_root():gsub("%p", "%%%0")
+  local home_index = env.home:match("(%d+)$")
+  return function(text)
+    if type(text) ~= "string" then return text end
+    -- sandbox directories are numbered per launch
+    text = text:gsub(root .. "/(%d+)", function(n)
+      return n == home_index and "<HOME>" or "<DIR>"
+    end)
+    -- wall-clock values: epoch seconds, and durations the extension measures
+    text = text:gsub("%f[%d]1[6-9]%d%d%d%d%d%d%d%d%f[%D]", "<EPOCH>")
+    text = text:gsub("%(%d+ms%)", "(<N>ms)"):gsub("in %d+ms", "in <N>ms")
+    text = text:gsub("%d+%.%d+ seconds", "<N> seconds")
+    text = text:gsub("%[%d%d:%d%d:%d%d%]", "[<CLOCK>]")
+    -- Lua errors: where they happen and what the local was called may change
+    -- in a refactor; that they happen, and why, may not.
+    text = text:gsub("[%w_%.%-]+%.lua:%d+:", "<SCRIPT>:<LINE>:")
+    text = text:gsub(" %((%a+) '[^']*'%)", "")
+    return text
+  end
+end
+
+-- ----------------------------------------------------------------- recorder --
+local function snapshot(env, norm, cursor)
+  local snap = {}
+
+  -- requests since the previous step
+  snap.requests = {}
+  for i = cursor.requests + 1, #env.server.requests do
+    local r = env.server.requests[i]
+    local headers = {}
+    for _, h in ipairs(r.header_list) do headers[#headers + 1] = h[1] .. ": " .. h[2] end
+    table.sort(headers) -- custom headers are emitted in table order, which is not behaviour
+    snap.requests[#snap.requests + 1] = norm(table.concat({
+      r.via .. " " .. r.method .. " " .. r.scheme .. "://" .. r.host .. ":" .. r.port .. r.target,
+      table.concat(headers, "\n"),
+      "body: " .. r.body,
+      #r.problems > 0 and ("PROBLEMS: " .. table.concat(r.problems, "; ")) or "",
+    }, "\n"))
+  end
+  cursor.requests = #env.server.requests
+
+  -- windows
+  snap.windows = {}
+  for index, d in ipairs(env.vlc._dialogs) do
+    local w = { "#" .. index .. " " .. norm(d.title) .. (d.visible and " [visible]" or " [hidden]") }
+    for _, x in ipairs(d.widgets) do
+      local line = string.format("%s @%s,%s %q", x.kind, tostring(x.col), tostring(x.row), norm(x.text or ""))
+      if x.kind == "check_box" then line = line .. " checked=" .. tostring(x.checked) end
+      w[#w + 1] = line
+      for _, v in ipairs(x.values) do
+        w[#w + 1] = "    " .. tostring(v.id) .. " " .. norm(v.text)
+      end
+    end
+    snap.windows[index] = table.concat(w, "\n")
+  end
+
+  -- files
+  snap.files = {}
+  local p = H.real_popen('cd "' .. env.home .. '" && find . -type f | LC_ALL=C sort')
+  for path in p:lines() do
+    local full = env.home .. "/" .. path:sub(3)
+    local ls = H.real_popen('ls -l "' .. full .. '"')
+    local mode = (ls:read("*l") or ""):sub(1, 10)
+    ls:close()
+    local content = H.read_file(full) or ""
+    if path:match("%.json$") then
+      local decoded = json.decode(content)
+      if type(decoded) == "table" then
+        if path:match("vlsub_conf%.json$") then
+          for k in pairs(DROP_CONFIG_KEYS) do decoded[k] = nil end
+        end
+        content = canonical(decoded)
+      end
+    elseif #content > 4096 then
+      -- the test videos: identify, do not dump
+      content = "<" .. #content .. " bytes>"
+    end
+    snap.files[#snap.files + 1] = norm(path) .. " " .. mode .. "\n" .. norm(content)
+  end
+  p:close()
+
+  -- what VLC was told
+  snap.vlc = norm(canonical({
+    subtitles = env.vlc._subtitles, config = env.vlc._config, vars = env.vlc._vars,
+    deactivated = env.vlc._deactivated, open_sockets = env.vlc._open_sockets(),
+  }))
+
+  -- log (debug level excluded: agreed exception 1), shell commands
+  snap.log = {}
+  for i = cursor.log + 1, #env.vlc._log do
+    local l = env.vlc._log[i]
+    if l.level ~= "dbg" then snap.log[#snap.log + 1] = l.level .. " " .. norm(l.msg) end
+  end
+  cursor.log = #env.vlc._log
+  snap.commands = {}
+  for i = cursor.commands + 1, #env.commands do snap.commands[#snap.commands + 1] = norm(env.commands[i]) end
+  cursor.commands = #env.commands
+  for i = cursor.executed + 1, #env.executed do snap.commands[#snap.commands + 1] = "exec " .. norm(env.executed[i]) end
+  cursor.executed = #env.executed
+
+  return snap
+end
+
+-- Run one session against one script; returns { {label=..., snap=...}, ... }
+local function record(session, script)
+  local trace = {}
+  local env, norm, cursor
+  local S = { H = H, api = H.fake_api }
+
+  function S.launch(o)
+    o = o or {}
+    o.script = script
+    local launched, err = pcall(function() env = H.launch(o) end)
+    if not launched then
+      trace[#trace + 1] = { label = "launch", error = tostring(err):gsub("^[^:]*:%d+: ", "") }
+      error({ aborted = true })
+    end
+    norm = make_normaliser(env)
+    cursor = { requests = 0, log = 0, commands = 0, executed = 0 }
+    S.env = env
+    S.step("launch")
+    return env
+  end
+
+  -- Perform an action and record the state after it. A Lua error inside the
+  -- action is part of the behaviour (VLC logs it and carries on).
+  function S.step(label, action)
+    local entry = { label = label }
+    if action then
+      local done, err = pcall(action)
+      if not done then
+        entry.error = norm(tostring(err):gsub("^[^:]*/", ""))
+      end
+    end
+    entry.snap = snapshot(env, norm, cursor)
+    trace[#trace + 1] = entry
+  end
+
+  local finished, err = pcall(session.run, S)
+  if not finished and not (type(err) == "table" and err.aborted) then
+    trace[#trace + 1] = { label = "SESSION SCRIPT ERROR", error = tostring(err) }
+  end
+  return trace
+end
+
+-- ------------------------------------------------------------------ compare --
+local function first_difference(a, b)
+  local la, lb = {}, {}
+  for line in (a .. "\n"):gmatch("(.-)\n") do la[#la + 1] = line end
+  for line in (b .. "\n"):gmatch("(.-)\n") do lb[#lb + 1] = line end
+  for i = 1, math.max(#la, #lb) do
+    if la[i] ~= lb[i] then
+      return "      line " .. i .. "\n        v1.3.2 : " .. tostring(la[i]) ..
+             "\n        current: " .. tostring(lb[i])
+    end
+  end
+end
+
+local function compare(old, new)
+  local diffs = {}
+  local function differ(where, a, b)
+    diffs[#diffs + 1] = "    " .. where .. "\n" .. (first_difference(a or "<nothing>", b or "<nothing>") or "")
+  end
+  for i = 1, math.max(#old, #new) do
+    local o, n = old[i], new[i]
+    local label = (o and o.label) or (n and n.label)
+    if not o or not n then
+      differ("step " .. i .. " '" .. label .. "': present in only one version", o and "present" or "absent", n and "present" or "absent")
+    else
+      if (o.error or "") ~= (n.error or "") then
+        differ("step '" .. label .. "': Lua error", o.error or "<none>", n.error or "<none>")
+      end
+      if o.snap and n.snap then
+        for _, section in ipairs({ "requests", "windows", "files", "log", "commands" }) do
+          local A, B = o.snap[section], n.snap[section]
+          for j = 1, math.max(#A, #B) do
+            if A[j] ~= B[j] then
+              differ("step '" .. label .. "': " .. section .. " #" .. j, A[j], B[j])
+            end
+          end
+        end
+        if o.snap.vlc ~= n.snap.vlc then differ("step '" .. label .. "': vlc state", o.snap.vlc, n.snap.vlc) end
+      end
+    end
+  end
+  return diffs
+end
+
+-- --------------------------------------------------------------------- main --
+local sessions = dofile(here .. "/sessions.lua")
+local filter = arg and arg[1]
+local failed, ran, steps = 0, 0, 0
+
+for _, session in ipairs(sessions) do
+  if not filter or session.name:lower():find(filter:lower(), 1, true) then
+    ran = ran + 1
+    local old = record(session, BASELINE)
+    local new = record(session, CANDIDATE)
+    steps = steps + #old
+    local diffs = compare(old, new)
+    if #diffs == 0 then
+      print(string.format("identical  %-62s %2d steps", session.name, #old))
+    else
+      failed = failed + 1
+      print("DIFFERENT  " .. session.name)
+      for i = 1, math.min(#diffs, 8) do print(diffs[i]) end
+      if #diffs > 8 then print("    ... and " .. (#diffs - 8) .. " more differences") end
+    end
+  end
+end
+
+H.cleanup()
+print(string.format("\n%d sessions, %d steps compared on %s: %d identical, %d different",
+  ran, steps, _VERSION, ran - failed, failed))
+print("agreed exceptions: " .. EXCEPTIONS[1].name .. "; " .. EXCEPTIONS[2].name)
+os.exit(failed == 0 and 0 or 1)

@@ -29,6 +29,7 @@ end
 H.real_getenv = os.getenv
 H.real_popen = io.popen
 H.real_open = io.open
+H.real_execute = os.execute
 H.real_setlocale = os.setlocale
 do
   local fake = 0
@@ -49,11 +50,12 @@ function H.tmpdir()
   end
   H._n = (H._n or 0) + 1
   local d = tmp_root .. "/" .. H._n
-  os.execute('mkdir -p "' .. d .. '"')
+  H.real_execute('mkdir -p "' .. d .. '"')
   return d
 end
+function H.tmp_root() return tmp_root end
 function H.cleanup()
-  if tmp_root then os.execute('rm -rf "' .. tmp_root .. '"') end
+  if tmp_root then H.real_execute('rm -rf "' .. tmp_root .. '"') end
 end
 function H.read_file(path)
   local f = H.real_open(path, "rb")
@@ -189,7 +191,7 @@ function H.launch(o)
   if o.offline then env.server.offline = true end
 
   if not o.first_run then
-    os.execute('mkdir -p "' .. env.dir .. '"')
+    H.real_execute('mkdir -p "' .. env.dir .. '"')
     H.write_file(env.dir .. "/vlsub_conf.json", json.encode(default_config(o)))
     for name, content in pairs(o.files or {}) do
       H.write_file(env.dir .. "/" .. name, content)
@@ -209,6 +211,11 @@ function H.launch(o)
     return H.real_getenv(name)
   end
   env.commands = {}
+  env.executed = {}
+  os.execute = function(cmd)
+    if cmd then env.executed[#env.executed + 1] = cmd end
+    return H.real_execute(cmd)
+  end
   io.popen = function(cmd, mode)
     env.commands[#env.commands + 1] = cmd
     if o.popen then
@@ -238,7 +245,7 @@ function H.launch(o)
   end
 
   _G.vlc = env.vlc
-  assert(loadfile(H.SCRIPT))()
+  assert(loadfile(o.script or H.SCRIPT))()
 
   function env.ui() return env.vlc._dialog() end
   function env.message()

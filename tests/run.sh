@@ -1,5 +1,6 @@
 #!/bin/sh
-# Run every check CI runs: syntax, static analysis, behaviour tests.
+# Run every check CI runs: syntax, static analysis, behaviour tests, and the
+# behaviour diff against the frozen v1.3.2 baseline.
 #
 #   tests/run.sh            use `lua` / `luac` from PATH
 #   LUA=lua5.2 tests/run.sh pick an interpreter (VLC 3 embeds Lua 5.2)
@@ -33,3 +34,11 @@ fi
 
 echo "==> Behaviour tests ($("$LUA" -v 2>&1 | head -1))"
 "$LUA" tests/run_tests.lua
+
+echo "==> Behaviour diff against v1.3.2 (tests/behaviour)"
+if DIFF_OUTPUT="$("$LUA" tests/behaviour/run.lua 2>&1)"; then
+  echo "$DIFF_OUTPUT" | tail -2
+else
+  echo "$DIFF_OUTPUT" | grep -v "^identical"
+  exit 1
+fi
