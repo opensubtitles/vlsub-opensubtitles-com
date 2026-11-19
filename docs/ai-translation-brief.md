@@ -210,12 +210,67 @@ Tests, as for everything else: recorded real answers as fixtures, the fake
 API plays the wait/redirect/no-credit cases, the behaviour diff must stay
 identical when the feature is not used, real-VLC run with a test account.
 
+## Answers and measurements (2026-11-19)
+
+- An on-demand translation is paid **with credits only**; the daily download
+  quota is not touched.
+- When the server offers no on-demand entry, VLSub says nothing.
+- `GET /subtitles` over plain HTTP answers with the header
+  `X-AI-Proxy: true` (through `kong/3.9.1`) for the User-Agents
+  `VLSub OpenSubtitles.com v2.0`, `v2.0.0` **and `v1.4.0`**. If only 2.x is
+  meant to get on-demand entries, the whitelist is wider than intended: the
+  released 1.4.0 would show such an entry as an ordinary subtitle and fail
+  on its id (see the simulation below).
+- No on-demand entry was returned yet (six anonymous searches, among them a
+  language without any subtitle for the film).
+
+### Languages that can be translated
+
+`GET /ai/info/translation`, live. An on-demand entry can only exist for a
+target language some engine supports.
+
+| engine | languages |
+|---|---|
+| `aws` (75) | af am ar az bg bn bs ca cs cy da de el en es es-MX et fa fa-AF fi fr fr-CA ga gu ha he hi hr ht hu hy id is it ja ka kk kn ko lt lv mk ml mn mr ms mt nl no pa pl ps pt pt-PT ro ru si sk sl so sq sr sv sw ta te th tl tr uk ur uz vi zh zh-TW |
+| `deepl2` (29) | bg cs da de el en es et fi fr hu id it ja ko lt lv nl no pl pt ro ru sk sl sv tr uk zh |
+| `gemini3-1-flash`, `gemini3-5-flash` (79 each) | af am ar as az be bg bn bs ca cs da de el en en-GB en-US es es-419 es-ES es-MX et eu fa fi fil fr gl gu he hi hr hu hy id is it ja ka kk km kn ko lo lt lv mk ml mn mr ne nl no or pa pl pt pt-BR pt-PT ro ru si sk sl sq sr sv sw ta te th tr uk ur uz vi zh-CN zh-TW zu |
+
+Of the 105 subtitle languages of the API, **no engine** covers 25:
+Abkhazian, Aragonese, Asturian, Breton, Esperanto, Extremaduran, Gaelic,
+Interlingua, Igbo, Kurdish, Luxembourgish, Manipuri, Montenegrin, Burmese,
+Navajo, Occitan, Portuguese (MZ), Sindhi, Northern Sami, Santali, Syriac,
+Turkmen, Tetum, Toki Pona, Tatar, and "Chinese bilingual". (Spanish LA / EU,
+Dari and Tagalog have other codes on the engines: es-419 / es-ES, fa-AF,
+fil.) Which engine and which source language are used is the server's
+choice; VLSub does not filter by language - it shows what the server offers.
+
+### The simulation
+
+The live API does not show on-demand entries yet, so `tests/lib/fake_api.lua`
+plays them (`server.ai.on_demand = { language = "cs", from = "pl" }`):
+the extra row in `/subtitles` with a 34-digit id written as a JSON number and
+the "will be created on demand" comment, a `/download` that spends credits and
+not quota, an empty answer without credits, "still translating" answers
+(`server.ai.waits`), `/ai/credits` and `/ai/credits/buy`. **It follows the
+Kodi addon's assumptions and the answers above, not recorded traffic**; it is
+to be corrected against the real server in stage 0.
+
+`lua tests/ondemand_demo.lua` runs the extension as it is today against it:
+
+- the row is listed like any AI-translated upload (`CS | ... 🤖 👤AI [0↓]`),
+  nothing says it does not exist yet or costs credits;
+- Download sends `"file_id":1.2464484099115e+33` instead of the 34 digits
+  (the id went through a Lua number), and the user gets
+  "API returned error: Invalid file_id". Nothing is paid, nothing is saved.
+
+So v1.4.0 fails safely on such an entry, but cannot use it.
+
 ## Open questions
 
 1. Blocked until done on the API side: the User-Agent
    `VLSub OpenSubtitles.com v2.` whitelisted for on-demand entries, and AI
    credits on the CI test account. Stage 0 cannot start before.
-2. When no on-demand entry is offered (language pair unsupported?), is
-   there anything to tell the user, or is it simply absent?
-3. Does an on-demand translation count against the daily download quota as
-   well as the credits?
+2. How to make the live API return an on-demand entry (login needed?
+   search by `imdb_id` / `moviehash`? a switch on the server?).
+3. Should 1.x User-Agents get on-demand entries at all (they cannot use
+   them)?
