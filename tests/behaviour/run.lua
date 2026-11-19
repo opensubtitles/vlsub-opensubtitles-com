@@ -111,6 +111,13 @@ local function canonical(v, indent)
   return "{\n" .. table.concat(out, "\n") .. "\n" .. indent .. "}"
 end
 
+-- The version number is the one difference a release always has.
+local VERSIONS = {}
+for _, script in ipairs({ BASELINE, CANDIDATE }) do
+  local version = (H.read_file(script) or ""):match('local app_version = "([^"]+)"')
+  if version then VERSIONS[#VERSIONS + 1] = version:gsub("%p", "%%%0") end
+end
+
 local function make_normaliser(env)
   local root = H.tmp_root():gsub("%p", "%%%0")
   local home_index = env.home:match("(%d+)$")
@@ -120,6 +127,9 @@ local function make_normaliser(env)
     text = text:gsub(root .. "/(%d+)", function(n)
       return n == home_index and "<HOME>" or "<DIR>"
     end)
+    for _, version in ipairs(VERSIONS) do
+      text = text:gsub("%f[%d]" .. version .. "%f[%D]", "<VERSION>")
+    end
     -- wall-clock values: epoch seconds, and durations the extension measures
     text = text:gsub("%f[%d]1[6-9]%d%d%d%d%d%d%d%d%f[%D]", "<EPOCH>")
     text = text:gsub("%(%d+ms%)", "(<N>ms)"):gsub("in %d+ms", "in <N>ms")

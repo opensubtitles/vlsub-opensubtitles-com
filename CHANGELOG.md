@@ -7,14 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+
+## [1.4.0] - 2026-11-19
+
 ### Added
-- **Interface translations.** The configuration window has an "Interface language" setting: English, Automatic (system language), or any reviewed translation. Translations live in the repository (`locale/`) and are downloaded on demand, so new ones arrive without a new release. New installations follow the detected system language when a reviewed translation exists; existing installations stay English until changed. First translation: Slovak (awaiting review).
+- **The interface in 61 languages.** The configuration window has an "Interface language" setting: English, Automatic (system language), or one of 61 translations - every language the opensubtitles.org website is translated into, using the site's own wording for the common terms. Translations live in the repository (`locale/`) and are downloaded when chosen and refreshed weekly, so corrections reach everyone without a new release. New installations follow the system language; existing installations stay English until changed. The translations are machine-made: if something reads wrong, please open an issue or a pull request (see `locale/README.md`).
+
+### Fixed
+- **A raw subtitle answer made the download fail** with a Lua error and left the window on its progress bar: a body that is valid JSON but not an object (a subtitle starts with its cue number) was treated as an API object. Search had the same weakness.
+- **A damaged `vlsub_conf.json` stopped the extension from starting.** It now starts with the default settings.
+- **VLC "not responding" when the internet is down**: a connection that cannot be opened blocks VLC until the system gives up, and the extension tried again and again (up to three times per request, then the next request). A dead connection is no longer retried and further requests are refused for 10 seconds, so the window is blocked once.
+- **macOS: labels in a language beyond Western European letters were shown empty** (VLC for macOS drops label text outside Latin-1), and the help window cut long lines off.
+- Text that no translation could reach ("Ready for search", the sorting drop-downs, "None").
 
 ### Changed
-- **Internal clean-up of the script with no change in behaviour** (9,173 → 6,875 lines): dead code removed (old XML-RPC API, a second HTTP client, the unreachable interface-translation code), the three search paths share one request function, long functions split into steps, debug output cut to the useful lines. Verified with a new behaviour-diff test that runs 96 scripted sessions against both v1.3.2 and the current script and compares every request, window, message and file.
+- **Configuration window: all fields are aligned** in one column (the drop-downs used to start further right than the username and password fields).
+- **Internal clean-up of the script** (9,173 → about 7,500 lines including the translation code): dead code removed (old XML-RPC API, a second HTTP client), the three search paths share one request function, long functions split into steps, debug output cut to the useful lines. Verified with a behaviour-diff test that runs 96 scripted sessions against both v1.3.2 and the current script and compares every request, window, message and file; the intended differences are declared one by one.
 - `vlsub_conf.json` now contains only settings (it used to include about 9 kB of interface text). Existing files keep working.
 - Debug output is controlled by VLC's own message verbosity; the hidden `debugLogging` setting is gone.
-- All interface text now lives in one table, as preparation for translations.
+
+### Not verified
+- Windows: no one has run this version there yet. The Windows-only code (paths, locale detection) was changed as little as possible.
 
 
 ## [1.3.2] - 2026-11-19
