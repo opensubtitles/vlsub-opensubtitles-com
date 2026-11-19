@@ -304,12 +304,10 @@ local strings = {
   ui_vlsub_update_available = "<a href='https://github.com/opensubtitles/vlsub-opensubtitles-com'><b>VLSub Update Available</b></a> (",
   ui_installation_instructions = "<b>Installation Instructions:</b>",
   ui_open_powershell_as_administrator_and_run = "Open PowerShell as Administrator and run:",
-  ui_iwr_useb_https_raw_githubusercontent_com_opensub = "iwr -useb https://raw.githubusercontent.com/opensubtitles/vlsub-opensubtitles-com/main/scripts/install.ps1 | iex",
   ui_if_this_doesn_t_work_download_a = "If this doesn't work, download <a href='",
   ui_vlsubcom_lua_and_save_to = "'>vlsubcom.lua</a> and save to:",
   ui_appdata_vlc_lua_extensions_vlsubcom_lua = "%APPDATA%\\vlc\\lua\\extensions\\vlsubcom.lua",
   ui_open_terminal_and_run = "Open Terminal and run:",
-  ui_curl_ssl_https_raw_githubusercontent_com_opensub = "curl -sSL https://raw.githubusercontent.com/opensubtitles/vlsub-opensubtitles-com/main/scripts/install.sh | bash",
   ui_then_restart_vlc_and_access_via_view = "Then restart VLC and access via View → VLSub OpenSubtitles.com",
   ui_what_s_new_in_v = "<b>What's New in v",
   ui_skip_version = "⏭️ Skip Version",
@@ -323,10 +321,6 @@ local strings = {
   ui_link = "🔗 Link",
   ui_config = "⚙️ Config",
   ui_help = "❓ Help",
-  ui_main = "main",
-  ui_a_href_file = "<a href='file:///",
-  ui_a_href = "<a href='",
-  ui_config_2 = "config",
   ui_check_updates = "🔄 Check Updates",
   ui_search_methods = "SEARCH METHODS:",
   ui_hash_search_uses_video_file_fingerprint_for = "Hash Search: Uses video file fingerprint for exact matches",
@@ -482,9 +476,7 @@ local strings = {
   ui_subtitles_saved_to_downloads = "Subtitles saved to Downloads",
   ui_subtitles_saved = "Subtitles saved",
   ui_subtitle_link = "<b>Subtitle Link:</b>",
-  ui_nbsp = "</span> &nbsp;",
   ui_view_subtitle = "View Subtitle",
-  ui_a_href_https_www_opensubtitles_com_subtitles = "<a href='https://www.opensubtitles.com/subtitles/",
   ui_checking_login_status = "Checking login status",
   ui_user_info_request_failed_with_http_status = "User info request failed with HTTP status: ",
   ui_unknown_2 = "Unknown",
@@ -977,7 +969,7 @@ function show_update_dialog(latest_version, release_notes, download_url)
   if openSub.conf.os == "win" then
     -- Windows instructions - compact with 2-line fallback
     dlg:add_label(strings.ui_open_powershell_as_administrator_and_run, 1, 3, 6, 1)
-    dlg:add_label(strings.ui_iwr_useb_https_raw_githubusercontent_com_opensub, 1, 4, 6, 1)
+    dlg:add_label("iwr -useb https://raw.githubusercontent.com/opensubtitles/vlsub-opensubtitles-com/main/scripts/install.ps1 | iex", 1, 4, 6, 1)
     dlg:add_label(strings.ui_if_this_doesn_t_work_download_a .. download_url .. strings.ui_vlsubcom_lua_and_save_to, 1, 5, 6, 1)
     dlg:add_label(strings.ui_appdata_vlc_lua_extensions_vlsubcom_lua, 1, 6, 6, 1)
 
@@ -992,7 +984,7 @@ function show_update_dialog(latest_version, release_notes, download_url)
     end
 
     dlg:add_label(strings.ui_open_terminal_and_run, 1, 3, 6, 1)
-    dlg:add_label(strings.ui_curl_ssl_https_raw_githubusercontent_com_opensub, 1, 4, 6, 1)
+    dlg:add_label("curl -sSL https://raw.githubusercontent.com/opensubtitles/vlsub-opensubtitles-com/main/scripts/install.sh | bash", 1, 4, 6, 1)
     dlg:add_label(strings.ui_if_this_doesn_t_work_download_a .. download_url .. strings.ui_vlsubcom_lua_and_save_to, 1, 5, 6, 1)
     dlg:add_label(install_path, 1, 6, 6, 1)
   end
@@ -1746,7 +1738,7 @@ function interface_main()
     strings.ui_config, show_conf, 5, 11, 1, 1)
   dlg:add_button(
     strings.ui_help,
-    function() show_help(strings.ui_main) end, -- Pass strings.ui_main to indicate source window
+    function() show_help("main") end, -- "main" tells the help window where to return to
     6, 11, 1, 1)
 
   -- Set up language dropdowns
@@ -1806,11 +1798,11 @@ function interface_config()
       dlg:add_label(lang["int_vlsub_work_dir"], 1, 9, 2, 1)
     elseif openSub.conf.os == "win" then
       dlg:add_label(
-        strings.ui_a_href_file..openSub.conf.dirPath.."'>"..
+        "<a href='file:///"..openSub.conf.dirPath.."'>"..
         lang["int_vlsub_work_dir"].."</a>", 1, 9, 2, 1)
     else
       dlg:add_label(
-        strings.ui_a_href..openSub.conf.dirPath.."'>"..
+        "<a href='"..openSub.conf.dirPath.."'>"..
         lang["int_vlsub_work_dir"].."</a>", 1, 9, 2, 1)
     end
   else
@@ -1831,7 +1823,7 @@ function interface_config()
 
   dlg:add_button(
     "❓ " .. lang["int_help"],
-    function() show_help(strings.ui_config_2) end,
+    function() show_help("config") end,
     2, 11, 1, 1)
 
   dlg:add_button(
@@ -1898,7 +1890,7 @@ function interface_help()
   dlg:add_label("", 1, 23, 6, 1) -- Spacer
   dlg:add_button(strings.ui_close,
     function()
-      if previous_window == strings.ui_config_2 then
+      if previous_window == "config" then
         show_conf()
       else
         show_main()
@@ -2306,8 +2298,8 @@ function open_subtitle_link()
   -- Create clickable link message
   local link_message = "<span style='color:#181'>"
   link_message = link_message .. strings.ui_subtitle_link
-  link_message = link_message .. strings.ui_nbsp
-  link_message = link_message .. strings.ui_a_href .. subtitle_url .. "'>"
+  link_message = link_message .. "</span> &nbsp;"
+  link_message = link_message .. "<a href='" .. subtitle_url .. "'>"
   link_message = link_message .. (item.SubFileName or strings.ui_view_subtitle) .. "</a>"
 
   setMessage(link_message)
@@ -4339,8 +4331,8 @@ function download_subtitles_v2()
     -- For manual download, provide the web URL
     local link = "<span style='color:#181'>"
     link = link.."<b>"..lang["mess_dowload_link"]..":</b>"
-    link = link..strings.ui_nbsp
-    link = link..strings.ui_a_href_https_www_opensubtitles_com_subtitles..
+    link = link.."</span> &nbsp;"
+    link = link.."<a href='https://www.opensubtitles.com/subtitles/"..
       (item.SubtitleID or item.SubHash).."'>"
     link = link..(item.MovieReleaseName or item.SubFileName).."</a>"
 

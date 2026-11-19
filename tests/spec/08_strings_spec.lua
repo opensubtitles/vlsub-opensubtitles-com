@@ -54,6 +54,20 @@ describe("interface strings", function()
     ok(count > 250, "table looks complete (" .. count .. " entries)")
   end)
 
+  it("program identifiers and markup are not in the table (they must never be translated)", function()
+    H.launch({ activate = false })
+    local suspicious = {}
+    for key, value in pairs(H.find_local("strings")) do
+      local text = value:gsub("<[^>]*>?", ""):gsub("https?://%S+", ""):gsub("file:///", "")
+      if not text:find("%a%a") or value:find("^curl ") or value:find("^iwr ")
+         or value == "main" or value == "config" then
+        suspicious[#suspicious + 1] = key
+      end
+    end
+    table.sort(suspicious)
+    eq(suspicious, {}, "entries that are not user-readable text")
+  end)
+
   it("messages and labels are not written inline any more", function()
     local src = source()
     local body = src:sub((src:find("\nlocal strings = %b{}")))
@@ -66,8 +80,10 @@ describe("interface strings", function()
       if code:find("setMessage%(") or code:find("setError%(") or code:find("report_failure%(")
          or code:find(":add_label%(") or code:find(":add_button%(") or code:find(":add_html%(") then
         for literal in code:gmatch('"([^"]*)"') do
-          local text = literal:gsub("<[^>]*>", "")
-          if select(2, text:gsub("%a", "")) >= 3 and text:find("%a%a")
+          -- markup, URLs and shell commands are not text for a translator
+          local text = literal:gsub("<[^>]*>?", ""):gsub("https?://%S+", ""):gsub("file:///", "")
+          local is_command = literal:find("^curl ") or literal:find("^iwr ")
+          if not is_command and select(2, text:gsub("%a", "")) >= 3 and text:find("%a%a%a")
              and not code:find('%[%s*"' .. literal:gsub("%p", "%%%0") .. '"%s*%]') then
             offenders[#offenders + 1] = line_number .. ": " .. literal
           end
