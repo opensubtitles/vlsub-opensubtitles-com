@@ -269,7 +269,6 @@ local strings = {
   ui_checking_dkjson_compatibility = "Checking dkjson compatibility...",
   ui_error_incompatible_dkjson_version = "ERROR: Incompatible dkjson version",
   ui_critical_dkjson_version_too_old_cannot_parse = "CRITICAL: dkjson version too old - cannot parse floats",
-  ui_dkjson_compatibility_check_passed_version = "dkjson compatibility check passed (version: ",
   ui_checking_configuration = "Checking configuration...",
   ui_error_unsupported_vlc_version = "ERROR: Unsupported VLC version",
   ui_critical_vlc_version_not_supported = "CRITICAL: VLC version not supported",
@@ -295,12 +294,10 @@ local strings = {
   ui_ready_to_show_configuration_window_no_auth = "Ready to show configuration window (no auth)",
   ui_initializing_auto_update_system = "Initializing auto-update system...",
   ui_setting_up_automatic_update_checking = "Setting up automatic update checking...",
-  ui_vlsub_update_available = "<a href='https://github.com/opensubtitles/vlsub-opensubtitles-com'><b>VLSub Update Available</b></a> (",
   ui_installation_instructions = "<b>Installation Instructions:</b>",
   ui_open_powershell_as_administrator_and_run = "Open PowerShell as Administrator and run:",
   ui_open_terminal_and_run = "Open Terminal and run:",
   ui_then_restart_vlc_and_access_via_view = "Then restart VLC and access via View → VLSub OpenSubtitles.com",
-  ui_what_s_new_in_v = "<b>What's New in v",
   ui_skip_version = "⏭️ Skip Version",
   ui_later = "⏰ Later",
   ui_close = "❌ Close",
@@ -395,7 +392,6 @@ local strings = {
   ui_login_failed_no_authentication_token_received = "Login failed - no authentication token received",
   ui_no_subtitles_available_for_download_please_searc = "No subtitles available for download. Please search first.",
   ui_failed_to_download_from_provided_link = "Failed to download from provided link",
-  ui_failed_to_download_subtitle_content_http = "Failed to download subtitle content (HTTP ",
   ui_empty_subtitle_content_downloaded = "Empty subtitle content downloaded",
   ui_no_file_id_available_for_download = "No file ID available for download",
   ui_authentication_failed_please_check_your_opensubt = "Authentication failed - please check your OpenSubtitles.com credentials",
@@ -414,11 +410,7 @@ local strings = {
   ui_failed_to_parse_user_info_response = "Failed to parse user info response",
   ui_invalid_user_info_response_format = "Invalid user info response format",
   ui_testing_network_connectivity = "Testing network connectivity...",
-  ui_testing_connection = "Testing connection ",
   ui_testing = "Testing: ",
-  ui_connection_ok_responded_in = "Connection OK (responded in ",
-  ui_network_test_passed = "Network test passed: ",
-  ui_network_test_failed = "Network test failed: ",
   ui_offline_mode_limited_functionality = "⚠️  OFFLINE MODE - LIMITED FUNCTIONALITY",
   ui_warning_no_internet_connection_detected = "⚠️  WARNING: No internet connection detected!",
   ui_extension_uses_vlc_s_built_in_networking = "Extension uses VLC's built-in networking (no external tools required)",
@@ -435,24 +427,13 @@ local strings = {
   ui_network_error_connection_failed = "Network error: Connection failed",
   ui_api_error_url_parameters_not_sorted_correctly = "API Error: URL parameters not sorted correctly",
   ui_http = ": HTTP ",
-  ui_too_many_requests_429_the_api_allows = "Too many requests (429) - the API allows only a few requests per ",
-  ui_second_please_wait_a_moment_and_try = "second. Please wait a moment and try again.",
-  ui_authentication_failed_401_please_check_your_open = "Authentication failed (401) - please check your OpenSubtitles.com ",
-  ui_username_and_password_in_the_configuration = "username and password in the configuration.",
   ui_access_forbidden_403 = "Access forbidden (403).",
-  ui_opensubtitles_com_server_error = "OpenSubtitles.com server error (",
-  ui_please_try_again_later = ") - please try again later.",
-  ui_network_is_redirecting_http_requests_status = "network is redirecting HTTP requests (status ",
-  ui_a_proxy_vpn_captive_portal_or_content = ") - a proxy, VPN, captive portal or content filter is intercepting ",
-  ui_port_80_disable_it_or_connect_through = "port 80. Disable it or connect through another network.",
   ui_reset_in = ", reset in: %s",
   ui_quota_reset_in = "Quota reset in: %s",
   ui_for_moviehash = " for moviehash ",
   ui_searched_by_hash_name = " (searched by hash + name)",
-  ui_and_title = " and title '",
   ui_for_imdb_id = " for IMDB ID ",
   ui_found_via_name_search = " (found via name search)",
-  ui_for_title = " for title '",
   ui_empty_subtitle_content_received = "Empty subtitle content received",
   ui_saved_with_video_file = " (saved with video file)",
   ui_saved_to_downloads_folder = " (saved to Downloads folder)",
@@ -484,7 +465,21 @@ local strings = {
   ui_set_third_language = "Set third language: %s",
   ui_if_this_doesn_t_work_download = "If this doesn't work, download <a href='%s'>vlsubcom.lua</a> and save to:",
   ui_quota_downloads = "Quota: %s/%s downloads",
-  ui_account_summary = "%s (%s), %s/%s downloads, reset in: %s"
+  ui_account_summary = "%s (%s), %s/%s downloads, reset in: %s",
+  ui_too_many_requests_429 = "Too many requests (429) - the API allows only a few requests per second. Please wait a moment and try again.",
+  ui_authentication_failed_401_check_configuration = "Authentication failed (401) - please check your OpenSubtitles.com username and password in the configuration.",
+  ui_server_error_try_again_later = "OpenSubtitles.com server error (%s) - please try again later.",
+  ui_network_is_redirecting = "network is redirecting HTTP requests (status %s) - a proxy, VPN, captive portal or content filter is intercepting port 80. Disable it or connect through another network.",
+  ui_dkjson_check_passed = "dkjson compatibility check passed (version: %s)",
+  ui_update_available = "<a href='https://github.com/opensubtitles/vlsub-opensubtitles-com'><b>VLSub Update Available</b></a> (%s => %s)",
+  ui_whats_new_in = "<b>What's New in v%s:</b>",
+  ui_and_title_quoted = " and title '%s'",
+  ui_for_title_quoted = " for title '%s'",
+  ui_failed_to_download_subtitle_http = "Failed to download subtitle content (HTTP %s)",
+  ui_testing_connection_n_of = "Testing connection %s/%s...",
+  ui_connection_ok_ms = "Connection OK (responded in %sms)",
+  ui_network_test_passed_ms = "Network test passed: %s (%sms)",
+  ui_network_test_failed_ms = "Network test failed: %s (%sms)"
 }
 
 -- A message with values filled in: tr(key, a, b) uses the string stored
@@ -767,7 +762,7 @@ function activate()
     criticalFailure = true
     return false
   end
-  log(strings.ui_dkjson_compatibility_check_passed_version .. tostring(json.version) .. ")")
+  log(tr("ui_dkjson_check_passed", tostring(json.version)))
 
   -- Paths, saved settings
   progress(strings.ui_checking_configuration)
@@ -963,7 +958,7 @@ function show_update_dialog(latest_version, release_notes, download_url)
   dlg = vlc.dialog("VLSub Update Available - " .. latest_version)
 
   -- Row 1: Update notification header with link and version info in compact format
-  dlg:add_label(strings.ui_vlsub_update_available .. update_config.current_version .. " => " .. latest_version .. ")", 1, 1, 6, 1)
+  dlg:add_label(tr("ui_update_available", update_config.current_version, latest_version), 1, 1, 6, 1)
 
   -- Row 2: Installation instructions
   dlg:add_label(strings.ui_installation_instructions, 1, 2, 6, 1)
@@ -995,7 +990,7 @@ function show_update_dialog(latest_version, release_notes, download_url)
   dlg:add_label(strings.ui_then_restart_vlc_and_access_via_view, 1, 7, 6, 1)
 
   -- Row 8: What's new section (compact - exactly 6 lines)
-  dlg:add_label(strings.ui_what_s_new_in_v .. latest_version .. ":</b>", 1, 8, 6, 1)
+  dlg:add_label(tr("ui_whats_new_in", latest_version), 1, 8, 6, 1)
 
   -- Process and display release notes - exactly 6 lines
   local processed_notes = process_release_notes(release_notes)
@@ -2178,7 +2173,7 @@ function display_subtitles()
         message = message .. strings.ui_for_moviehash .. openSub.file.hash
       end
       if openSub.movie.title and openSub.movie.title ~= "" then
-        message = message .. strings.ui_and_title .. openSub.movie.title .. "'"
+        message = message .. tr("ui_and_title_quoted", openSub.movie.title)
       end
     end
 
@@ -2260,11 +2255,11 @@ function display_subtitles()
     elseif openSub.lastSearchMethod == "hash_fallback" then
       message = message .. strings.ui_found_via_name_search
       if openSub.movie.title and openSub.movie.title ~= "" then
-        message = message .. strings.ui_for_title .. openSub.movie.title .. "'"
+        message = message .. tr("ui_for_title_quoted", openSub.movie.title)
       end
     elseif openSub.lastSearchMethod == "name" then
       if openSub.movie.title and openSub.movie.title ~= "" then
-        message = message .. strings.ui_for_title .. openSub.movie.title .. "'"
+        message = message .. tr("ui_for_title_quoted", openSub.movie.title)
       end
     end
 
@@ -3669,16 +3664,13 @@ end
 -- Text shown under the result list when a search request failed.
 function api_error_message(status)
   if status == 429 then
-    return strings.ui_too_many_requests_429_the_api_allows..
-      strings.ui_second_please_wait_a_moment_and_try
+    return strings.ui_too_many_requests_429
   elseif status == 401 then
-    return strings.ui_authentication_failed_401_please_check_your_open..
-      strings.ui_username_and_password_in_the_configuration
+    return strings.ui_authentication_failed_401_check_configuration
   elseif status == 403 then
     return strings.ui_access_forbidden_403
   elseif status and status >= 500 and status <= 599 then
-    return strings.ui_opensubtitles_com_server_error..tostring(status)..
-      strings.ui_please_try_again_later
+    return tr("ui_server_error_try_again_later", tostring(status))
   end
   return network_redirect_message(status)
 end
@@ -3686,9 +3678,7 @@ end
 function network_redirect_message(status)
   if status == 301 or status == 302 or status == 303
   or status == 307 or status == 308 or status == 310 then
-    return strings.ui_network_is_redirecting_http_requests_status..tostring(status)..
-      strings.ui_a_proxy_vpn_captive_portal_or_content..
-      strings.ui_port_80_disable_it_or_connect_through
+    return tr("ui_network_is_redirecting", tostring(status))
   end
   return nil
 end
@@ -4584,7 +4574,7 @@ local function fetch_subtitle(link)
   if not res then
     return report_failure(strings.ui_failed_to_download_from_provided_link)
   elseif res.status ~= 200 then
-    return report_failure(strings.ui_failed_to_download_subtitle_content_http .. res.status .. ")")
+    return report_failure(tr("ui_failed_to_download_subtitle_http", tostring(res.status)))
   elseif not res.body then
     return report_failure(strings.ui_empty_subtitle_content_downloaded)
   end
@@ -5787,7 +5777,7 @@ function test_network_connectivity()
   }
 
   for i, url in ipairs(test_urls) do
-    update_debug_network(strings.ui_testing_connection .. i .. "/" .. #test_urls .. "...")
+    update_debug_network(tr("ui_testing_connection_n_of", tostring(i), tostring(#test_urls)))
     append_debug_log(strings.ui_testing .. url)
 
     local test_client = Curl.new() -- This uses VLC's networking, not curl
@@ -5801,11 +5791,11 @@ function test_network_connectivity()
     local elapsed_ms = math.floor((end_time - start_time) * 1000)
 
     if res and res.status and res.status >= 200 and res.status < 400 then
-      update_debug_network(strings.ui_connection_ok_responded_in .. elapsed_ms .. "ms)")
-      append_debug_log(strings.ui_network_test_passed .. url .. " (" .. elapsed_ms .. "ms)")
+      update_debug_network(tr("ui_connection_ok_ms", tostring(elapsed_ms)))
+      append_debug_log(tr("ui_network_test_passed_ms", url, tostring(elapsed_ms)))
       return true
     else
-      append_debug_log(strings.ui_network_test_failed .. url .. " (" .. elapsed_ms .. "ms)")
+      append_debug_log(tr("ui_network_test_failed_ms", url, tostring(elapsed_ms)))
     end
   end
 
