@@ -217,10 +217,8 @@ identical when the feature is not used, real-VLC run with a test account.
 - When the server offers no on-demand entry, VLSub says nothing.
 - `GET /subtitles` over plain HTTP answers with the header
   `X-AI-Proxy: true` (through `kong/3.9.1`) for the User-Agents
-  `VLSub OpenSubtitles.com v2.0`, `v2.0.0` **and `v1.4.0`**. If only 2.x is
-  meant to get on-demand entries, the whitelist is wider than intended: the
-  released 1.4.0 would show such an entry as an ordinary subtitle and fail
-  on its id (see the simulation below).
+  `VLSub OpenSubtitles.com v2.0` and `v2.0.0`. (At first also for `v1.4.0`;
+  corrected on the server, see below.)
 - No on-demand entry was returned yet (six anonymous searches, among them a
   language without any subtitle for the film).
 
@@ -304,12 +302,16 @@ the answer is one on-demand row **and the existing subtitles of the other
 languages are gone**. `languages=cs,en&query=big+buck+bunny` returns 1 row
 instead of about 50.
 
-This also happens for the User-Agents `v1.3.2` and `v1.4.0`, i.e. for
-released VLSub: a user with several subtitle languages can get a single row
-that fails with "Invalid file_id" in place of real results. Reported to the
-API owner; to be fixed on the server (insert one on-demand row per missing
-language, in addition to - never instead of - the real rows; 2.x User-Agents
-only).
+For a short time this also reached the User-Agents `v1.3.2` and `v1.4.0`.
+**Fixed on the server the same day**: re-measured, 1.x gets no
+`X-AI-Proxy` header and its normal results (50 rows for `cs,en`); only
+`VLSub OpenSubtitles.com v2.` is proxied.
+
+Still open for 2.x, on the server: with several languages the real rows of
+the other languages are missing (`languages=cs,en&query=big+buck+bunny`:
+1 on-demand row instead of 50 rows), and only the first language gets an
+on-demand row. VLSub 2.0 must not ship before that is settled - or it must
+work around it (e.g. one extra request per language without results).
 
 ### No simulation
 
