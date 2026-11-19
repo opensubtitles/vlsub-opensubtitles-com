@@ -1,0 +1,128 @@
+# AI subtitles in VLSub - brief (branch `dev`)
+
+Goal: when no good subtitle exists in the user's language, VLSub offers an
+AI-made one, paid with the AI credits of the user's OpenSubtitles account.
+
+Status: **draft, waiting for decisions** (see "Open questions"). Nothing is
+implemented yet.
+
+API reference: `private/opensubtitles_openapi.json` (local only, excluded
+from git). Reference client: Kodi addon `service.subtitles.opensubtitles-com`,
+branch `develop` (version 2.0.0), studied 2026-11-19.
+
+## What the Kodi addon really does
+
+It does **not** call `/ai/translate`. It has two AI features:
+
+1. **On-demand AI translation, through the ordinary download.** The server
+   itself adds entries to `GET /subtitles` results (with the default
+   `ai_translated=include`) for translations that do not exist yet:
+   - recognised by `attributes.comments` containing "will be created on
+     demand" ("This subtitle file will be created on demand in czech language
+     as AI translation from polish language."), or by a `file_id` of more
+     than 10 digits (pseudo ids have 34 digits; real ones 7-8);
+   - shown with a badge `[AI on demand]`; ranked below human subtitles;
+   - picking it is a normal `POST /download {"file_id": <id>}`. The server
+     translates while the request is open (20 s or more) or answers with a
+     redirect to `/download/{id}?wait_for_translation=N` and no `link`; the
+     addon then waits 5 s and posts again, at most 3 times;
+   - no price, no engine choice, no confirmation; credits are taken by the
+     server. An empty answer plus a balance of 0 means "no credits";
+   - automatic download never picks such an entry.
+   This server behaviour is not in the OpenAPI file; the addon's own comments
+   call it new and untested.
+2. **AI transcription** (experimental, off by default): extract the audio,
+   upload it to `/ai/transcribe`, poll, download the result. Not possible in
+   VLC's Lua (no way to extract or upload audio) - **out of scope**.
+
+Credits: `GET /ai/credits` -> `data.credits`; `GET /ai/credits/buy` -> list
+of `{name, value, discount_percent, checkout_url}`; the addon shows the
+checkout URL as a QR code (not needed here: VLSub shows a link).
+
+## What the API offers besides that
+
+`POST /ai/translate` + `GET /ai/translate/{correlation_id}`: translate a
+given subtitle (uploaded content, or perhaps a `file_id`) from one language to
+another with a chosen engine. Asynchronous: `CREATED` -> `PENDING` ->
+`COMPLETED` / `ERROR` / `TIMEOUT`. The result names the file URL
+(`/ai/files/<id>/<name>`, needs Api-Key + Bearer), the characters counted,
+price, credits left and a quality report (`quality.valid`).
+
+`GET /ai/info/translation` (no login), live on 2026-11-19:
+
+| engine | name | credits per character | languages |
+|---|---|---|---|
+| `aws` | Amazon Translate | 0.0054 | 75 |
+| `deepl2` | DeepL2 | 0.0009 | 29 |
+| `gemini3-1-flash` | Gemini 3.1 Flash | 0.001556 | 79 |
+| `gemini3-5-flash` | Gemini 3.5 Flash | 0.004668 | 79 |
+
+A typical film subtitle has 40-60 thousand characters: about 40-55 credits
+with DeepL2, 60-95 with Gemini 3.1, 220-320 with Amazon. (500 credits = 5 USD.)
+
+Unclear in the specification, to be measured before coding:
+- parameters are declared as query parameters, `file` (content) as required
+  and `file_id` as optional; for the sibling `/ai/transcribe` the Kodi
+  authors measured that they must be multipart form fields. Whether
+  `file_id` alone is enough is not stated;
+- no error answers are documented (no credits, unsupported language pair).
+
+## Limits of VLC's Lua that shape the design
+
+From `docs/vlc-lua-environment.md`:
+
+- **The window is frozen while a request runs**, and a request cannot be
+  interrupted. A download that the server holds open for 20-60 s freezes VLC
+  for that long. Polling (`/ai/translate/{id}`) has the same problem unless
+  each poll is a separate click or the wait is cut into short requests.
+- **API requests go over plain HTTP** with a hand-written client
+  (`socket_exchange`, deadline 15 s today). POST with a JSON body and custom
+  headers works; multipart upload of a subtitle (some 60 kB) is possible but
+  new code. `vlc.stream` (https) can only GET without headers, so the
+  `/ai/files/...` result (needs Bearer) must come over plain HTTP too.
+- **Numbers**: Lua numbers are doubles; a 34-digit `file_id` is destroyed by
+  JSON decode/encode. It has to be taken from the raw response text and sent
+  back as text.
+- No timers, no background work, no browser launch: a checkout URL can only
+  be shown as a link in a label.
+- Every new text goes into the strings table and all 61 translations.
+
+## Proposed design (to confirm)
+
+Phase A - **on-demand entries, as Kodi does**
+1. Search: recognise on-demand entries; keep the id as text; show them marked
+   ("AI on demand") and listed after existing subtitles of the same language.
+2. Download of such an entry: only when logged in; first a line "AI
+   translation, uses credits - you have N" (one `GET /ai/credits`); then the
+   normal download with a long deadline and the wait/retry rule above, with a
+   message before the window freezes ("Translating, this can take a
+   minute...").
+3. No credits: message with the balance and a link to buy credits
+   (`/ai/credits/buy`, cheapest package or the list).
+4. Configuration window: a line with the AI credit balance and a "Buy
+   credits" link, shown when logged in.
+5. Automatic download on media change never spends credits.
+
+Phase B - **explicit translation** (`/ai/translate`), only if wanted
+- "Translate with AI" for a selected, existing subtitle into the user's
+  language: choose engine, see the estimated price, confirm, wait, get the
+  quality verdict. Needs the unclear points measured first.
+
+Tests, as for everything else: recorded real answers as fixtures, the fake
+API plays the wait/redirect/no-credit cases, the behaviour diff must stay
+identical when the feature is not used, real-VLC run with a test account.
+
+## Open questions
+
+1. Which mechanism: phase A only (as Kodi), or also phase B?
+2. Search results in the live API showed no on-demand entry for three test
+   queries (anonymous, 2026-11-19). When does the server add them: only for
+   logged-in users, only with credits, only when nothing exists in that
+   language?
+3. A test account with some AI credits is needed to verify against the live
+   API (credentials through CI secrets / environment, never in the
+   repository).
+4. Spending credits: confirm every time, or a setting "translate with AI
+   without asking"?
+5. Release: this goes to `dev`; which version (1.5.0?) and when is decided
+   later.
