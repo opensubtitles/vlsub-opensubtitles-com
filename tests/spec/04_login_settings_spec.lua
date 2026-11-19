@@ -85,6 +85,18 @@ describe("login", function()
     eq(env.errors(), {})
   end)
 
+  it("configuration window: every field starts in the same column, labels in the first", function()
+    local env = H.launch()
+    trigger_menu(2)
+    for _, w in ipairs(env.ui().widgets) do
+      if w.kind == "text_input" or w.kind == "password" or w.kind == "dropdown" then
+        eq(w.col, 2, w.kind .. " in row " .. tostring(w.row))
+      elseif w.kind == "label" then
+        eq(w.col, 1, "label in row " .. tostring(w.row))
+      end
+    end
+  end)
+
   it("a config file that is not readable JSON does not stop the extension: it starts with the default settings", function()
     for _, content in ipairs({ "{not json", "", "1", "true", '"text"' }) do
       local env = H.launch({ files = { ["vlsub_conf.json"] = content } })

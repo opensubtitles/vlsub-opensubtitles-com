@@ -74,6 +74,12 @@ EXCEPTIONS[5] = {
      .. "the comparison; windows, messages and files must still be the same.",
   log_lines = { "failed: connect %(attempt %d+%)", "Not sent: the network was unreachable" },
 }
+EXCEPTIONS[6] = {
+  name = "configuration window: fields aligned",
+  why = "asked for by the user: the drop-downs started one column to the right of the "
+     .. "username / password fields (labels were two columns wide). Every field starts in "
+     .. "column 2 now. In the configuration window a drop-down's column is not compared.",
+}
 local DROP_CONFIG_KEYS = EXCEPTIONS[2].drop_config_keys
 DROP_CONFIG_KEYS.interfaceLanguage = true
 DROP_CONFIG_KEYS.detectedLanguage = true
@@ -179,7 +185,8 @@ local function snapshot(env, norm, cursor)
     for _, x in ipairs(d.widgets) do
       if not (is_config and x.row == skip_row and skip_row) then
         local row = is_config and row_number[x.row] or x.row
-        local line = string.format("%s @%s,%s %q", x.kind, tostring(x.col), tostring(row), norm(x.text or ""))
+        local col = (is_config and x.kind == "dropdown") and "*" or tostring(x.col) -- exception 6
+        local line = string.format("%s @%s,%s %q", x.kind, col, tostring(row), norm(x.text or ""))
         if x.kind == "check_box" then line = line .. " checked=" .. tostring(x.checked) end
         w[#w + 1] = line
         for _, v in ipairs(x.values) do
@@ -369,5 +376,6 @@ H.cleanup()
 print(string.format("\n%d sessions, %d steps compared on %s: %d identical, %d different",
   ran, steps, _VERSION, ran - failed, failed))
 print("agreed exceptions: " .. EXCEPTIONS[1].name .. "; " .. EXCEPTIONS[2].name .. "; " .. EXCEPTIONS[3].name
-  .. "; " .. EXCEPTIONS[4].name .. "; " .. EXCEPTIONS[5].name)
+  .. "; " .. EXCEPTIONS[4].name .. "; " .. EXCEPTIONS[5].name
+  .. "; " .. EXCEPTIONS[6].name)
 os.exit(failed == 0 and 0 or 1)

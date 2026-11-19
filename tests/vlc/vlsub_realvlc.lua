@@ -314,7 +314,7 @@ step("interface language: fetch Slovak from the repository, window rebuilt in Sl
   -- the list of languages comes from the repository
   check(refresh_interface_language() ~= nil, "refresh failed")
   trigger_menu(2)
-  local language = ui():_at(3, 9, "dropdown")
+  local language = ui():_at(2, 9, "dropdown")
   line("     offered: " .. table.concat(language:_texts(), " | "))
   language:_choose_text("^Sloven")
   ui():_at(1, 12, "button"):_click()

@@ -303,7 +303,7 @@ H.describe("network down: the window is blocked once, not again and again", func
     -- the list of languages was fetched while online
     local d = env.ui()
     openSub.option.interfaceLanguage = "en"
-    d:_at(3, 9, "dropdown"):_choose_text("^Automatic")
+    d:_at(2, 9, "dropdown"):_choose_text("^Automatic")
     d:_at(1, 12, "button"):_click()
     eq(attempts(env), 1, "connection attempts")
     eq(H.waited() - before, 30)

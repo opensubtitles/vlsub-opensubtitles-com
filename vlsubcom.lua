@@ -1950,6 +1950,9 @@ function interface_main()
 end
 
 function interface_config()
+  -- Grid: labels in column 1, every field starts in column 2 (two columns
+  -- wide), so the fields line up under each other; the four buttons of the
+  -- last row use columns 1 to 4.
   -- Row 1: OpenSubtitles username
   dlg:add_label(lang["int_os_username"]..":", 1, 1, 1, 1)
   input_table['os_username'] = dlg:add_text_input(
@@ -1963,49 +1966,49 @@ function interface_config()
     and openSub.option.os_password or "", 2, 2, 2, 1)
 
   -- Row 3: Default primary language
-  dlg:add_label(lang["int_default_lang"]..":", 1, 3, 2, 1)
-  input_table['default_language'] = dlg:add_dropdown(3, 3, 1, 1)
+  dlg:add_label(lang["int_default_lang"]..":", 1, 3, 1, 1)
+  input_table['default_language'] = dlg:add_dropdown(2, 3, 2, 1)
 
   -- Row 4: Default secondary language
-  dlg:add_label(lang["int_second_lang"]..":", 1, 4, 2, 1)
-  input_table['default_language2'] = dlg:add_dropdown(3, 4, 1, 1)
+  dlg:add_label(lang["int_second_lang"]..":", 1, 4, 1, 1)
+  input_table['default_language2'] = dlg:add_dropdown(2, 4, 2, 1)
 
   -- Row 5: Default third language
-  dlg:add_label(lang["int_third_lang"]..":", 1, 5, 2, 1)
-  input_table['default_language3'] = dlg:add_dropdown(3, 5, 1, 1)
+  dlg:add_label(lang["int_third_lang"]..":", 1, 5, 1, 1)
+  input_table['default_language3'] = dlg:add_dropdown(2, 5, 2, 1)
 
   -- Row 6: Download behavior
-  dlg:add_label(lang["int_dowload_behav"]..":", 1, 6, 2, 1)
-  input_table['downloadBehaviour'] = dlg:add_dropdown(3, 6, 1, 1)
+  dlg:add_label(lang["int_dowload_behav"]..":", 1, 6, 1, 1)
+  input_table['downloadBehaviour'] = dlg:add_dropdown(2, 6, 2, 1)
 
   -- Row 7: Display language code
-  dlg:add_label(lang["int_display_code"]..":", 1, 7, 2, 1)
-  input_table['langExt'] = dlg:add_dropdown(3, 7, 1, 1)
+  dlg:add_label(lang["int_display_code"]..":", 1, 7, 1, 1)
+  input_table['langExt'] = dlg:add_dropdown(2, 7, 2, 1)
 
   -- Row 8: Remove tags
-  dlg:add_label(lang["int_remove_tag"]..":", 1, 8, 2, 1)
-  input_table['removeTag'] = dlg:add_dropdown(3, 8, 1, 1)
+  dlg:add_label(lang["int_remove_tag"]..":", 1, 8, 1, 1)
+  input_table['removeTag'] = dlg:add_dropdown(2, 8, 2, 1)
 
 
   -- Row 9: Interface language
-  dlg:add_label(strings.ui_interface_language..":", 1, 9, 2, 1)
-  input_table['interfaceLanguage'] = dlg:add_dropdown(3, 9, 1, 1)
+  dlg:add_label(strings.ui_interface_language..":", 1, 9, 1, 1)
+  input_table['interfaceLanguage'] = dlg:add_dropdown(2, 9, 2, 1)
 
   -- Row 10: Working directory
   if openSub.conf.dirPath then
     if openSub.conf.os == "lin" then
-      dlg:add_label(lang["int_vlsub_work_dir"], 1, 10, 2, 1)
+      dlg:add_label(lang["int_vlsub_work_dir"], 1, 10, 1, 1)
     elseif openSub.conf.os == "win" then
       dlg:add_label(
         "<a href='file:///"..openSub.conf.dirPath.."'>"..
-        lang["int_vlsub_work_dir"].."</a>", 1, 10, 2, 1)
+        lang["int_vlsub_work_dir"].."</a>", 1, 10, 1, 1)
     else
       dlg:add_label(
         "<a href='"..openSub.conf.dirPath.."'>"..
-        lang["int_vlsub_work_dir"].."</a>", 1, 10, 2, 1)
+        lang["int_vlsub_work_dir"].."</a>", 1, 10, 1, 1)
     end
   else
-    dlg:add_label(lang["int_vlsub_work_dir"], 1, 10, 2, 1)
+    dlg:add_label(lang["int_vlsub_work_dir"], 1, 10, 1, 1)
   end
 
   input_table['dir_path'] = dlg:add_text_input(

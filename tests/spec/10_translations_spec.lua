@@ -20,7 +20,7 @@ end
 local function config_window(env)
   trigger_menu(2)
   local d = env.ui()
-  return { dialog = d, language = d:_at(3, 9, "dropdown"), save = d:_at(1, 12, "button") }
+  return { dialog = d, language = d:_at(2, 9, "dropdown"), save = d:_at(1, 12, "button") }
 end
 
 local function labels(d)
@@ -130,7 +130,7 @@ describe("interface language: choosing one", function()
 
   it("the chosen language is listed first in the rebuilt drop-down", function()
     local env = switch_to_slovak()
-    eq(env.ui():_at(3, 9, "dropdown"):_texts()[1], "Sloven\196\141ina")
+    eq(env.ui():_at(2, 9, "dropdown"):_texts()[1], "Sloven\196\141ina")
   end)
 
   it("every window is translated: main, help, messages", function()
@@ -391,7 +391,7 @@ describe("interface language: shipped translations", function()
     for _, code in ipairs({ "ja", "ar", "de" }) do
       local c = config_window(env)
       local translation = json.decode(H.read_file(H.ROOT .. "/locale/" .. code .. ".json"))
-      for _, entry in ipairs(env.ui():_at(3, 9, "dropdown").values) do
+      for _, entry in ipairs(env.ui():_at(2, 9, "dropdown").values) do
         if openSub.conf.interfaceLanguages[entry.id] and openSub.conf.interfaceLanguages[entry.id][1] == code then
           c.language:_choose(entry.id)
         end
