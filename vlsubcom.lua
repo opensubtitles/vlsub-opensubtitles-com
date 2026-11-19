@@ -5062,331 +5062,292 @@ function detect_macos_locale(detected_locales)
   end
 end
 
--- Enhanced analyze_detected_locales function with English fallback
+-- How much each source of locale information is trusted (higher wins)
+local LOCALE_SOURCE_PRIORITY = {
+  user_pref = 15,
+  linux_user_config = 13,
+  macos_safe_locale = 12,
+  macos_safe_language = 11,
+  win_safe_lang = 10,
+  win_vlc_intf = 9,
+  linux_printenv_1 = 8,
+  macos_env_LANG = 8,
+  win_env_LANG = 8,
+  env_LANG = 7,
+  env_LC_ALL = 6,
+  ip_geolocation = 6,
+  locale_cmd_LANG = 5,
+  vlc_intf = 4,
+  file_locale_conf = 4,
+  file_locale = 4,
+  file_i18n = 4,
+  ip_country_specific = 3,
+  linux_available_locale = 3,
+  win_timezone_hint = 3,
+  win_codepage_hint = 3,
+  linux_timezone_hint = 2,
+  macos_timezone_hint = 2,
+  win_english_resources = 1,
+  sys_time = 1,
+  sys_collate = 0,
+  sys_ctype = 0
+}
+
+-- Country -> languages commonly understood there, most likely first
+local COUNTRY_LANGUAGES = {
+  -- Central Europe - Slavic languages
+  ["sk"] = {"sk", "cs"}, -- Slovakia: Slovak + Czech (very similar languages)
+  ["cz"] = {"cs", "sk"}, -- Czech Republic: Czech + Slovak
+
+  -- Scandinavia - North Germanic languages
+  ["se"] = {"sv", "no", "da"}, -- Sweden: Swedish + Norwegian + Danish
+  ["no"] = {"no", "sv", "da"}, -- Norway: Norwegian + Swedish + Danish
+  ["dk"] = {"da", "sv", "no"}, -- Denmark: Danish + Swedish + Norwegian
+
+  -- Netherlands/Belgium - Dutch/Flemish
+  ["nl"] = {"nl", "de", "en"}, -- Netherlands: Dutch + German + English
+  ["be"] = {"nl", "fr", "de"}, -- Belgium: Dutch/Flemish + French + German
+
+  -- Switzerland - Multilingual country
+  ["ch"] = {"de", "fr", "it", "en"}, -- Switzerland: German + French + Italian + English
+
+  -- Austria - German speaking
+  ["at"] = {"de", "en"}, -- Austria: German + English
+
+  -- Former Yugoslavia - South Slavic languages
+  ["hr"] = {"hr", "sr", "bs"}, -- Croatia: Croatian + Serbian + Bosnian
+  ["rs"] = {"sr", "hr", "bs"}, -- Serbia: Serbian + Croatian + Bosnian
+  ["ba"] = {"bs", "hr", "sr"}, -- Bosnia: Bosnian + Croatian + Serbian
+  ["me"] = {"sr", "hr", "bs"}, -- Montenegro: Serbian + Croatian + Bosnian
+  ["si"] = {"sl", "hr", "de"}, -- Slovenia: Slovenian + Croatian + German
+  ["mk"] = {"mk", "sr", "bg"}, -- North Macedonia: Macedonian + Serbian + Bulgarian
+
+  -- Baltic states
+  ["lv"] = {"lv", "ru", "en"}, -- Latvia: Latvian + Russian + English
+  ["lt"] = {"lt", "ru", "en"}, -- Lithuania: Lithuanian + Russian + English
+  ["ee"] = {"et", "ru", "en"}, -- Estonia: Estonian + Russian + English
+
+  -- Eastern Europe
+  ["ua"] = {"uk", "ru", "en"}, -- Ukraine: Ukrainian + Russian + English
+  ["by"] = {"be", "ru", "en"}, -- Belarus: Belarusian + Russian + English
+  ["md"] = {"ro", "ru", "en"}, -- Moldova: Romanian + Russian + English
+
+  -- Portuguese/Spanish speaking
+  ["pt"] = {"pt", "es", "en"}, -- Portugal: Portuguese + Spanish + English
+  ["es"] = {"es", "pt", "ca"}, -- Spain: Spanish + Portuguese + Catalan
+
+  -- English + local languages
+  ["ie"] = {"en", "ga"}, -- Ireland: English + Irish Gaelic
+  ["gb"] = {"en", "cy", "gd"}, -- UK: English + Welsh + Scottish Gaelic
+
+  -- German speaking regions
+  ["de"] = {"de", "en"}, -- Germany: German + English
+  ["lu"] = {"fr", "de", "lb"}, -- Luxembourg: French + German + Luxembourgish
+
+  -- Nordic with English
+  ["fi"] = {"fi", "sv", "en"}, -- Finland: Finnish + Swedish + English
+  ["is"] = {"is", "da", "en"}, -- Iceland: Icelandic + Danish + English
+
+  -- Multilingual regions
+  ["ca"] = {"en", "fr"}, -- Canada: English + French
+  ["sg"] = {"en", "zh-cn", "ms", "ta"}, -- Singapore: English + Chinese + Malay + Tamil
+  ["in"] = {"hi", "en", "bn", "te"}, -- India: Hindi + English + regional languages
+
+  -- Major single language countries (with English as common second language)
+  ["us"] = {"en"}, -- USA: English
+  ["au"] = {"en"}, -- Australia: English
+  ["nz"] = {"en"}, -- New Zealand: English
+  ["fr"] = {"fr", "en"}, -- France: French + English
+  ["it"] = {"it", "en"}, -- Italy: Italian + English
+  ["pl"] = {"pl", "en"}, -- Poland: Polish + English
+  ["ro"] = {"ro", "en"}, -- Romania: Romanian + English
+  ["hu"] = {"hu", "en"}, -- Hungary: Hungarian + English
+  ["bg"] = {"bg", "en"}, -- Bulgaria: Bulgarian + English
+  ["gr"] = {"el", "en"}, -- Greece: Greek + English
+  ["tr"] = {"tr", "en"}, -- Turkey: Turkish + English
+  ["ru"] = {"ru", "en"}, -- Russia: Russian + English
+  ["jp"] = {"ja", "en"}, -- Japan: Japanese + English
+  ["kr"] = {"ko", "en"}, -- South Korea: Korean + English
+  ["cn"] = {"zh-cn", "en"}, -- China: Chinese + English
+  ["tw"] = {"zh-tw", "en"}, -- Taiwan: Traditional Chinese + English
+  ["hk"] = {"zh-ca", "en"}, -- Hong Kong: Cantonese + English
+  ["th"] = {"th", "en"}, -- Thailand: Thai + English
+  ["vn"] = {"vi", "en"}, -- Vietnam: Vietnamese + English
+  ["id"] = {"id", "en"}, -- Indonesia: Indonesian + English
+  ["my"] = {"ms", "en", "zh-cn"}, -- Malaysia: Malay + English + Chinese
+  ["ph"] = {"tl", "en"}, -- Philippines: Tagalog + English
+  ["br"] = {"pt-br", "es", "en"}, -- Brazil: Portuguese + Spanish + English
+  ["mx"] = {"es", "en"}, -- Mexico: Spanish + English
+  ["ar"] = {"es", "en"}, -- Argentina: Spanish + English
+  ["cl"] = {"es", "en"}, -- Chile: Spanish + English
+  ["co"] = {"es", "en"}, -- Colombia: Spanish + English
+  ["pe"] = {"es", "en"}, -- Peru: Spanish + English
+  ["ve"] = {"es", "en"}, -- Venezuela: Spanish + English
+  ["ec"] = {"es", "en"}, -- Ecuador: Spanish + English
+  ["bo"] = {"es", "en"}, -- Bolivia: Spanish + English
+  ["py"] = {"es", "en"}, -- Paraguay: Spanish + English
+  ["uy"] = {"es", "en"}, -- Uruguay: Spanish + English
+
+  -- Arabic speaking countries
+  ["sa"] = {"ar", "en"}, -- Saudi Arabia: Arabic + English
+  ["ae"] = {"ar", "en"}, -- UAE: Arabic + English
+  ["eg"] = {"ar", "en"}, -- Egypt: Arabic + English
+  ["ma"] = {"ar", "fr", "en"}, -- Morocco: Arabic + French + English
+  ["tn"] = {"ar", "fr", "en"}, -- Tunisia: Arabic + French + English
+  ["dz"] = {"ar", "fr", "en"}, -- Algeria: Arabic + French + English
+  ["lb"] = {"ar", "fr", "en"}, -- Lebanon: Arabic + French + English
+  ["sy"] = {"ar", "en"}, -- Syria: Arabic + English
+  ["jo"] = {"ar", "en"}, -- Jordan: Arabic + English
+  ["iq"] = {"ar", "en"}, -- Iraq: Arabic + English
+  ["kw"] = {"ar", "en"}, -- Kuwait: Arabic + English
+  ["qa"] = {"ar", "en"}, -- Qatar: Arabic + English
+  ["bh"] = {"ar", "en"}, -- Bahrain: Arabic + English
+  ["om"] = {"ar", "en"}, -- Oman: Arabic + English
+  ["ye"] = {"ar", "en"}, -- Yemen: Arabic + English
+
+  -- Persian/Farsi speaking
+  ["ir"] = {"fa", "en"}, -- Iran: Persian + English
+  ["af"] = {"fa", "ar", "en"}, -- Afghanistan: Persian + Arabic + English
+
+  -- Hebrew speaking
+  ["il"] = {"he", "ar", "en"}, -- Israel: Hebrew + Arabic + English
+
+  -- African countries (former colonies with multilingual heritage)
+  ["za"] = {"en", "af", "zu"}, -- South Africa: English + Afrikaans + Zulu
+  ["ng"] = {"en", "ha", "ig"}, -- Nigeria: English + Hausa + Igbo
+  ["ke"] = {"en", "sw"}, -- Kenya: English + Swahili
+  ["tz"] = {"sw", "en"}, -- Tanzania: Swahili + English
+  ["gh"] = {"en", "tw"}, -- Ghana: English + Twi
+  ["et"] = {"am", "en"}, -- Ethiopia: Amharic + English
+}
+
+-- Count one sighting of `key` (a language or a country) and remember the
+-- most trusted source that reported it.
+local function tally(found, key, priority, source)
+  local entry = found[key]
+  if not entry then
+    found[key] = { priority = priority, source = source, count = 1 }
+    return
+  end
+  if priority > entry.priority then
+    entry.priority = priority
+    entry.source = source
+  end
+  entry.count = entry.count + 1
+end
+
+-- Turn the raw detections ({source=..., locale=...}) into one answer: the
+-- most trusted locale and up to a handful of suggested subtitle languages
+-- (the locale's own language, then the languages of its country, then
+-- English as a fallback).
 function analyze_detected_locales(detected_locales)
   if #detected_locales == 0 then
     return nil
   end
 
-  -- Priority order for sources (higher index = higher priority)
-  local source_priority = {
-    user_pref = 15,
-    linux_user_config = 13,
-    macos_safe_locale = 12,
-    macos_safe_language = 11,
-    win_safe_lang = 10,
-    win_vlc_intf = 9,
-    linux_printenv_1 = 8,
-    macos_env_LANG = 8,
-    win_env_LANG = 8,
-    env_LANG = 7,
-    env_LC_ALL = 6,
-    ip_geolocation = 6,
-    locale_cmd_LANG = 5,
-    vlc_intf = 4,
-    file_locale_conf = 4,
-    file_locale = 4,
-    file_i18n = 4,
-    ip_country_specific = 3,
-    linux_available_locale = 3,
-    win_timezone_hint = 3,
-    win_codepage_hint = 3,
-    linux_timezone_hint = 2,
-    macos_timezone_hint = 2,
-    win_english_resources = 1,
-    sys_time = 1,
-    sys_collate = 0,
-    sys_ctype = 0
-  }
-
   local best_locale = nil
   local best_priority = -1
-
-  -- Collect all languages found with their countries
   local languages_found = {}
   local countries_found = {}
 
   for _, detection in ipairs(detected_locales) do
-    local priority = source_priority[detection.source] or 0
-
-
-    -- Parse each detection to collect languages and countries
+    local priority = LOCALE_SOURCE_PRIORITY[detection.source] or 0
     local lang, country = parse_locale_string(detection.locale)
     if lang then
-      if not languages_found[lang] then
-        languages_found[lang] = {priority = priority, source = detection.source, count = 1}
-      else
-        -- Update if higher priority, or increment count
-        if priority > languages_found[lang].priority then
-          languages_found[lang].priority = priority
-          languages_found[lang].source = detection.source
-        end
-        languages_found[lang].count = languages_found[lang].count + 1
-      end
+      tally(languages_found, lang, priority, detection.source)
     end
-
     if country then
-      if not countries_found[country] then
-        countries_found[country] = {priority = priority, source = detection.source, count = 1}
-      else
-        if priority > countries_found[country].priority then
-          countries_found[country].priority = priority
-          countries_found[country].source = detection.source
-        end
-        countries_found[country].count = countries_found[country].count + 1
-      end
+      tally(countries_found, country, priority, detection.source)
     end
-
     if priority > best_priority then
       best_priority = priority
       best_locale = detection
     end
   end
 
-  if best_locale then
-    -- Parse the locale string to extract language and country
-    local locale_str = best_locale.locale
-    local language, country = parse_locale_string(locale_str)
-
-    -- Build suggested languages list - ALWAYS BUILD MULTI-LANGUAGE SUGGESTIONS
-    local suggested_languages = {}
-
-    -- Add primary language (from best detection)
-    if language then
-      table.insert(suggested_languages, {
-        language = language,
-        priority = best_priority,
-        source = best_locale.source,
-        reason = "primary_detection"
-      })
-    end
-
-    -- ALWAYS check for country-based languages, regardless of primary language
-    local most_likely_country = nil
-    local highest_country_priority = -1
-
-    -- Look for country in all detections, including IP-based ones
-    for country_code, info in pairs(countries_found) do
-      if info.priority > highest_country_priority then
-        highest_country_priority = info.priority
-        most_likely_country = country_code
-      end
-    end
-
-    -- Also check for direct country detection from IP geolocation
-    for _, detection in ipairs(detected_locales) do
-      if detection.source == "ip_geolocation" or detection.source == "ip_country_specific" then
-        local detected_lang, detected_country = parse_locale_string(detection.locale)
-        if detected_country and (not most_likely_country or source_priority[detection.source] >= highest_country_priority) then
-          most_likely_country = detected_country
-          highest_country_priority = source_priority[detection.source] or 0
-          dbg("Using IP-detected country: " .. detected_country)
-        end
-      end
-    end
-
-    if most_likely_country then
-
-      -- Enhanced country to languages mapping (native + commonly understood)
-      local country_languages_map = {
-        -- Central Europe - Slavic languages
-        ["sk"] = {"sk", "cs"}, -- Slovakia: Slovak + Czech (very similar languages)
-        ["cz"] = {"cs", "sk"}, -- Czech Republic: Czech + Slovak
-
-        -- Scandinavia - North Germanic languages
-        ["se"] = {"sv", "no", "da"}, -- Sweden: Swedish + Norwegian + Danish
-        ["no"] = {"no", "sv", "da"}, -- Norway: Norwegian + Swedish + Danish
-        ["dk"] = {"da", "sv", "no"}, -- Denmark: Danish + Swedish + Norwegian
-
-        -- Netherlands/Belgium - Dutch/Flemish
-        ["nl"] = {"nl", "de", "en"}, -- Netherlands: Dutch + German + English
-        ["be"] = {"nl", "fr", "de"}, -- Belgium: Dutch/Flemish + French + German
-
-        -- Switzerland - Multilingual country
-        ["ch"] = {"de", "fr", "it", "en"}, -- Switzerland: German + French + Italian + English
-
-        -- Austria - German speaking
-        ["at"] = {"de", "en"}, -- Austria: German + English
-
-        -- Former Yugoslavia - South Slavic languages
-        ["hr"] = {"hr", "sr", "bs"}, -- Croatia: Croatian + Serbian + Bosnian
-        ["rs"] = {"sr", "hr", "bs"}, -- Serbia: Serbian + Croatian + Bosnian
-        ["ba"] = {"bs", "hr", "sr"}, -- Bosnia: Bosnian + Croatian + Serbian
-        ["me"] = {"sr", "hr", "bs"}, -- Montenegro: Serbian + Croatian + Bosnian
-        ["si"] = {"sl", "hr", "de"}, -- Slovenia: Slovenian + Croatian + German
-        ["mk"] = {"mk", "sr", "bg"}, -- North Macedonia: Macedonian + Serbian + Bulgarian
-
-        -- Baltic states
-        ["lv"] = {"lv", "ru", "en"}, -- Latvia: Latvian + Russian + English
-        ["lt"] = {"lt", "ru", "en"}, -- Lithuania: Lithuanian + Russian + English
-        ["ee"] = {"et", "ru", "en"}, -- Estonia: Estonian + Russian + English
-
-        -- Eastern Europe
-        ["ua"] = {"uk", "ru", "en"}, -- Ukraine: Ukrainian + Russian + English
-        ["by"] = {"be", "ru", "en"}, -- Belarus: Belarusian + Russian + English
-        ["md"] = {"ro", "ru", "en"}, -- Moldova: Romanian + Russian + English
-
-        -- Portuguese/Spanish speaking
-        ["pt"] = {"pt", "es", "en"}, -- Portugal: Portuguese + Spanish + English
-        ["es"] = {"es", "pt", "ca"}, -- Spain: Spanish + Portuguese + Catalan
-
-        -- English + local languages
-        ["ie"] = {"en", "ga"}, -- Ireland: English + Irish Gaelic
-        ["gb"] = {"en", "cy", "gd"}, -- UK: English + Welsh + Scottish Gaelic
-
-        -- German speaking regions
-        ["de"] = {"de", "en"}, -- Germany: German + English
-        ["lu"] = {"fr", "de", "lb"}, -- Luxembourg: French + German + Luxembourgish
-
-        -- Nordic with English
-        ["fi"] = {"fi", "sv", "en"}, -- Finland: Finnish + Swedish + English
-        ["is"] = {"is", "da", "en"}, -- Iceland: Icelandic + Danish + English
-
-        -- Multilingual regions
-        ["ca"] = {"en", "fr"}, -- Canada: English + French
-        ["sg"] = {"en", "zh-cn", "ms", "ta"}, -- Singapore: English + Chinese + Malay + Tamil
-        ["in"] = {"hi", "en", "bn", "te"}, -- India: Hindi + English + regional languages
-
-        -- Major single language countries (with English as common second language)
-        ["us"] = {"en"}, -- USA: English
-        ["au"] = {"en"}, -- Australia: English
-        ["nz"] = {"en"}, -- New Zealand: English
-        ["fr"] = {"fr", "en"}, -- France: French + English
-        ["it"] = {"it", "en"}, -- Italy: Italian + English
-        ["pl"] = {"pl", "en"}, -- Poland: Polish + English
-        ["ro"] = {"ro", "en"}, -- Romania: Romanian + English
-        ["hu"] = {"hu", "en"}, -- Hungary: Hungarian + English
-        ["bg"] = {"bg", "en"}, -- Bulgaria: Bulgarian + English
-        ["gr"] = {"el", "en"}, -- Greece: Greek + English
-        ["tr"] = {"tr", "en"}, -- Turkey: Turkish + English
-        ["ru"] = {"ru", "en"}, -- Russia: Russian + English
-        ["jp"] = {"ja", "en"}, -- Japan: Japanese + English
-        ["kr"] = {"ko", "en"}, -- South Korea: Korean + English
-        ["cn"] = {"zh-cn", "en"}, -- China: Chinese + English
-        ["tw"] = {"zh-tw", "en"}, -- Taiwan: Traditional Chinese + English
-        ["hk"] = {"zh-ca", "en"}, -- Hong Kong: Cantonese + English
-        ["th"] = {"th", "en"}, -- Thailand: Thai + English
-        ["vn"] = {"vi", "en"}, -- Vietnam: Vietnamese + English
-        ["id"] = {"id", "en"}, -- Indonesia: Indonesian + English
-        ["my"] = {"ms", "en", "zh-cn"}, -- Malaysia: Malay + English + Chinese
-        ["ph"] = {"tl", "en"}, -- Philippines: Tagalog + English
-        ["br"] = {"pt-br", "es", "en"}, -- Brazil: Portuguese + Spanish + English
-        ["mx"] = {"es", "en"}, -- Mexico: Spanish + English
-        ["ar"] = {"es", "en"}, -- Argentina: Spanish + English
-        ["cl"] = {"es", "en"}, -- Chile: Spanish + English
-        ["co"] = {"es", "en"}, -- Colombia: Spanish + English
-        ["pe"] = {"es", "en"}, -- Peru: Spanish + English
-        ["ve"] = {"es", "en"}, -- Venezuela: Spanish + English
-        ["ec"] = {"es", "en"}, -- Ecuador: Spanish + English
-        ["bo"] = {"es", "en"}, -- Bolivia: Spanish + English
-        ["py"] = {"es", "en"}, -- Paraguay: Spanish + English
-        ["uy"] = {"es", "en"}, -- Uruguay: Spanish + English
-
-        -- Arabic speaking countries
-        ["sa"] = {"ar", "en"}, -- Saudi Arabia: Arabic + English
-        ["ae"] = {"ar", "en"}, -- UAE: Arabic + English
-        ["eg"] = {"ar", "en"}, -- Egypt: Arabic + English
-        ["ma"] = {"ar", "fr", "en"}, -- Morocco: Arabic + French + English
-        ["tn"] = {"ar", "fr", "en"}, -- Tunisia: Arabic + French + English
-        ["dz"] = {"ar", "fr", "en"}, -- Algeria: Arabic + French + English
-        ["lb"] = {"ar", "fr", "en"}, -- Lebanon: Arabic + French + English
-        ["sy"] = {"ar", "en"}, -- Syria: Arabic + English
-        ["jo"] = {"ar", "en"}, -- Jordan: Arabic + English
-        ["iq"] = {"ar", "en"}, -- Iraq: Arabic + English
-        ["kw"] = {"ar", "en"}, -- Kuwait: Arabic + English
-        ["qa"] = {"ar", "en"}, -- Qatar: Arabic + English
-        ["bh"] = {"ar", "en"}, -- Bahrain: Arabic + English
-        ["om"] = {"ar", "en"}, -- Oman: Arabic + English
-        ["ye"] = {"ar", "en"}, -- Yemen: Arabic + English
-
-        -- Persian/Farsi speaking
-        ["ir"] = {"fa", "en"}, -- Iran: Persian + English
-        ["af"] = {"fa", "ar", "en"}, -- Afghanistan: Persian + Arabic + English
-
-        -- Hebrew speaking
-        ["il"] = {"he", "ar", "en"}, -- Israel: Hebrew + Arabic + English
-
-        -- African countries (former colonies with multilingual heritage)
-        ["za"] = {"en", "af", "zu"}, -- South Africa: English + Afrikaans + Zulu
-        ["ng"] = {"en", "ha", "ig"}, -- Nigeria: English + Hausa + Igbo
-        ["ke"] = {"en", "sw"}, -- Kenya: English + Swahili
-        ["tz"] = {"sw", "en"}, -- Tanzania: Swahili + English
-        ["gh"] = {"en", "tw"}, -- Ghana: English + Twi
-        ["et"] = {"am", "en"}, -- Ethiopia: Amharic + English
-      }
-
-      local country_languages = country_languages_map[most_likely_country]
-      if country_languages then
-        for i, lang_code in ipairs(country_languages) do
-          -- Skip if already added as primary
-          local already_added = false
-          for _, existing in ipairs(suggested_languages) do
-            if existing.language == lang_code then
-              already_added = true
-              break
-            end
-          end
-
-          if not already_added then
-            table.insert(suggested_languages, {
-              language = lang_code,
-              priority = highest_country_priority,
-              source = "country_multilingual",
-              reason = i == 1 and "country_native_language" or "country_understood_language"
-            })
-          end
-        end
-      end
-    end
-
-    -- ENHANCED: Check if English is already included, if not add it as fallback
-    local has_english = false
-    for _, lang_suggestion in ipairs(suggested_languages) do
-      if lang_suggestion.language == "en" then
-        has_english = true
-        break
-      end
-    end
-
-    -- If English is not present and we have 1-2 languages detected, add English as fallback
-    if not has_english and #suggested_languages >= 1 and #suggested_languages <= 2 then
-      dbg("Adding English as fallback language (detected " .. #suggested_languages .. " non-English languages)")
-      table.insert(suggested_languages, {
-        language = "en",
-        priority = 1, -- Lower priority than detected languages
-        source = "english_fallback",
-        reason = "international_fallback"
-      })
-    end
-
-    -- ADDITIONAL: Always ensure English is available if no languages detected at all
-    if #suggested_languages == 0 then
-      dbg("No languages detected, defaulting to English")
-      table.insert(suggested_languages, {
-        language = "en",
-        priority = 1,
-        source = "english_default",
-        reason = "default_language"
-      })
-    end
-
-    for i, lang_suggestion in ipairs(suggested_languages) do
-      dbg("  " .. i .. ": " .. lang_suggestion.language .. " (" .. lang_suggestion.reason .. ")")
-    end
-
-    return {
-      locale = locale_str,
-      source = best_locale.source,
-      language = language,
-      country = country,
-      priority = best_priority,
-      suggested_languages = suggested_languages,
-      languages_analysis = languages_found,
-      countries_analysis = countries_found
-    }
+  if not best_locale then
+    return nil
   end
 
-  return nil
+  local locale_str = best_locale.locale
+  local language, country = parse_locale_string(locale_str)
+  local suggested_languages = {}
+
+  local function suggest(code, priority, source, reason)
+    table.insert(suggested_languages, {
+      language = code, priority = priority, source = source, reason = reason
+    })
+  end
+  local function is_suggested(code)
+    for _, existing in ipairs(suggested_languages) do
+      if existing.language == code then
+        return true
+      end
+    end
+    return false
+  end
+
+  if language then
+    suggest(language, best_priority, best_locale.source, "primary_detection")
+  end
+
+  -- The country: the most trusted one seen, unless IP geolocation is at
+  -- least as trusted
+  local most_likely_country = nil
+  local highest_country_priority = -1
+  for country_code, info in pairs(countries_found) do
+    if info.priority > highest_country_priority then
+      highest_country_priority = info.priority
+      most_likely_country = country_code
+    end
+  end
+  for _, detection in ipairs(detected_locales) do
+    if detection.source == "ip_geolocation" or detection.source == "ip_country_specific" then
+      local _, detected_country = parse_locale_string(detection.locale)
+      if detected_country and (not most_likely_country
+         or LOCALE_SOURCE_PRIORITY[detection.source] >= highest_country_priority) then
+        most_likely_country = detected_country
+        highest_country_priority = LOCALE_SOURCE_PRIORITY[detection.source] or 0
+        dbg("Using IP-detected country: " .. detected_country)
+      end
+    end
+  end
+
+  local country_languages = most_likely_country and COUNTRY_LANGUAGES[most_likely_country]
+  if country_languages then
+    for i, lang_code in ipairs(country_languages) do
+      if not is_suggested(lang_code) then
+        suggest(lang_code, highest_country_priority, "country_multilingual",
+                i == 1 and "country_native_language" or "country_understood_language")
+      end
+    end
+  end
+
+  -- English as a fallback when one or two other languages were found, and as
+  -- the default when nothing was
+  if not is_suggested("en") and #suggested_languages >= 1 and #suggested_languages <= 2 then
+    dbg("Adding English as fallback language (detected " .. #suggested_languages .. " non-English languages)")
+    suggest("en", 1, "english_fallback", "international_fallback")
+  end
+  if #suggested_languages == 0 then
+    dbg("No languages detected, defaulting to English")
+    suggest("en", 1, "english_default", "default_language")
+  end
+
+  for i, lang_suggestion in ipairs(suggested_languages) do
+    dbg("  " .. i .. ": " .. lang_suggestion.language .. " (" .. lang_suggestion.reason .. ")")
+  end
+
+  return {
+    locale = locale_str,
+    source = best_locale.source,
+    language = language,
+    country = country,
+    priority = best_priority,
+    suggested_languages = suggested_languages,
+    languages_analysis = languages_found,
+    countries_analysis = countries_found
+  }
 end
 
 
