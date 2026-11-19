@@ -244,19 +244,61 @@ Dari and Tagalog have other codes on the engines: es-419 / es-ES, fa-AF,
 fil.) Which engine and which source language are used is the server's
 choice; VLSub does not filter by language - it shows what the server offers.
 
+### A real on-demand entry (live API, 2026-11-19)
+
+`GET http://api.opensubtitles.com/api/v1/subtitles?imdb_id=1254207&languages=cs`
+(Big Buck Bunny; no Czech subtitle exists), anonymous, User-Agent
+`VLSub OpenSubtitles.com v2.0.0`. Recorded as
+`tests/fixtures/raw/search_on_demand_cs.http`. One row:
+
+| field | value |
+|---|---|
+| `id`, `attributes.subtitle_id` | `"422433409911500000000000000000000"` |
+| `attributes.files[0].file_id` | `"431137309911500000000000000000000"` |
+| `attributes.files[0].file_name` | `big_buck_bunny.eng` (the source file's name) |
+| `attributes.language` | `cs` |
+| `attributes.ai_translated` | `true` |
+| `attributes.machine_translated` | `true` |
+| `attributes.comments` | `This subtitle file will be created on demand in czech language as AI translation from english language.` |
+| `attributes.uploader` | `{"uploader_id":null,"name":"AI.OpenSubtitles.com","rank":"anonymous"}` |
+| `attributes.download_count` | `0` |
+| `attributes.upload_date`, `release`, `fps`, `feature_details` | those of the English source subtitle |
+
+What this settles:
+
+- **The ids are 33 digits and they are JSON strings**, not numbers (ordinary
+  ids are numbers: `"file_id":4311373`). The digits start with the id of the
+  source (file 4311373, subtitle 4224334). Kept as the string it arrives as,
+  nothing is lost in Lua; what must not happen is `tonumber()` on it.
+  Whether `/download` wants it back as a string or as bare digits is still
+  to be measured (needs a login).
+- An on-demand entry is offered **without login**, for searches by
+  `imdb_id` and by `query`. It was **not** offered for a `moviehash` search
+  of the same film, nor for Georgian (`ka`) although engines list it.
+- It appears when the film has **no subtitle in the asked language**
+  (`cs`, `sk`: one on-demand row each; `en`: only the real subtitle).
+- With two languages asked (`languages=cs,sk`) only **one** on-demand row
+  came back (`cs`).
+- Recognising one: the comment text, the uploader name
+  `AI.OpenSubtitles.com`, or an id that is a string of more than 10 digits.
+  There is no dedicated field.
+
+Not measured yet (needs a logged-in account with credits): the download.
+
 ### No simulation
 
 A simulated on-demand server in the test suite was tried and removed on the
 user's instruction (2026-11-19): tests are built from real examples only.
-Until one exists, nothing about the shape of an on-demand entry or of its
-download is assumed in code.
 
 ## Open questions
 
 1. Blocked until done on the API side: the User-Agent
    `VLSub OpenSubtitles.com v2.` whitelisted for on-demand entries, and AI
    credits on the CI test account. Stage 0 cannot start before.
-2. How to make the live API return an on-demand entry (login needed?
-   search by `imdb_id` / `moviehash`? a switch on the server?).
+2. The download of an on-demand entry, measured with a logged-in account:
+   id as string or digits, how long the request is held, what a "still
+   translating" answer looks like, what comes back without credits.
+   Also: no on-demand entry for a `moviehash` search and only one for two
+   asked languages - intended?
 3. Should 1.x User-Agents get on-demand entries at all (they cannot use
    them)?

@@ -1,0 +1,27 @@
+HTTP/1.1 200 OK
+Date: Thu, 19 Nov 2026 21:47:09 GMT
+Content-Type: application/json; charset=utf-8
+Transfer-Encoding: chunked
+Connection: close
+RateLimit-Limit: 5
+RateLimit-Remaining: 4
+RateLimit-Reset: 1
+X-RateLimit-Remaining-Second: 4
+X-RateLimit-Limit-Second: 5
+Server: cloudflare
+X-Powered-By: Fat-Free Framework
+X-XSS-Protection: 1; mode=block
+X-Content-Type-Options: nosniff
+Pragma: no-cache
+Cache-Control: private, no-store
+Expires: Thu, 01 Jan 1970 00:00:00 +0000
+X-AI-Proxy: true
+Access-Control-Allow-Origin: *
+Access-Control-Expose-Headers: X-Auth-Token
+Via: 1.1 kong/3.9.1
+Speculation-Rules: "/cdn-cgi/speculation"
+
+4eb
+{"total_pages":1,"total_count":1,"per_page":50,"page":1,"data":[{"id":"422433409911500000000000000000000","type":"subtitle","attributes":{"subtitle_id":"422433409911500000000000000000000","language":"cs","download_count":0,"new_download_count":0,"hearing_impaired":false,"hd":false,"fps":24,"votes":0,"ratings":0,"from_trusted":false,"foreign_parts_only":false,"upload_date":"2014-09-24T14:43:45Z","ai_translated":true,"nb_cd":1,"slug":"big_buck_bunny","machine_translated":true,"release":"big_buck_bunny","comments":"This subtitle file will be created on demand in czech language as AI translation from english language.","uploader":{"uploader_id":null,"name":"AI.OpenSubtitles.com","rank":"anonymous"},"feature_details":{"feature_id":548792,"feature_type":"Movie","year":2008,"title":"Big Buck Bunny","movie_name":"2008 - Big Buck Bunny","imdb_id":1254207,"tmdb_id":10378},"url":"https:\/\/www.opensubtitles.com\/en\/subtitles\/big_buck_bunny","related_links":[{"label":"All subtitles for big buck bunny","url":"https:\/\/www.opensubtitles.com\/en\/movies\/big_buck_bunny","img_url":"https:\/\/s5.opensubtitles.com\/features\/2\/9\/7\/548792.jpg"}],"files":[{"file_id":"431137309911500000000000000000000","cd_number":1,"file_name":"big_buck_bunny.eng"}]}}]}
+0
+
