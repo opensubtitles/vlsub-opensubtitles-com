@@ -1448,7 +1448,6 @@ end
   -- Extract country code and map to language
   local country_code = ip_data.cc
   local country_name = ip_data.country
-  local ip_address = ip_data.ip
 
   if country_code and country_code ~= "" then
     dbg("Detected country from IP: " .. country_name .. " (" .. country_code .. ")")
@@ -2126,50 +2125,36 @@ function assoc_select_conf(select_id, option, conf, ind, default)
   display_select(select_id)
 end
 
--- Missing display_select function that's called by assoc_select_conf
+-- Fill a drop-down. VLC shows whatever is added first as the selection and
+-- offers no way to select an entry later, so the saved choice goes first,
+-- then the default ("All" / "None", id 0), then everything else. Ids are
+-- positions in `conf`, whatever the display order.
 function display_select(select_id)
--- Display the drop down values with flags and consistent ordering
--- Put selected item first so VLC shows it as selected, but keep track of real indices
   local conf = select_conf[select_id].cf
-  local opt = select_conf[select_id].opt
-  local option = openSub.option[opt]
+  local option = openSub.option[select_conf[select_id].opt]
   local default = select_conf[select_id].dflt
+  local widget = input_table[select_id]
 
-  -- If we have a default option and no selection, show default first
   if not option and default then
-    input_table[select_id]:add_value(default, 0)
-    -- Then add all languages in original order with flags
+    widget:add_value(default, 0)
     for k, l in ipairs(conf) do
-      local displayText = l[2] or "" -- language name
-      input_table[select_id]:add_value(displayText, k)
+      widget:add_value(l[2] or "", k)
     end
     return
   end
 
-  -- If we have a selected option, put it first, then others
-  local selected_found = false
   for k, l in ipairs(conf) do
     if option and option == l[1] then
-      -- Put selected language first with flag
-      local displayText = l[2] -- language name
-      input_table[select_id]:add_value(displayText, k)
-      selected_found = true
+      widget:add_value(l[2], k)
       break
     end
   end
-
-  -- The default ("All" / "None") is always offered: first when nothing is
-  -- selected, otherwise right after the selected entry so the choice can be
-  -- cleared again.
   if default then
-    input_table[select_id]:add_value(default, 0)
+    widget:add_value(default, 0)
   end
-
-  -- Add all other languages in original order with flags
   for k, l in ipairs(conf) do
     if not option or option ~= l[1] then
-      local displayText = l[2] -- language name
-      input_table[select_id]:add_value(displayText, k)
+      widget:add_value(l[2], k)
     end
   end
 end
@@ -2615,7 +2600,7 @@ function load_config()
   local resp = tmpFile:read("*all")
   tmpFile:flush()
   tmpFile:close()
-   local option, pos, err = json.decode (resp)
+  local option = json.decode(resp)
 
   -- Written by versions up to 1.3.2, which had an (unreachable) interface
   -- translation feature. Accepted in old files and ignored.
@@ -2628,6 +2613,7 @@ function load_config()
 
   for key, value in pairs(option) do
     if obsolete[key] then
+      -- skipped
     elseif type(value) == "table" then
       openSub.option[key] = value
     else
@@ -2859,7 +2845,6 @@ function save_config()
       tmpFile:write(resp)
       tmpFile:flush()
       tmpFile:close()
-      tmpFile = nil
     else
       return false
     end
@@ -3278,7 +3263,7 @@ end,
   -- Hash calculation
   local lo = size
   local hi = 0
-  local o,a,b,c,d,e,f,g,h
+  local a,b,c,d,e,f,g,h
   local hash_data = data_start..data_end
   local max_size = 4294967296
   local overflow
