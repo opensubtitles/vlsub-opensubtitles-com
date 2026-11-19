@@ -558,6 +558,34 @@ describe("interface language: VLC for macOS", function()
     eq(env.errors(), {})
   end)
 
+  it("changing the language: the old window gets no label update in the click that closes it", function()
+    -- VLC 3.0.24 on macOS quit at this point (twice, for a user): Save wrote
+    -- "Testing login..." and the result to the message label, then replaced
+    -- the window. Label updates go through a slow helper process there, and
+    -- closing the window with one still on its way took VLC down. The window
+    -- is now replaced first, and the messages go to the new one.
+    local server = api.new()
+    server:publish_real_index()
+    local env = H.launch({ server = server, macos = true })
+    for _, name in ipairs({ "^\196\140e\197\161tina", "^Sloven", "^English", "^Deutsch" }) do
+      local c = config_window(env)
+      c.language:_choose_text(name)
+      c.save:_click()
+      eq(env.unsafe_closes(), {}, "after choosing " .. name)
+      eq(env.errors(), {})
+      ok(env.message() ~= "", "the result of Save is shown in the new window")
+    end
+    has(env.ui().title, "Einstellungen")
+  end)
+
+  it("the mock notices a window closed in the click that changed its label", function()
+    local env = H.launch({ macos = true })
+    local d = env.vlc.dialog("x")
+    local label = d:add_label("a", 1, 1)
+    d:add_button("go", function() label:set_text("b") d:hide() end, 1, 2):_click()
+    eq(env.unsafe_closes(), { "x" })
+  end)
+
   it("the way back: 'English' is offered under that name in every interface language", function()
     -- (it was translated - "Angličtina", "英語" - so someone who had picked a
     -- language they cannot read could not find English again)

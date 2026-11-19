@@ -720,6 +720,9 @@ local function new_dialog(title)
   if not on_macos() then
     return real
   end
+  -- VLSUB_TRACE_DIALOG=1 (tools/dev.sh run -v): log every widget before it
+  -- is handed to VLC, so the last line names the one VLC did not survive
+  local trace = os.getenv("VLSUB_TRACE_DIALOG") == "1"
   local originals = {} -- wrapped label -> real widget
   local function wrap_label(widget, text)
     local label = { text = text }
@@ -728,6 +731,7 @@ local function new_dialog(title)
       if method == "set_text" then
         return function(self, value)
           self.text = value
+          if trace then vlc.msg.warn("[VLSub] label:set_text " .. html_entities(value)) end
           return widget:set_text(html_entities(value))
         end
       elseif method == "get_text" then
@@ -736,7 +740,7 @@ local function new_dialog(title)
       return function(_, ...) return widget[method](widget, ...) end
     end })
   end
-  return setmetatable({}, { __index = function(_, method)
+  local function handler(method)
     if method == "add_label" or method == "add_html" then
       return function(_, text, ...)
         return wrap_label(real[method](real, html_entities(text or ""), ...), text or "")
@@ -745,6 +749,18 @@ local function new_dialog(title)
       return function(_, widget) return real:del_widget(originals[widget] or widget) end
     end
     return function(_, ...) return real[method](real, ...) end
+  end
+  return setmetatable({}, { __index = function(_, method)
+    local call = handler(method)
+    if not trace then
+      return call
+    end
+    return function(self, ...)
+      local first = ...
+      vlc.msg.warn("[VLSub] dialog:" .. method .. " "
+        .. (type(first) == "string" and html_entities(first) or tostring(first)))
+      return call(self, ...)
+    end
   end })
 end
 
@@ -3111,18 +3127,12 @@ function apply_config()
   local language_before = openSub.option.interfaceLanguage
   local language_changed, language_missing = false, nil
 
-  -- After everything else: if the interface language was changed, rebuild
-  -- the window in the new language and put the result message back.
+  -- Last step: say so if the chosen interface language could not be fetched
   local function finish()
-    if not language_changed then
-      return
-    end
-    local message = input_table["message"] and input_table["message"]:get_text() or ""
-    trigger_menu(2)
     if language_missing then
-      message = error_tag(tr("ui_translation_not_available", language_missing)) .. "<br>" .. message
+      local message = input_table["message"] and input_table["message"]:get_text() or ""
+      setMessage(error_tag(tr("ui_translation_not_available", language_missing)) .. "<br>" .. message)
     end
-    setMessage(message)
   end
   -- Handle dropdown selections - get the actual language code from the stored mapping
   for select_id, v in pairs(select_conf) do
@@ -3228,6 +3238,14 @@ function apply_config()
   language_changed = (openSub.option.interfaceLanguage or "en") ~= (language_before or "en")
   if language_changed and not refresh_interface_language() then
     language_missing = wanted_interface_language()
+  end
+  if language_changed then
+    -- Rebuild the window in the new language NOW, before this click has
+    -- written anything to the old window; every message below goes to the
+    -- new one. Order matters on macOS: VLC there renders label text through
+    -- a slow helper process, and deleting a window while an update of one of
+    -- its labels is still on its way took VLC down (seen with 3.0.24).
+    trigger_menu(2)
   end
 
 

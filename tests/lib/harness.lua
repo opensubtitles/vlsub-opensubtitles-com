@@ -187,6 +187,7 @@ end
 function H.launch(o)
   o = o or {}
   local env = { home = H.tmpdir() }
+  mock.unsafe_closes = {}
   if o.macos then -- VLC's folder on macOS; the mock then renders labels as macOS does
     env.home = env.home .. "/Library/Application Support/org.videolan.vlc"
     H.real_execute('mkdir -p "' .. env.home .. '"')
@@ -307,6 +308,8 @@ function H.launch(o)
     env.vlc._item = uri and mock.item(uri, metas) or nil
   end
   function env.errors() return env.vlc._messages("err") end
+  -- macOS: windows closed in the click that had just changed one of their labels
+  function env.unsafe_closes() return mock.unsafe_closes end
 
   if o.activate ~= false then activate() end
   return env

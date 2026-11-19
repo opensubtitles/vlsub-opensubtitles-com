@@ -28,6 +28,7 @@
 --   server.segment                    -> max bytes handed out per recv()
 
 local M = {}
+M.unsafe_closes = {} -- see dialog hide(): windows closed while a label update was pending (macOS)
 local real_popen = io.popen -- tests may replace io.popen for the extension
 
 -- ------------------------------------------------------------ namespaces --
@@ -115,6 +116,9 @@ local function new_widget(kind, dialog)
   local api = {}
   function api.set_text(self, t)
     assert(type(t) == "string", "set_text() needs a string, got " .. type(t))
+    -- macOS: a label update travels to the window through a slow helper
+    -- process; remember in which click this window last got one
+    if kind == "label" or kind == "html" then self.dialog.label_update_in_click = M.click end
     self.text = t
   end
   function api.get_text(self) return self.text end
@@ -150,7 +154,14 @@ local function new_widget(kind, dialog)
     error("no drop-down entry matching '" .. pattern .. "'")
   end
   function w:_select(id) self.selected = { [id] = true } end -- list: user clicks row
-  function w:_click() return self.func() end                -- button
+  function w:_click()                                        -- button
+    M.click = (M.click or 0) + 1
+    M.in_click = true
+    local ok, result = pcall(self.func)
+    M.in_click = false
+    if not ok then error(result, 0) end
+    return result
+  end
   -- What the user sees. On macOS a label / HTML widget is built from the
   -- text converted to Latin-1 and parsed as HTML (VLCExtensionsDialogProvider.m):
   -- any character outside Latin-1 makes the whole widget EMPTY; numeric
@@ -216,7 +227,14 @@ local function new_dialog(vlc, title)
     end
   end
   function api.show(self) self.visible = true end
-  function api.hide(self) self.visible = false end
+  function api.hide(self)
+    -- macOS VLC 3.0.24 quit when a window was closed in the same click that
+    -- had just changed one of its labels (the update was still on its way)
+    if self.macos and M.in_click and self.label_update_in_click == M.click then
+      M.unsafe_closes[#M.unsafe_closes + 1] = self.title
+    end
+    self.visible = false
+  end
   function api.delete(self) self.deleted = true; self.visible = false end
   function api.set_title(self, t) self.title = t end
   function api.update(self) self.updates = self.updates + 1 end

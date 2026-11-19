@@ -3,7 +3,9 @@
 #
 #   tools/dev.sh link        use this checkout as the installed extension (symlink)
 #   tools/dev.sh install     copy vlsubcom.lua into VLC instead of linking
-#   tools/dev.sh run [file]  start VLC with a debug log, optionally playing a file
+#   tools/dev.sh run [-v] [file]  start VLC with a debug log, optionally playing a file;
+#                            -v prints VLSub's log lines here as they happen and
+#                            traces every dialog widget (to find what VLC chokes on)
 #   tools/dev.sh errors      show VLSub's Lua errors from the last run (exit 1 if any)
 #   tools/dev.sh requests    list the API requests made during the last run
 #   tools/dev.sh log         follow the VLSub lines of the log (Ctrl-C to stop)
@@ -91,6 +93,19 @@ case "${1:-help}" in
     : "${VLSUB_LOCALE_URL:=https://raw.githubusercontent.com/opensubtitles/vlsub-opensubtitles-com/$BRANCH/locale/}"
     export VLSUB_LOCALE_URL
     echo "Translations from: $VLSUB_LOCALE_URL"
+    if [ "${1:-}" = "-v" ]; then
+      shift
+      export VLSUB_TRACE_DIALOG=1
+      echo "Verbose: VLSub lines follow; VLC's own messages (stderr) are shown too."
+      ( tail -f "$LOG" 2>/dev/null | grep --line-buffered -E "\[VLSub\]|lua (warning|error)|[Dd]ialog" ) &
+      TAIL=$!
+      trap 'kill $TAIL 2>/dev/null' EXIT INT TERM
+      "$VLC" --verbose=2 --file-logging --logfile="$LOG" "$@" || echo "VLC ended with exit code $?"
+      sleep 1
+      echo "== VLC has ended. Last lines of the log:"
+      tail -5 "$LOG" | cut -c1-240
+      exit 0
+    fi
     exec "$VLC" --verbose=2 --file-logging --logfile="$LOG" "$@"
     ;;
   errors)
