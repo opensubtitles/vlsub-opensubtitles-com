@@ -318,6 +318,24 @@ work around it (e.g. one extra request per language without results).
 A simulated on-demand server in the test suite was tried and removed on the
 user's instruction (2026-11-19): tests are built from real examples only.
 
+## First cut on `dev` (2026-11-19) - to try it, not finished
+
+So that the feature can be seen in VLC before the download is measured:
+
+- `app_version` is `2.0.0` (the User-Agent the API proxies).
+- An on-demand entry is recognised (string id longer than 10 digits, or the
+  comment text) and listed as `... 🤖 AI on demand (uses credits)`.
+- Download of one: the 33 digits go back as a JSON number; **one** request,
+  allowed to take 120 s, never repeated by itself; before it the message
+  "Creating the AI translation - this can take a minute, VLC will not
+  respond meanwhile...". What comes back is handled like any download answer.
+- `tools/dev.sh run -v` also prints the raw `/download` answer
+  (`VLSUB_TRACE_HTTP=1`), to learn what the server really says.
+
+Missing: credits before / after, the no-credits message with a buy link, the
+"still translating" case, the configuration window line, translations of the
+3 new texts, the download fixtures and their tests.
+
 ## Open questions
 
 1. Blocked until done on the API side: the User-Agent

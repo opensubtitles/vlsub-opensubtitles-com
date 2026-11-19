@@ -219,6 +219,8 @@ function M.new(opts)
     if q.moviehash then
       if q.moviehash == "8e245d9679d31e12" then return M.fixture("search_hash") end
       return M.fixture("search_none")
+    elseif q.imdb_id == "1254207" and q.languages == "cs" then
+      return M.fixture("search_on_demand_cs") -- recorded: one AI on-demand row
     elseif q.imdb_id then
       return M.fixture("search_imdb")
     elseif q.query and q.query:find("zzz") then

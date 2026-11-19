@@ -124,7 +124,7 @@ https://github.com/opensubtitles/vlsub-opensubtitles-com/commits/main
             --[[ Global var ]]--
 
 local app_name = "VLSub OpenSubtitles.com";  
-local app_version = "1.4.0";
+local app_version = "2.0.0";
 local app_useragent = app_name.." v"..app_version;
 
 local config = {
@@ -517,7 +517,12 @@ local strings = {
   ui_sort_asc = "Asc",
   ui_sort_default = "Default",
   ui_ready_for_search = "Ready for search",
-  ui_none = "None"
+  ui_none = "None",
+
+  -- AI on-demand translation
+  ui_ai_on_demand = "AI on demand (uses credits)",
+  ui_ai_creating_translation = "Creating the AI translation - this can take a minute, VLC will not respond meanwhile...",
+  ui_ai_no_answer = "The AI translation did not arrive in time. It may still be in the making: try again in a minute."
 }
 
 -- A message with values filled in: tr(key, a, b) uses the string stored
@@ -2572,7 +2577,9 @@ function buildSubtitleDisplayText(item, langCode)
   end
 
   -- Translation indicators (lower priority)
-  if item.AITranslated then
+  if item.OnDemand then
+    table.insert(qualityIndicators, "🤖 " .. strings.ui_ai_on_demand)
+  elseif item.AITranslated then
     table.insert(qualityIndicators, "🤖") -- Robot for AI translated
   elseif item.MachineTranslated then
     table.insert(qualityIndicators, "⚙️") -- Gear for machine translated
@@ -4429,6 +4436,13 @@ openSub.convertNewAPIResponse = function(newData)
         -- New API specific fields that we'll preserve
         SubtitleID = attr.subtitle_id,
         FileID = firstFile.file_id,
+        -- A translation that does not exist yet: the API makes it when it is
+        -- downloaded, paid with the account's AI credits. Its ids are strings
+        -- of 33 digits (ordinary ids are numbers) and must stay strings: a
+        -- Lua number cannot hold them.
+        OnDemand = (type(firstFile.file_id) == "string" and #firstFile.file_id > 10)
+          or (type(attr.comments) == "string"
+              and string.find(string.lower(attr.comments), "will be created on demand", 1, true) ~= nil),
         MovieReleaseName = attr.release or firstFile.file_name or "Unknown",
 
         -- Enhanced fields for display
@@ -5108,12 +5122,31 @@ openSub.downloadFromNewAPI = function(item, is_retry)
   client:set_timeout(30)
   client:set_retries(2)
 
-  setMessage(openSub.actionLabel..": "..progressBarContent(60))
+  local request_body = json.encode({ file_id = item.FileID })
+  if item.OnDemand then
+    -- The server translates while the request is open. One long request,
+    -- never repeated by itself: a repeat could be a second purchase.
+    client:set_timeout(120)
+    client:set_deadline(120)
+    client:set_retries(0)
+    -- the id goes back digit for digit, as a JSON number (as the Kodi addon
+    -- sends it)
+    if type(item.FileID) == "string" and string.match(item.FileID, "^%d+$") then
+      request_body = '{"file_id":' .. item.FileID .. '}'
+    end
+    setMessage(loading_tag(strings.ui_ai_creating_translation))
+  else
+    setMessage(openSub.actionLabel..": "..progressBarContent(60))
+  end
 
-  local res = client:post("http://api.opensubtitles.com/api/v1/download",
-                          json.encode({ file_id = item.FileID }))
+  local res = client:post("http://api.opensubtitles.com/api/v1/download", request_body)
+  if os.getenv("VLSUB_TRACE_HTTP") == "1" then
+    -- developer switch (tools/dev.sh run -v): the raw answer, to learn what
+    -- the server says. Off in normal use: answers are never logged.
+    vlc.msg.warn("[VLSub] trace /download -> " .. (res and (tostring(res.status) .. " " .. tostring(res.body)) or "no answer"))
+  end
   if not res then
-    return report_failure(strings.ui_no_response_from_download_server)
+    return report_failure(item.OnDemand and strings.ui_ai_no_answer or strings.ui_no_response_from_download_server)
   end
 
   if res.status == 401 then
@@ -6409,6 +6442,13 @@ function VLCHttpClient:set_timeout(seconds)
     return self
 end
 
+-- How long one plain-HTTP request may take in all (15 s unless raised: VLC's
+-- window is frozen for that long).
+function VLCHttpClient:set_deadline(seconds)
+    self.deadline = tonumber(seconds)
+    return self
+end
+
 function VLCHttpClient:set_retries(count)
     self.retries = tonumber(count) or 2
     return self
@@ -7178,7 +7218,7 @@ function VLCHttpClient:_make_request_tcp(method, url, data)
     while attempt <= self.retries do
         attempt = attempt + 1
 
-        local response_data, failure = socket_exchange(host, port, request, math.min(self.timeout, 15))
+        local response_data, failure = socket_exchange(host, port, request, self.deadline or math.min(self.timeout, 15))
 
         if not response_data then
             vlc.msg.err("[VLSub] Request to " .. host .. ":" .. port .. " failed: " .. failure .. " (attempt " .. attempt .. ")")

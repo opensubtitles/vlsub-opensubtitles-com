@@ -96,6 +96,7 @@ case "${1:-help}" in
     if [ "${1:-}" = "-v" ]; then
       shift
       export VLSUB_TRACE_DIALOG=1
+      export VLSUB_TRACE_HTTP=1   # shows the raw /download answer (it contains a temporary link)
       echo "Verbose: VLSub lines follow; VLC's own messages (stderr) are shown too."
       ( tail -f "$LOG" 2>/dev/null | grep --line-buffered -E "\[VLSub\]|lua (warning|error)|[Dd]ialog" ) &
       TAIL=$!

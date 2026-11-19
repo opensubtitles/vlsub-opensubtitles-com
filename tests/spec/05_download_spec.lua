@@ -246,3 +246,62 @@ describe("download: failures", function()
     has(env.message(), "Cannot write")
   end)
 end)
+
+
+-- AI on-demand translation. Built on a recorded search answer only
+-- (tests/fixtures/raw/search_on_demand_cs.http); what the server answers to
+-- the download is not recorded yet, so nothing is asserted about it.
+H.describe("AI on-demand entry (recorded search answer)", function()
+  local it, eq, ok, has = H.it, H.eq, H.ok, H.has
+  local DOWNLOAD = "POST api.opensubtitles.com/api/v1/download"
+  local ID = "431137309911500000000000000000000"
+
+  local function searched()
+    local dir = H.tmpdir()
+    local env = H.launch({ config = { language = "cs" }, media = "file://" .. dir .. "/Big.Buck.Bunny.2008.mkv" })
+    local d = env.ui()
+    d:_at(4, 3, "text_input"):set_text("1254207")
+    env.server:reset()
+    d:_button("Search$"):_click()
+    return env
+  end
+
+  it("is listed and marked as on demand, costing credits", function()
+    local env = searched()
+    local rows = env.results().values
+    eq(#rows, 1)
+    has(rows[1].text, "AI on demand (uses credits)")
+    has(rows[1].text, "CS")
+  end)
+
+  it("its 33-digit id is kept as text and sent back digit for digit", function()
+    local env = searched()
+    local item = openSub.itemStore[1]
+    eq(item.FileID, ID)
+    eq(item.OnDemand, true)
+    env.results():_select(1)
+    env.ui():_button("Download"):_click()
+    local sent = env.server:last(DOWNLOAD)
+    ok(sent, "download requested")
+    eq(sent.body, '{"file_id":' .. ID .. '}')
+  end)
+
+  it("one request only: a translation is never asked for twice by itself", function()
+    local env = searched()
+    env.server:on(DOWNLOAD, function() return api.response(503, { message = "busy" }) end)
+    env.results():_select(1)
+    env.ui():_button("Download"):_click()
+    eq(#env.server:seen(DOWNLOAD), 1)
+  end)
+
+  it("ordinary entries are not marked", function()
+    local env = H.launch()
+    local d = env.ui()
+    d:_at(2, 1, "text_input"):set_text("big buck bunny")
+    d:_button("Search$"):_click()
+    for _, row in ipairs(env.results().values) do
+      ok(not row.text:find("on demand", 1, true), row.text)
+    end
+    for _, item in ipairs(openSub.itemStore) do eq(item.OnDemand, false) end
+  end)
+end)
