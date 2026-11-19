@@ -667,6 +667,9 @@ local function html_entities(text)
 end
 
 local function on_macos()
+  -- VLSUB_PLAIN_DIALOGS=1 switches the macOS handling off, to tell its
+  -- effects apart from VLC's own when hunting a problem there
+  if os.getenv("VLSUB_PLAIN_DIALOGS") == "1" then return false end
   local dir = vlc.config.userdatadir() or ""
   return string.find(dir, "/Library/Application Support/", 1, true) ~= nil
 end
