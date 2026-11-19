@@ -1636,7 +1636,7 @@ function interface_main()
   assoc_select_conf('sort_direction', 'sortDirection', openSub.conf.sortDirectionOptions, 2)
 
   -- Only call display_subtitles if we actually have search results to display
-  if openSub.itemStore and type(openSub.itemStore) == "table" and #openSub.itemStore > 0 then
+  if has_results() then
     display_subtitles()
   end
 end
@@ -1847,7 +1847,7 @@ function should_auto_search()
   end
 
   -- Check if we already have search results (avoid re-searching)
-  if openSub.itemStore and type(openSub.itemStore) == "table" and #openSub.itemStore > 0 then
+  if has_results() then
     dbg("Already have search results - skipping auto-search")
     return false
   end
@@ -2062,29 +2062,7 @@ function display_subtitles()
   local transportError = openSub.lastTransportError
   openSub.lastTransportError = nil
 
-  -- Safe check for no results - FIXED to avoid string/number comparison error
-  local hasNoResults = false
-  local hasResults = false
-
-  if not openSub.itemStore then
-    hasNoResults = true
-  elseif type(openSub.itemStore) == "string" then
-    if openSub.itemStore == "0" then
-      hasNoResults = true
-    end
-  elseif type(openSub.itemStore) == "number" then
-    if openSub.itemStore == 0 then
-      hasNoResults = true
-    end
-  elseif type(openSub.itemStore) == "table" then
-    if #openSub.itemStore == 0 then
-      hasNoResults = true
-    else
-      hasResults = true
-    end
-  end
-
-  if hasNoResults then
+  if has_no_results() then
     mainlist:add_value(lang["mess_no_res"], 1)
 
     -- Enhanced message for different search scenarios
@@ -2110,7 +2088,7 @@ function display_subtitles()
 
     setMessage(message)
 
-  elseif hasResults then
+  elseif has_results() then
     -- Get user selected languages in order
     local selectedLanguages = getUserSelectedLanguages()
 
@@ -2195,14 +2173,7 @@ end
 
 -- New function to open subtitle link in browser
 function open_subtitle_link()
-  -- Check if we have any results first
-  local hasResults = false
-
-  if openSub.itemStore and type(openSub.itemStore) == "table" and #openSub.itemStore > 0 then
-    hasResults = true
-  end
-
-  if not hasResults then
+  if not has_results() then
     setMessage(error_tag("No subtitles available. Please search first."))
     return false
   end
@@ -3238,129 +3209,88 @@ getAuthHeader = function()
 end,
 }
 
--- Enhanced searchHash function with all-languages fallback for name search fallback
-function searchHash()
-  openSub.lastSearchMethod = "hash" -- Track that this started as a hash search
+-- openSub.itemStore holds a non-empty result list
+function has_results()
+  local store = openSub.itemStore
+  return type(store) == "table" and #store > 0
+end
 
-  -- Get file info first
+-- openSub.itemStore holds no results at all: nil, "0", 0 or an empty list
+-- (the searches use different markers for "nothing found")
+function has_no_results()
+  local store = openSub.itemStore
+  return not store or store == "0" or store == 0
+      or (type(store) == "table" and #store == 0)
+end
+
+-- Hash search cannot be used or found nothing: get ready to search by name.
+-- The title comes from the file name or, failing that, from the title field.
+-- Returns true when there is a title to search for.
+local function prepare_name_fallback()
+  openSub.lastSearchMethod = "hash_fallback"
+  openSub.getMovieInfo()
+
+  if not openSub.movie.title or openSub.movie.title == "" then
+    if input_table["title"] and input_table["title"]:get_text() then
+      openSub.movie.title = trim(input_table["title"]:get_text())
+    end
+  end
+  return openSub.movie.title and openSub.movie.title ~= ""
+end
+
+-- "Search by hash" button. Falls back to a name search when the media cannot
+-- be hashed, when hashing fails, or when the hash is unknown to the API.
+function searchHash()
+  openSub.lastSearchMethod = "hash"
   openSub.getFileInfo()
 
-  -- Check if this is a suitable file for hashing BEFORE attempting hash calculation
-  if not openSub.isLocalFileForHashing() then
-    dbg("File not suitable for hash search, falling back to name search")
-
-    -- Set up for name search fallback immediately
-    openSub.lastSearchMethod = "hash_fallback" -- Track that this is a fallback
-
-    -- Get movie title and info for name search
-    openSub.getMovieInfo()
-
-    -- Use the detected title or get from input field
-    if not openSub.movie.title or openSub.movie.title == "" then
-      if input_table["title"] and input_table["title"]:get_text() then
-        openSub.movie.title = trim(input_table["title"]:get_text())
-      end
-    end
-
-    -- Only proceed with name search if we have a title
-    if openSub.movie.title and openSub.movie.title ~= "" then
-
+  local function name_search(refresh_window)
+    if refresh_window then
       openSub.movie.sublanguageid = getSelectedLanguages()
-
-      -- Update the title field in the interface
       if input_table["title"] then
         input_table["title"]:set_text(openSub.movie.title)
       end
+    end
+    openSub.checkSession()
+    openSub.searchSubtitlesNewAPI()
+  end
 
-      -- Ensure session is valid and perform name search with all-languages fallback
-      openSub.checkSession()
-      performNameSearchWithFallback()
+  -- Streams and other non-local media cannot be hashed
+  if not openSub.isLocalFileForHashing() then
+    dbg("File not suitable for hash search, falling back to name search")
+    if prepare_name_fallback() then
+      name_search(true)
     else
       dbg("Cannot perform search: no local file for hashing and no title for name search")
       openSub.itemStore = {}
       setError("Hash search requires local files. Please enter a title for name search.")
     end
-
     display_subtitles()
     return
   end
 
-  -- Proceed with hash calculation for local files
   openSub.movie.sublanguageid = getSelectedLanguages()
 
   if not openSub.getMovieHash() then
-    -- Hash calculation failed, try name search fallback if we have a title
     dbg("Hash calculation failed, attempting name search fallback")
-
-    openSub.lastSearchMethod = "hash_fallback"
-    openSub.getMovieInfo()
-
-    if not openSub.movie.title or openSub.movie.title == "" then
-      if input_table["title"] and input_table["title"]:get_text() then
-        openSub.movie.title = trim(input_table["title"]:get_text())
-      end
-    end
-
-    if openSub.movie.title and openSub.movie.title ~= "" then
-      openSub.checkSession()
-      performNameSearchWithFallback()
+    if prepare_name_fallback() then
+      name_search(false)
     else
       openSub.itemStore = {}
       setError("Hash calculation failed and no title available for name search")
     end
-
     display_subtitles()
     return
   end
 
-  -- Hash calculation successful, proceed with hash search
   openSub.checkSession()
   openSub.searchSubtitlesByHashNewAPI()
 
-  -- Check if hash search returned results
-
-  local hasNoResults = false
-
-  if not openSub.itemStore then
-    hasNoResults = true
-  elseif type(openSub.itemStore) == "string" then
-    if openSub.itemStore == "0" then
-      hasNoResults = true
-    end
-  elseif type(openSub.itemStore) == "number" then
-    if openSub.itemStore == 0 then
-      hasNoResults = true
-    end
-  elseif type(openSub.itemStore) == "table" then
-    if #openSub.itemStore == 0 then
-      hasNoResults = true
-    end
-  end
-
-  if hasNoResults then
+  if has_no_results() then
     dbg("Hash search returned 0 results, falling back to name search")
-
-    -- Set up for name search fallback
-    openSub.lastSearchMethod = "hash_fallback"
-    openSub.getMovieInfo()
-
-    if not openSub.movie.title or openSub.movie.title == "" then
-      if input_table["title"] and input_table["title"]:get_text() then
-        openSub.movie.title = trim(input_table["title"]:get_text())
-      end
-    end
-
-    if openSub.movie.title and openSub.movie.title ~= "" then
-
+    if prepare_name_fallback() then
       openSub.itemStore = nil
-      openSub.movie.sublanguageid = getSelectedLanguages()
-
-      if input_table["title"] then
-        input_table["title"]:set_text(openSub.movie.title)
-      end
-
-      openSub.checkSession()
-      performNameSearchWithFallback()
+      name_search(true)
     else
       dbg("Cannot perform name search fallback: no title available")
     end
@@ -3369,18 +3299,6 @@ function searchHash()
   display_subtitles()
 end
 
--- New function to perform name search
-function performNameSearchWithFallback()
-
-  -- Search with selected languages
-  openSub.searchSubtitlesNewAPI()
-
-  -- Check if we got results
-  local hasResults = false
-  if openSub.itemStore and type(openSub.itemStore) == "table" and #openSub.itemStore > 0 then
-    hasResults = true
-  end
-end
 
 
 -- Extract IMDB ID from various input formats
@@ -4324,14 +4242,7 @@ function download_subtitles_v2()
   -- Refresh file info to get current playing item's directory
   openSub.getFileInfo()
 
-  -- Check if we have any results first
-  local hasResults = false
-
-  if openSub.itemStore and type(openSub.itemStore) == "table" and #openSub.itemStore > 0 then
-    hasResults = true
-  end
-
-  if not hasResults then
+  if not has_results() then
     setMessage(error_tag("No subtitles available for download. Please search first."))
     return false
   end
@@ -4373,67 +4284,41 @@ function download_subtitles_v2()
 end
 
 
--- Fixed getSelectedLanguages function
-function getSelectedLanguages()
+-- Languages chosen in the three drop-downs of the main window, in that
+-- order, without duplicates. "All" / "None" (id 0) contribute nothing.
+function getUserSelectedLanguages()
   local languages = {}
 
-  -- Debug: log dropdown values
-  local sel1 = input_table["language"]:get_value()
-
-  -- Get primary language
-  if sel1 > 0 and openSub.conf.languages[sel1] then
-    local lang1 = openSub.conf.languages[sel1][1]
-    table.insert(languages, lang1)
-  end
-
-  -- Get secondary language
-  if input_table["language2"] then
-    local sel2 = input_table["language2"]:get_value()
-    if sel2 > 0 and openSub.conf.languages[sel2] then
-      local lang2 = openSub.conf.languages[sel2][1]
-      -- Avoid duplicates
-      local found = false
-      for _, lang in ipairs(languages) do
-        if lang == lang2 then
-          found = true
-          break
+  for position, widget_id in ipairs({ "language", "language2", "language3" }) do
+    local widget = input_table[widget_id]
+    -- the first drop-down always exists in the main window; the others may not
+    if position == 1 or widget then
+      local selected = widget:get_value()
+      local entry = selected > 0 and openSub.conf.languages[selected]
+      if entry then
+        local already_listed = false
+        for _, code in ipairs(languages) do
+          if code == entry[1] then
+            already_listed = true
+            break
+          end
         end
-      end
-      if not found then
-        table.insert(languages, lang2)
+        if not already_listed then
+          table.insert(languages, entry[1])
+        end
       end
     end
   end
 
-  -- Get third language
-  if input_table["language3"] then
-    local sel3 = input_table["language3"]:get_value()
-    if sel3 > 0 and openSub.conf.languages[sel3] then
-      local lang3 = openSub.conf.languages[sel3][1]
-      -- Avoid duplicates
-      local found = false
-      for _, lang in ipairs(languages) do
-        if lang == lang3 then
-          found = true
-          break
-        end
-      end
-      if not found then
-        table.insert(languages, lang3)
-      end
-    end
-  end
+  return languages
+end
 
-  -- Sort languages alphabetically as required by API
+-- The same selection as the API wants it: sorted, comma separated, or 'all'
+function getSelectedLanguages()
+  local languages = getUserSelectedLanguages()
   table.sort(languages)
 
-  local result
-  if #languages == 0 then
-    result = 'all'
-  else
-    result = table.concat(languages, ',')
-  end
-
+  local result = (#languages == 0) and 'all' or table.concat(languages, ',')
   dbg("Final language string: " .. result)
   return result
 end
@@ -4466,57 +4351,6 @@ end
 -- Also add this debug function to check what languages are available
 
 
--- Get user selected languages in order
-function getUserSelectedLanguages()
-  local languages = {}
-
-  -- Get primary language
-  local sel1 = input_table["language"]:get_value()
-  if sel1 > 0 and openSub.conf.languages[sel1] then
-    local lang1 = openSub.conf.languages[sel1][1]
-    table.insert(languages, lang1)
-  end
-
-  -- Get secondary language
-  if input_table["language2"] then
-    local sel2 = input_table["language2"]:get_value()
-    if sel2 > 0 and openSub.conf.languages[sel2] then
-      local lang2 = openSub.conf.languages[sel2][1]
-      -- Avoid duplicates
-      local found = false
-      for _, lang in ipairs(languages) do
-        if lang == lang2 then
-          found = true
-          break
-        end
-      end
-      if not found then
-        table.insert(languages, lang2)
-      end
-    end
-  end
-
-  -- Get third language
-  if input_table["language3"] then
-    local sel3 = input_table["language3"]:get_value()
-    if sel3 > 0 and openSub.conf.languages[sel3] then
-      local lang3 = openSub.conf.languages[sel3][1]
-      -- Avoid duplicates
-      local found = false
-      for _, lang in ipairs(languages) do
-        if lang == lang3 then
-          found = true
-          break
-        end
-      end
-      if not found then
-        table.insert(languages, lang3)
-      end
-    end
-  end
-
-  return languages
-end
 
 -- New function to search by hash using REST API
 -- NOTE: This function has been moved to line 7767 with performance optimizations including:
