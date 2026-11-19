@@ -5750,134 +5750,17 @@ function parse_locale_string(locale_str)
 end
 
 
--- Map language codes to OpenSubtitles language codes (2-character codes from API)
+-- Language codes as the OpenSubtitles API spells them. Almost every two-letter
+-- code is used as is; these are the ones that only exist with a region.
+local REGIONAL_DEFAULT = {
+  zh = "zh-cn", -- Chinese -> Chinese (simplified)
+  pt = "pt-pt", -- Portuguese -> Portuguese (Portugal)
+  az = "az-az", -- Azerbaijani
+  tm = "tm-td"  -- Tetum
+}
+
 function map_to_opensubtitles_language(language_code)
-  -- Mapping table based on the actual OpenSubtitles API language codes
-  local language_mapping = {
-    -- Direct matches (no mapping needed)
-    ab = "ab", -- Abkhazian
-    af = "af", -- Afrikaans
-    sq = "sq", -- Albanian
-    am = "am", -- Amharic
-    ar = "ar", -- Arabic
-    an = "an", -- Aragonese
-    hy = "hy", -- Armenian
-    as = "as", -- Assamese
-    at = "at", -- Asturian
-    eu = "eu", -- Basque
-    be = "be", -- Belarusian
-    bn = "bn", -- Bengali
-    bs = "bs", -- Bosnian
-    br = "br", -- Breton
-    bg = "bg", -- Bulgarian
-    my = "my", -- Burmese
-    ca = "ca", -- Catalan
-    hr = "hr", -- Croatian
-    cs = "cs", -- Czech
-    da = "da", -- Danish
-    pr = "pr", -- Dari
-    nl = "nl", -- Dutch
-    en = "en", -- English
-    eo = "eo", -- Esperanto
-    et = "et", -- Estonian
-    ex = "ex", -- Extremaduran
-    fi = "fi", -- Finnish
-    fr = "fr", -- French
-    gd = "gd", -- Gaelic
-    gl = "gl", -- Galician
-    ka = "ka", -- Georgian
-    de = "de", -- German
-    el = "el", -- Greek
-    he = "he", -- Hebrew
-    hi = "hi", -- Hindi
-    hu = "hu", -- Hungarian
-    is = "is", -- Icelandic
-    ig = "ig", -- Igbo
-    id = "id", -- Indonesian
-    ia = "ia", -- Interlingua
-    ga = "ga", -- Irish
-    it = "it", -- Italian
-    ja = "ja", -- Japanese
-    kn = "kn", -- Kannada
-    kk = "kk", -- Kazakh
-    km = "km", -- Khmer
-    ko = "ko", -- Korean
-    ku = "ku", -- Kurdish
-    lv = "lv", -- Latvian
-    lt = "lt", -- Lithuanian
-    lb = "lb", -- Luxembourgish
-    mk = "mk", -- Macedonian
-    ms = "ms", -- Malay
-    ml = "ml", -- Malayalam
-    ma = "ma", -- Manipuri
-    mr = "mr", -- Marathi
-    mn = "mn", -- Mongolian
-    me = "me", -- Montenegrin
-    nv = "nv", -- Navajo
-    ne = "ne", -- Nepali
-    se = "se", -- Northern Sami
-    no = "no", -- Norwegian
-    oc = "oc", -- Occitan
-    ["or"] = "or", -- Odia (quoted because 'or' is reserved keyword)
-    fa = "fa", -- Persian
-    pl = "pl", -- Polish
-    ro = "ro", -- Romanian
-    ru = "ru", -- Russian
-    sx = "sx", -- Santali
-    sr = "sr", -- Serbian
-    sd = "sd", -- Sindhi
-    si = "si", -- Sinhalese
-    sk = "sk", -- Slovak
-    sl = "sl", -- Slovenian
-    so = "so", -- Somali
-    es = "es", -- Spanish
-    sp = "sp", -- Spanish (EU)
-    ea = "ea", -- Spanish (LA)
-    sw = "sw", -- Swahili
-    sv = "sv", -- Swedish
-    sy = "sy", -- Syriac
-    tl = "tl", -- Tagalog
-    ta = "ta", -- Tamil
-    tt = "tt", -- Tatar
-    te = "te", -- Telugu
-    th = "th", -- Thai
-    tp = "tp", -- Toki Pona
-    tr = "tr", -- Turkish
-    tk = "tk", -- Turkmen
-    uk = "uk", -- Ukrainian
-    ur = "ur", -- Urdu
-    uz = "uz", -- Uzbek
-    vi = "vi", -- Vietnamese
-    cy = "cy", -- Welsh
-
-    -- Special mappings for complex codes
-    ["az-az"] = "az-az", -- Azerbaijani
-    ["az-zb"] = "az-zb", -- South Azerbaijani
-    ["zh-ca"] = "zh-ca", -- Chinese (Cantonese)
-    ["zh-cn"] = "zh-cn", -- Chinese (simplified)
-    ["zh-tw"] = "zh-tw", -- Chinese (traditional)
-    ["pt-pt"] = "pt-pt", -- Portuguese
-    ["pt-br"] = "pt-br", -- Portuguese (BR)
-    ["tm-td"] = "tm-td", -- Tetum
-    ze = "ze", -- Chinese bilingual
-    pm = "pm", -- Portuguese (MZ)
-    ps = "ps", -- Pushto
-
-    -- Common locale mappings to OpenSubtitles codes
-    zh = "zh-cn", -- Chinese -> Chinese (simplified)
-    pt = "pt-pt", -- Portuguese -> Portuguese (Portugal)
-    az = "az-az", -- Azerbaijani -> Azerbaijani
-    tm = "tm-td" -- Turkmen -> Tetum (this might need verification)
-  }
-
-  -- First try direct mapping
-  local mapped = language_mapping[language_code]
-  if mapped then
-    return mapped
-  end
-
-  -- If no mapping found, return original code
-  return language_code
+  return REGIONAL_DEFAULT[language_code] or language_code
 end
 
 
