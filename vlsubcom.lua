@@ -3852,124 +3852,6 @@ end
 -- - Filtered default parameter values
 -- - Using '+' instead of '%20' for URL encoding
 
--- Search subtitles by IMDB ID
-openSub.searchSubtitlesByIMDB = function(imdbId, is_retry)
-  openSub.actionLabel = lang["action_search"]
-  setMessage(openSub.actionLabel..": "..progressBarContent(0))
-
-  applySubtitleSortingSelection()
-
-  -- Ensure we have valid session
-  if not openSub.checkSession() then
-    vlc.msg.err("[VLSub] Failed to establish session")
-    openSub.itemStore = "0"
-    return
-  end
-
-  -- Build the API URL with sorted parameters
-  local base_url = "http://api.opensubtitles.com/api/v1/subtitles"
-  local params = {}
-
-  -- Add IMDB ID parameter (this is the primary search filter)
-  if imdbId and imdbId ~= "" then
-    params["imdb_id"] = imdbId
-  else
-    vlc.msg.err("[VLSub] No IMDB ID provided")
-    openSub.itemStore = "0"
-    return
-  end
-
-  -- Add language parameter (multiple languages, comma separated)
-  if openSub.movie.sublanguageid and openSub.movie.sublanguageid ~= "all" then
-    params["languages"] = openSub.movie.sublanguageid
-  end
-
-  if openSub.option.sortBy and openSub.option.sortBy ~= "" then
-    params["order_by"] = openSub.option.sortBy
-    params["order_direction"] = (openSub.option.sortDirection == "asc") and "asc" or "desc"
-  end
-
-  -- Build URL with sorted parameters
-  local url = build_sorted_url(base_url, params)
-
-
-  -- Make the API request with authentication
-  local client = Curl.new()
-  client:add_header("Api-Key", config.api_key)
-
-  -- Add authorization header if we have a token
-  local auth_header = openSub.getAuthHeader()
-  if auth_header then
-    client:add_header("Authorization", auth_header)
-  end
-
-  client:set_timeout(30)
-  client:set_retries(2)
-
-  -- Wrap HTTP request in pcall to catch any Lua errors
-  local request_ok, res = pcall(function()
-    return client:get(url)
-  end)
-
-  if not request_ok then
-    -- HTTP request threw a Lua error
-    vlc.msg.err("[VLSub] HTTP request crashed with error: " .. tostring(res))
-    openSub.itemStore = "0"
-    return
-  end
-
-  if res and res.status == 200 and res.body then
-    local ok, parsed_data = pcall(json.decode, res.body, 1, true)
-    if ok and parsed_data and parsed_data.data then
-      openSub.itemStore = openSub.convertNewAPIResponse(parsed_data.data)
-      dbg("Found " .. #openSub.itemStore .. " subtitles by IMDB ID")
-    else
-      vlc.msg.err("[VLSub] Failed to parse API response: " .. (res.body or "no body"))
-      openSub.itemStore = "0"
-    end
-  elseif res and res.status == 401 then
-    -- Token expired or invalid, try to re-login
-    dbg("Authentication failed, attempting re-login")
-    if not is_retry and openSub.refreshSession() then
-      -- Retry the search once with the new token
-      openSub.searchSubtitlesByIMDB(imdbId, true)
-    else
-      openSub.lastTransportError = api_error_message(401)
-      openSub.itemStore = "0"
-    end
-  elseif res and res.status == 429 then
-    -- Rate limiting error
-    vlc.msg.err("[VLSub] Rate limit exceeded (HTTP 429)")
-    openSub.lastTransportError = api_error_message(429)
-    openSub.itemStore = "0"
-  elseif res and res.status == 403 then
-    -- Access forbidden
-    vlc.msg.err("[VLSub] Access forbidden (HTTP 403)")
-    openSub.itemStore = "0"
-  elseif res and res.status == 404 then
-    -- Not found
-    vlc.msg.err("[VLSub] Resource not found (HTTP 404)")
-    openSub.itemStore = "0"
-  elseif res and res.status == 500 then
-    -- Server error
-    vlc.msg.err("[VLSub] Server error (HTTP 500)")
-    openSub.itemStore = "0"
-  elseif res and res.status == 503 then
-    -- Service unavailable
-    vlc.msg.err("[VLSub] Service unavailable (HTTP 503)")
-    openSub.itemStore = "0"
-  elseif res and res.status then
-    vlc.msg.err("[VLSub] API request failed with status: " .. res.status)
-    if res.body then
-      vlc.msg.err("[VLSub] Error response: " .. res.body)
-    end
-    openSub.lastTransportError = api_error_message(res.status)
-    openSub.itemStore = "0"
-  else
-    vlc.msg.err("[VLSub] API request failed - no response")
-    openSub.itemStore = "0"
-  end
-end
 
 -- Convert the new API response format to the old XML-RPC format for compatibility
 -- Enhanced buildSubtitleDisplayText function with upload date
@@ -6529,101 +6411,128 @@ function build_sorted_url(base_url, params_table)
 end
 
 
--- Updated searchSubtitlesNewAPI function with sorted parameters
-openSub.searchSubtitlesNewAPI = function(is_retry)
+
+
+-- Enhanced _build_url_params method that decodes existing URL params and rebuilds with sorting
+            --[[ Subtitle search ]]--
+
+local SUBTITLES_URL = "http://api.opensubtitles.com/api/v1/subtitles"
+
+-- First steps of every search. Returns false when no session could be set up.
+local function search_begin()
   openSub.actionLabel = lang["action_search"]
   setMessage(openSub.actionLabel..": "..progressBarContent(0))
-
   applySubtitleSortingSelection()
 
-  -- Ensure we have valid session
   if not openSub.checkSession() then
     vlc.msg.err("[VLSub] Failed to establish session")
-    openSub.itemStore = "0"
-    return
+    return false
   end
+  return true
+end
 
-  -- Build the API URL with sorted parameters
-  local base_url = "http://api.opensubtitles.com/api/v1/subtitles"
-  local params = {}
-
-  -- Add query parameter (movie title)
-  if openSub.movie.title and openSub.movie.title ~= "" then
-    params["query"] = openSub.movie.title
-  end
-
-  -- Add year parameter if available
-  if openSub.movie.year and openSub.movie.year ~= "" then
-    params["year"] = openSub.movie.year
-  end
-
-  -- Add language parameter (multiple languages, comma separated)
+-- GET /subtitles with `params` plus the selected languages and sort order.
+-- The API redirects unless the query is canonical; build_sorted_url takes
+-- care of that. Returns url, response (nil when nothing came back).
+-- With `protected`, a Lua error raised by the request is caught and returned
+-- as a third value instead of propagating.
+local function search_get(params, protected)
   if openSub.movie.sublanguageid and openSub.movie.sublanguageid ~= "all" then
     params["languages"] = openSub.movie.sublanguageid
   end
-
-  -- Add season and episode if available
-  if openSub.movie.seasonNumber and openSub.movie.seasonNumber ~= "" and tonumber(openSub.movie.seasonNumber) and tonumber(openSub.movie.seasonNumber) > 0 then
-    params["season_number"] = openSub.movie.seasonNumber
-  end
-
-  if openSub.movie.episodeNumber and openSub.movie.episodeNumber ~= "" and tonumber(openSub.movie.episodeNumber) and tonumber(openSub.movie.episodeNumber) > 0 then
-    params["episode_number"] = openSub.movie.episodeNumber
-  end
-
   if openSub.option.sortBy and openSub.option.sortBy ~= "" then
     params["order_by"] = openSub.option.sortBy
     params["order_direction"] = (openSub.option.sortDirection == "asc") and "asc" or "desc"
   end
 
-  -- Build URL with sorted parameters
-  local url = build_sorted_url(base_url, params)
+  local url = build_sorted_url(SUBTITLES_URL, params)
 
-
-  -- Make the API request with authentication
   local client = Curl.new()
   client:add_header("Api-Key", config.api_key)
-
-  -- Add authorization header if we have a token
   local auth_header = openSub.getAuthHeader()
   if auth_header then
     client:add_header("Authorization", auth_header)
   end
-
   client:set_timeout(30)
   client:set_retries(2)
 
-  local res = client:get(url)
+  if not protected then
+    return url, client:get(url)
+  end
+  local request_ok, res = pcall(function()
+    return client:get(url)
+  end)
+  if not request_ok then
+    return url, nil, res
+  end
+  return url, res
+end
 
-  if res and res.status == 200 and res.body then
-    local ok, parsed_data = pcall(json.decode, res.body, 1, true)
-    if ok and parsed_data and parsed_data.data then
-      openSub.itemStore = openSub.convertNewAPIResponse(parsed_data.data)
-      dbg("Found " .. #openSub.itemStore .. " subtitles")
+-- The result list of a 200 answer, or nil (plus the decode error, if any).
+local function search_results(res)
+  local ok, parsed_data = pcall(json.decode, res.body, 1, true)
+  if ok and parsed_data and parsed_data.data then
+    return openSub.convertNewAPIResponse(parsed_data.data)
+  end
+  return nil, (not ok) and parsed_data or nil
+end
+
+local function is_positive_number(value)
+  return value and value ~= "" and tonumber(value) and tonumber(value) > 0
+end
+
+-- Search by title (plus year, season, episode). Leaves the result list, or
+-- "0" when there is none, in openSub.itemStore.
+openSub.searchSubtitlesNewAPI = function(is_retry)
+  if not search_begin() then
+    openSub.itemStore = "0"
+    return
+  end
+
+  local params = {}
+  if openSub.movie.title and openSub.movie.title ~= "" then
+    params["query"] = openSub.movie.title
+  end
+  if openSub.movie.year and openSub.movie.year ~= "" then
+    params["year"] = openSub.movie.year
+  end
+  if is_positive_number(openSub.movie.seasonNumber) then
+    params["season_number"] = openSub.movie.seasonNumber
+  end
+  if is_positive_number(openSub.movie.episodeNumber) then
+    params["episode_number"] = openSub.movie.episodeNumber
+  end
+
+  local url, res = search_get(params)
+  local status = res and res.status
+
+  if status == 200 and res.body then
+    local items = search_results(res)
+    if items then
+      openSub.itemStore = items
+      dbg("Found " .. #items .. " subtitles")
     else
       vlc.msg.err("[VLSub] Failed to parse API response: " .. (res.body or "no body"))
       openSub.itemStore = "0"
     end
-  elseif res and res.status == 301 then
+  elseif status == 301 then
     vlc.msg.err("[VLSub] 301 Redirect - URL parameters may not be sorted correctly")
     vlc.msg.err("[VLSub] URL was: " .. url)
     openSub.itemStore = "0"
-  elseif res and res.status == 401 then
-    -- Token expired or invalid, try to re-login
+  elseif status == 401 then
     dbg("Authentication failed, attempting re-login")
     if not is_retry and openSub.refreshSession() then
-      -- Retry the search once with the new token
       openSub.searchSubtitlesNewAPI(true)
     else
       openSub.lastTransportError = api_error_message(401)
       openSub.itemStore = "0"
     end
-  elseif res and res.status then
-    vlc.msg.err("[VLSub] API request failed with status: " .. res.status)
+  elseif status then
+    vlc.msg.err("[VLSub] API request failed with status: " .. status)
     if res.body then
       vlc.msg.err("[VLSub] Error response: " .. res.body)
     end
-    openSub.lastTransportError = api_error_message(res.status)
+    openSub.lastTransportError = api_error_message(status)
     openSub.itemStore = "0"
   else
     vlc.msg.err("[VLSub] API request failed - no response")
@@ -6631,167 +6540,169 @@ openSub.searchSubtitlesNewAPI = function(is_retry)
   end
 end
 
--- Updated searchSubtitlesByHashNewAPI function with sorted parameters
-openSub.searchSubtitlesByHashNewAPI = function(is_retry)
-    openSub.actionLabel = lang["action_search"]
-    setMessage(openSub.actionLabel..": "..progressBarContent(0))
+-- Statuses the IMDb search only logs (no explanation under the result list)
+local IMDB_STATUS_LOG = {
+  [403] = "Access forbidden (HTTP 403)",
+  [404] = "Resource not found (HTTP 404)",
+  [500] = "Server error (HTTP 500)",
+  [503] = "Service unavailable (HTTP 503)",
+}
 
-    applySubtitleSortingSelection()
+-- Search by IMDb id. Result list, or "0", in openSub.itemStore.
+openSub.searchSubtitlesByIMDB = function(imdbId, is_retry)
+  if not search_begin() then
+    openSub.itemStore = "0"
+    return
+  end
 
-    -- Ensure we have valid session
-    if not openSub.checkSession() then
-        vlc.msg.err("[VLSub] Failed to establish session")
-        openSub.itemStore = {} -- Set to empty table
-        setMessage(error_tag(lang["mess_no_res"]))
-        display_subtitles()
-        return
-    end
+  if not imdbId or imdbId == "" then
+    vlc.msg.err("[VLSub] No IMDB ID provided")
+    openSub.itemStore = "0"
+    return
+  end
 
-    -- Build the API URL with sorted parameters
-    local base_url = "http://api.opensubtitles.com/api/v1/subtitles"
-    local params = {}
+  local _, res, crash = search_get({ imdb_id = imdbId }, true)
+  if crash then
+    vlc.msg.err("[VLSub] HTTP request crashed with error: " .. tostring(crash))
+    openSub.itemStore = "0"
+    return
+  end
+  local status = res and res.status
 
-    -- Add moviehash parameter (required for hash search)
-    if openSub.file.hash and openSub.file.hash ~= "" then
-        params["moviehash"] = openSub.file.hash
+  if status == 200 and res.body then
+    local items = search_results(res)
+    if items then
+      openSub.itemStore = items
+      dbg("Found " .. #items .. " subtitles by IMDB ID")
     else
-        vlc.msg.err("[VLSub] No movie hash available")
-        openSub.itemStore = {} -- Set to empty table
-        setMessage(error_tag(lang["mess_no_input"]))
-        display_subtitles()
-        return
+      vlc.msg.err("[VLSub] Failed to parse API response: " .. (res.body or "no body"))
+      openSub.itemStore = "0"
     end
-
-    -- Add moviebytesize parameter (recommended for better matching)
-    if openSub.file.bytesize and openSub.file.bytesize > 0 then
-        params["moviebytesize"] = tostring(openSub.file.bytesize)
-    end
-
-    -- Add language parameter (multiple languages, comma separated)
-    if openSub.movie.sublanguageid and openSub.movie.sublanguageid ~= "all" then
-        params["languages"] = openSub.movie.sublanguageid
-    end
-
-    if openSub.option.sortBy and openSub.option.sortBy ~= "" then
-        params["order_by"] = openSub.option.sortBy
-        params["order_direction"] = (openSub.option.sortDirection == "asc") and "asc" or "desc"
-    end
-
-    -- Build URL with sorted parameters
-    local url = build_sorted_url(base_url, params)
-
-
-    -- Make the API request with authentication
-    local client = Curl.new()
-    client:add_header("Api-Key", config.api_key)
-    client:add_header("User-Agent", openSub.conf.userAgentHTTP)
-
-    -- Add authorization header if we have a token
-    local auth_header = openSub.getAuthHeader()
-    if auth_header then
-        client:add_header("Authorization", auth_header)
-    end
-
-    client:set_timeout(30)
-    client:set_retries(2)
-
-    -- Wrap HTTP request in pcall to catch any Lua errors
-    local request_ok, res = pcall(function()
-        return client:get(url)
-    end)
-
-    if not request_ok then
-        -- HTTP request threw a Lua error
-        vlc.msg.err("[VLSub] HTTP request crashed with error: " .. tostring(res))
-        openSub.itemStore = {} -- Set to empty table
-        setMessage(error_tag("Network error: Connection failed"))
-        display_subtitles()
-        return
-    end
-
-    if res and res.status == 200 and res.body then
-        local ok, parsed_data = pcall(json.decode, res.body, 1, true)
-        if ok and parsed_data and parsed_data.data then
-            openSub.itemStore = openSub.convertNewAPIResponse(parsed_data.data)
-            dbg("Found " .. #openSub.itemStore .. " subtitles by hash")
-
-            if #openSub.itemStore > 0 then
-                setMessage(success_tag(lang["mess_complete"] .. ": " .. #openSub.itemStore .. " " .. lang["mess_res"]))
-            else
-                setMessage(error_tag(lang["mess_no_res"]))
-            end
-        else
-            if not ok then
-                vlc.msg.err("[VLSub] JSON decode error: " .. tostring(parsed_data))
-            end
-            vlc.msg.err("[VLSub] Failed to parse hash search API response")
-            openSub.itemStore = {} -- Set to empty table
-            setMessage(error_tag(lang["mess_no_res"]))
-        end
-    elseif res and res.status == 301 then
-        vlc.msg.err("[VLSub] 301 Redirect in hash search - URL parameters may not be sorted correctly")
-        vlc.msg.err("[VLSub] URL was: " .. url)
-        openSub.itemStore = {} -- Set to empty table
-        setMessage(error_tag("API Error: URL parameters not sorted correctly"))
-    elseif res and res.status == 401 then
-        -- Token expired or invalid, try to re-login
-        dbg("Authentication failed during hash search, attempting re-login")
-        if not is_retry and openSub.refreshSession() then
-            -- Retry the search once with the new token
-            openSub.searchSubtitlesByHashNewAPI(true)
-            return
-        else
-            openSub.itemStore = {} -- Set to empty table
-            setMessage(error_tag(lang["mess_unauthorized"]))
-        end
-    elseif res and res.status == 429 then
-        -- Rate limiting error
-        vlc.msg.err("[VLSub] Rate limit exceeded (HTTP 429). Too many requests.")
-        openSub.itemStore = {} -- Set to empty table
-        setMessage(error_tag("Rate limit: Too many requests. Please wait."))
-    elseif res and res.status == 403 then
-        -- Access forbidden
-        vlc.msg.err("[VLSub] Access forbidden (HTTP 403)")
-        openSub.itemStore = {} -- Set to empty table
-        setMessage(error_tag("Access forbidden. Check your API permissions."))
-    elseif res and res.status == 404 then
-        -- Not found
-        vlc.msg.err("[VLSub] Resource not found (HTTP 404)")
-        openSub.itemStore = {} -- Set to empty table
-        setMessage(error_tag("Resource not found."))
-    elseif res and res.status == 500 then
-        -- Server error
-        vlc.msg.err("[VLSub] Server error (HTTP 500)")
-        openSub.itemStore = {} -- Set to empty table
-        setMessage(error_tag("Server error. Please try again later."))
-    elseif res and res.status == 503 then
-        -- Service unavailable
-        vlc.msg.err("[VLSub] Service unavailable (HTTP 503)")
-        openSub.itemStore = {} -- Set to empty table
-        setMessage(error_tag("Service temporarily unavailable."))
-    elseif res and res.status then
-        vlc.msg.err("[VLSub] Hash search API request failed with status: " .. res.status)
-        if res.body then
-            vlc.msg.err("[VLSub] Hash search error response: " .. res.body)
-        end
-        openSub.itemStore = {} -- Set to empty table
-        local redirect_mess = network_redirect_message(res.status)
-        if redirect_mess then
-            openSub.lastTransportError = redirect_mess
-            setMessage(error_tag(redirect_mess))
-        else
-            setMessage(error_tag(lang["mess_error"] .. ": HTTP " .. res.status))
-        end
+  elseif status == 401 then
+    dbg("Authentication failed, attempting re-login")
+    if not is_retry and openSub.refreshSession() then
+      openSub.searchSubtitlesByIMDB(imdbId, true)
     else
-        vlc.msg.err("[VLSub] Hash search API request failed - no response")
-        openSub.itemStore = {} -- Set to empty table
-        setMessage(error_tag(lang["mess_no_response"]))
+      openSub.lastTransportError = api_error_message(401)
+      openSub.itemStore = "0"
     end
-
-    display_subtitles()
+  elseif status == 429 then
+    vlc.msg.err("[VLSub] Rate limit exceeded (HTTP 429)")
+    openSub.lastTransportError = api_error_message(429)
+    openSub.itemStore = "0"
+  elseif IMDB_STATUS_LOG[status] then
+    vlc.msg.err("[VLSub] " .. IMDB_STATUS_LOG[status])
+    openSub.itemStore = "0"
+  elseif status then
+    vlc.msg.err("[VLSub] API request failed with status: " .. status)
+    if res.body then
+      vlc.msg.err("[VLSub] Error response: " .. res.body)
+    end
+    openSub.lastTransportError = api_error_message(status)
+    openSub.itemStore = "0"
+  else
+    vlc.msg.err("[VLSub] API request failed - no response")
+    openSub.itemStore = "0"
+  end
 end
 
--- Enhanced _build_url_params method that decodes existing URL params and rebuilds with sorting
+-- Hash search: status -> { error log line, message shown to the user }
+local HASH_STATUS = {
+  [429] = { "Rate limit exceeded (HTTP 429). Too many requests.", "Rate limit: Too many requests. Please wait." },
+  [403] = { "Access forbidden (HTTP 403)", "Access forbidden. Check your API permissions." },
+  [404] = { "Resource not found (HTTP 404)", "Resource not found." },
+  [500] = { "Server error (HTTP 500)", "Server error. Please try again later." },
+  [503] = { "Service unavailable (HTTP 503)", "Service temporarily unavailable." },
+}
+
+-- Search by file hash. Unlike the other two it reports its outcome itself:
+-- the result list (or an empty table) goes to openSub.itemStore, a message is
+-- set and the list is displayed.
+openSub.searchSubtitlesByHashNewAPI = function(is_retry)
+  local function nothing(message)
+    openSub.itemStore = {}
+    setMessage(error_tag(message))
+  end
+
+  if not search_begin() then
+    nothing(lang["mess_no_res"])
+    display_subtitles()
+    return
+  end
+
+  if not openSub.file.hash or openSub.file.hash == "" then
+    vlc.msg.err("[VLSub] No movie hash available")
+    nothing(lang["mess_no_input"])
+    display_subtitles()
+    return
+  end
+
+  local params = { moviehash = openSub.file.hash }
+  if openSub.file.bytesize and openSub.file.bytesize > 0 then
+    params["moviebytesize"] = tostring(openSub.file.bytesize)
+  end
+
+  local url, res, crash = search_get(params, true)
+  if crash then
+    vlc.msg.err("[VLSub] HTTP request crashed with error: " .. tostring(crash))
+    nothing("Network error: Connection failed")
+    display_subtitles()
+    return
+  end
+  local status = res and res.status
+
+  if status == 200 and res.body then
+    local items, decode_error = search_results(res)
+    if items then
+      openSub.itemStore = items
+      dbg("Found " .. #items .. " subtitles by hash")
+      if #items > 0 then
+        setMessage(success_tag(lang["mess_complete"] .. ": " .. #items .. " " .. lang["mess_res"]))
+      else
+        setMessage(error_tag(lang["mess_no_res"]))
+      end
+    else
+      if decode_error then
+        vlc.msg.err("[VLSub] JSON decode error: " .. tostring(decode_error))
+      end
+      vlc.msg.err("[VLSub] Failed to parse hash search API response")
+      nothing(lang["mess_no_res"])
+    end
+  elseif status == 301 then
+    vlc.msg.err("[VLSub] 301 Redirect in hash search - URL parameters may not be sorted correctly")
+    vlc.msg.err("[VLSub] URL was: " .. url)
+    nothing("API Error: URL parameters not sorted correctly")
+  elseif status == 401 then
+    dbg("Authentication failed during hash search, attempting re-login")
+    if not is_retry and openSub.refreshSession() then
+      openSub.searchSubtitlesByHashNewAPI(true)
+      return
+    end
+    nothing(lang["mess_unauthorized"])
+  elseif HASH_STATUS[status] then
+    vlc.msg.err("[VLSub] " .. HASH_STATUS[status][1])
+    nothing(HASH_STATUS[status][2])
+  elseif status then
+    vlc.msg.err("[VLSub] Hash search API request failed with status: " .. status)
+    if res.body then
+      vlc.msg.err("[VLSub] Hash search error response: " .. res.body)
+    end
+    openSub.itemStore = {}
+    local redirect_mess = network_redirect_message(status)
+    if redirect_mess then
+      openSub.lastTransportError = redirect_mess
+      setMessage(error_tag(redirect_mess))
+    else
+      setMessage(error_tag(lang["mess_error"] .. ": HTTP " .. status))
+    end
+  else
+    vlc.msg.err("[VLSub] Hash search API request failed - no response")
+    nothing(lang["mess_no_response"])
+  end
+
+  display_subtitles()
+end
+
 function VLCHttpClient:_build_url_params(url, data)
     local all_params = {}
 
