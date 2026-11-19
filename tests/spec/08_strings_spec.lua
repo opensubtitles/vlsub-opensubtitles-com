@@ -104,7 +104,10 @@ describe("interface strings", function()
     local suspicious = {}
     for key, value in pairs(H.find_local("strings")) do
       local text = value:gsub("<[^>]*>?", ""):gsub("https?://%S+", ""):gsub("file:///", "")
-      if not text:find("%a%a") or value:find("^curl ") or value:find("^iwr ")
+      -- (a pattern that is all placeholders and punctuation is fine: its
+      -- punctuation differs between languages)
+      local only_placeholders = not value:gsub("%%s", ""):find("%a")
+      if (not text:find("%a%a") and not only_placeholders) or value:find("^curl ") or value:find("^iwr ")
          or value == "main" or value == "config"
          or value:find("^%%APPDATA%%") or value:find("^~/") or value:find("%.lua$") then
         suspicious[#suspicious + 1] = key
