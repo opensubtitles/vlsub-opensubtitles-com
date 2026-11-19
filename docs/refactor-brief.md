@@ -110,8 +110,13 @@ and in a request parameter and see both reported.
 ## Report after each stage
 
 Lines before and after, what was removed, tests and sessions added, bugs
-noticed and left alone. Stop and ask before anything outside the agreed
-exceptions that could change what a user sees or what is sent to the API.
+noticed and left alone.
+
+**Unattended rule.** Anything outside the agreed exceptions that could change
+what a user sees or what is sent to the API is **not done**: leave that code
+as it is, add an entry to `docs/refactor-open-questions.md` (what, where, why
+it was left, what the options are) and continue with the rest. Do not stop to
+ask, and do not decide it alone.
 
 ## Done when
 
