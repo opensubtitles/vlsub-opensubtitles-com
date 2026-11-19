@@ -287,13 +287,9 @@ function H.launch(o)
 
   function env.ui() return env.vlc._dialog() end
   function env.message()
-    local d = env.ui()
-    -- The status line is the label on the row above the bottom button row.
-    local best
-    for _, w in ipairs(d.widgets) do
-      if w.kind == "label" and w.row == 10 then best = w end
-    end
-    return best and best.text or ""
+    -- the status line of whichever window is open
+    local label = H.find_local("input_table")["message"]
+    return label and label:get_text() or ""
   end
   function env.results() return env.ui():_all("list")[1] end
   function env.saved_config()

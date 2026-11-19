@@ -4537,12 +4537,13 @@ end
 
             --[[ Download ]]--
 
+-- status -> key of the message in the strings table
 local DOWNLOAD_STATUS_MESSAGE = {
-  [403] = strings.ui_access_forbidden_403_insufficient_permissions,
-  [404] = strings.ui_subtitle_not_found_404_file_may_have,
-  [429] = strings.ui_too_many_requests_429_please_wait_and,
-  [500] = strings.ui_server_error_500_please_try_again_later,
-  [503] = strings.ui_service_unavailable_503_server_overloaded,
+  [403] = "ui_access_forbidden_403_insufficient_permissions",
+  [404] = "ui_subtitle_not_found_404_file_may_have",
+  [429] = "ui_too_many_requests_429_please_wait_and",
+  [500] = "ui_server_error_500_please_try_again_later",
+  [503] = "ui_service_unavailable_503_server_overloaded",
 }
 
 -- "Quota: 3/20 downloads, reset in: 5 hours" from the fields of a /download
@@ -4621,7 +4622,7 @@ openSub.downloadFromNewAPI = function(item, is_retry)
     end
     return report_failure(strings.ui_authentication_failed_401_please_check_your_cred)
   elseif DOWNLOAD_STATUS_MESSAGE[res.status] then
-    return report_failure(DOWNLOAD_STATUS_MESSAGE[res.status])
+    return report_failure(strings[DOWNLOAD_STATUS_MESSAGE[res.status]])
   elseif res.status ~= 200 then
     local message = "Download failed with HTTP status: " .. res.status
     vlc.msg.err("[VLSub] " .. message)
@@ -6193,13 +6194,13 @@ openSub.searchSubtitlesByIMDB = function(imdbId, is_retry)
   end
 end
 
--- Hash search: status -> { error log line, message shown to the user }
+-- Hash search: status -> { error log line, key of the message shown to the user }
 local HASH_STATUS = {
-  [429] = { "Rate limit exceeded (HTTP 429). Too many requests.", strings.ui_rate_limit_too_many_requests_please_wait },
-  [403] = { "Access forbidden (HTTP 403)", strings.ui_access_forbidden_check_your_api_permissions },
-  [404] = { "Resource not found (HTTP 404)", strings.ui_resource_not_found },
-  [500] = { "Server error (HTTP 500)", strings.ui_server_error_please_try_again_later },
-  [503] = { "Service unavailable (HTTP 503)", strings.ui_service_temporarily_unavailable },
+  [429] = { "Rate limit exceeded (HTTP 429). Too many requests.", "ui_rate_limit_too_many_requests_please_wait" },
+  [403] = { "Access forbidden (HTTP 403)", "ui_access_forbidden_check_your_api_permissions" },
+  [404] = { "Resource not found (HTTP 404)", "ui_resource_not_found" },
+  [500] = { "Server error (HTTP 500)", "ui_server_error_please_try_again_later" },
+  [503] = { "Service unavailable (HTTP 503)", "ui_service_temporarily_unavailable" },
 }
 
 -- Search by file hash. Unlike the other two it reports its outcome itself:
@@ -6268,7 +6269,7 @@ openSub.searchSubtitlesByHashNewAPI = function(is_retry)
     nothing(lang["mess_unauthorized"])
   elseif HASH_STATUS[status] then
     vlc.msg.err("[VLSub] " .. HASH_STATUS[status][1])
-    nothing(HASH_STATUS[status][2])
+    nothing(strings[HASH_STATUS[status][2]])
   elseif status then
     vlc.msg.err("[VLSub] Hash search API request failed with status: " .. status)
     if res.body then
