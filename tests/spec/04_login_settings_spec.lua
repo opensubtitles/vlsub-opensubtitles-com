@@ -85,6 +85,15 @@ describe("login", function()
     eq(env.errors(), {})
   end)
 
+  it("a config file that is not readable JSON does not stop the extension: it starts with the default settings", function()
+    for _, content in ipairs({ "{not json", "", "1", "true", '"text"' }) do
+      local env = H.launch({ files = { ["vlsub_conf.json"] = content } })
+      eq(env.errors(), {}, "content " .. content)
+      -- no settings, so no account: the configuration window asks for one
+      has(env.ui().title, "Configuration", "content " .. content)
+    end
+  end)
+
   it("wrong password (real 401 response): the API's message is shown, nothing is cached", function()
     local env = H.launch({ password = "wrong" })
     search(env)

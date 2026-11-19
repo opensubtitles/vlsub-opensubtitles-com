@@ -623,6 +623,17 @@ local function dbg(message)
 end
 
 local json = nil
+
+-- Decode a JSON object or array. Returns true and the table, or false (and
+-- the decoder's error message if it raised). Everything the API, the caches
+-- and the config file are expected to hold is an object, so a body such as
+-- "1", "true" or "\"text\"" - valid JSON, but nothing that can be indexed -
+-- counts as a failure to parse.
+local function decode_object(text)
+  local ok, value = pcall(json.decode, text, 1, true)
+  if ok and type(value) == "table" then return true, value end
+  return false, (not ok) and value or nil
+end
 local dlg = nil
 local current_window_id = nil -- 1 = main, 2 = configuration, 3 = help (see trigger_menu)
 local input_table = {} -- General widget id reference
@@ -926,7 +937,7 @@ function get_last_update_check()
   local content = file:read("*all")
   file:close()
 
-  local ok, data = pcall(json.decode, content, 1, true)
+  local ok, data = decode_object(content)
   if ok and data and data.last_check then
     return tonumber(data.last_check) or 0
   end
@@ -1351,7 +1362,7 @@ function check_for_updates(force_check)
   end
 
   -- Parse the GitHub API response
-  local ok, release_data = pcall(json.decode, res.body, 1, true)
+  local ok, release_data = decode_object(res.body)
   if not ok or not release_data then
     vlc.msg.err("[VLSub] Failed to parse update response")
     return
@@ -1460,7 +1471,7 @@ end
   end
 
   -- Parse the JSON response
-  local ok, ip_data = pcall(json.decode, res.body, 1, true)
+  local ok, ip_data = decode_object(res.body)
   if not ok or not ip_data then
     dbg("IP geolocation: Failed to parse response: " .. (res.body or "no body"))
     return
@@ -1548,7 +1559,7 @@ function initialize_languages()
         local cache_content = cache_file:read("*all")
         cache_file:close()
 
-        local ok, parsed_data = pcall(json.decode, cache_content, 1, true)
+        local ok, parsed_data = decode_object(cache_content)
         if ok and parsed_data and type(parsed_data.data) == "table" then
           local formatted_langs = {}
           for _, lang_obj in ipairs(parsed_data.data) do
@@ -1580,7 +1591,7 @@ function initialize_languages()
   local res = client:get(config.api_languages_url)
 
   if res and res.status == 200 and res.body then
-    local ok, parsed_data = pcall(json.decode, res.body, 1, true)
+    local ok, parsed_data = decode_object(res.body)
     if ok and parsed_data and type(parsed_data.data) == "table" then
       -- Save to cache
       if file_touch(cache_file_path) then
@@ -2511,13 +2522,25 @@ end
 -- the user needs is downloaded once, kept in <VLSub folder>/locale/ and
 -- refreshed at most once a week. English is the fallback for every single
 -- string, so a missing or damaged translation can never leave a label empty.
-local LOCALE_URL = os.getenv("VLSUB_LOCALE_URL")
-  or "https://raw.githubusercontent.com/opensubtitles/vlsub-opensubtitles-com/main/locale/"
+-- (Looked up when used, not when the script is loaded: VLC first runs the
+-- file only to read descriptor(), in a state without the os and io libraries.)
+local function locale_url()
+  return os.getenv("VLSUB_LOCALE_URL")
+    or "https://raw.githubusercontent.com/opensubtitles/vlsub-opensubtitles-com/main/locale/"
+end
 local LOCALE_REFRESH_SECONDS = 7 * 24 * 60 * 60
 
-local english_strings = {}
-for key, value in pairs(strings) do
-  english_strings[key] = value
+-- The English originals, copied on first use (strings is overwritten in
+-- place when a translation is applied; nothing runs at load time, see above).
+local english_strings
+local function english()
+  if not english_strings then
+    english_strings = {}
+    for key, value in pairs(strings) do
+      english_strings[key] = value
+    end
+  end
+  return english_strings
 end
 
 local function count_matches(text, pattern)
@@ -2538,7 +2561,7 @@ end
 -- %s placeholders, the same HTML tags (so no markup or link can be injected)
 -- and the same leading/trailing space as the English original.
 local function usable_translation(key, value)
-  local english = english_strings[key]
+  local english = english()[key]
   if not english or type(value) ~= "string" or value == "" then
     return false
   end
@@ -2565,7 +2588,7 @@ end
 -- Switch the interface to `translation` (key -> text), or back to English
 -- with nil. Returns how many strings were taken from the translation.
 function apply_interface_strings(translation)
-  for key, value in pairs(english_strings) do
+  for key, value in pairs(english()) do
     strings[key] = value
   end
   local used = 0
@@ -2596,7 +2619,7 @@ local function read_locale_file(name)
   end
   local content = file:read("*all")
   file:close()
-  local ok, data = pcall(json.decode, content, 1, true)
+  local ok, data = decode_object(content)
   return (ok and type(data) == "table") and data or nil
 end
 
@@ -2625,7 +2648,7 @@ local function fetch_locale_file(name)
   client:set_raw(true)
   client:set_timeout(15)
   client:set_retries(0)
-  local res = client:get(LOCALE_URL .. name)
+  local res = client:get(locale_url() .. name)
   if not res or res.status ~= 200 or not res.body then
     return nil
   end
@@ -2633,7 +2656,7 @@ local function fetch_locale_file(name)
   if #res.body > 200000 then
     return nil
   end
-  local ok, data = pcall(json.decode, res.body, 1, true)
+  local ok, data = decode_object(res.body)
   return (ok and type(data) == "table") and data or nil
 end
 
@@ -2653,7 +2676,7 @@ function available_interface_languages()
           table.insert(languages, { language.code, language.name })
         elseif openSub.option.translationPreview == true then
           table.insert(languages, { language.code,
-            language.name .. " " .. english_strings.ui_translation_unreviewed })
+            language.name .. " " .. english().ui_translation_unreviewed })
         end
       end
     end
@@ -2871,7 +2894,11 @@ function load_config()
   local resp = tmpFile:read("*all")
   tmpFile:flush()
   tmpFile:close()
-  local option = json.decode(resp)
+  local readable, option = decode_object(resp)
+  if not readable then
+    vlc.msg.warn("[VLSub] The config file is not readable; using the default settings")
+    return false
+  end
 
   -- Written by versions up to 1.3.2, which had an (unreachable) interface
   -- translation feature. Accepted in old files and ignored.
@@ -3820,7 +3847,7 @@ openSub.callGuessIt = function(filename)
       f:close()
 
       if cache_content and cache_content ~= "" then
-        local ok, cache_json = pcall(json.decode, cache_content, 1, true)
+        local ok, cache_json = decode_object(cache_content)
         if ok and cache_json and cache_json.timestamp then
           local cache_age = os.time() - cache_json.timestamp
           if cache_age < config.cache_guessit_duration_seconds then
@@ -3875,7 +3902,7 @@ openSub.callGuessIt = function(filename)
   end
 
   -- Parse the GuessIt response
-  local ok, guessit_response = pcall(json.decode, res.body, 1, true)
+  local ok, guessit_response = decode_object(res.body)
   if not ok or not guessit_response then
     vlc.msg.err("[VLSub] GuessIt: Failed to parse response: " .. (res.body or "no body"))
     return false
@@ -4323,7 +4350,7 @@ openSub.loginWithRestAPI = function()
       return false
     end
     if res.body then
-      local ok, error_data = pcall(json.decode, res.body, 1, true)
+      local ok, error_data = decode_object(res.body)
       if ok and error_data and error_data.message then
         setError(tr("ui_login_failed_2", tostring(error_data.message)))
       else
@@ -4343,7 +4370,7 @@ openSub.loginWithRestAPI = function()
 
   -- Mask token in logs for security
   -- Parse JSON response (body is now pre-cleaned by HTTP client)
-  local ok, login_response = pcall(json.decode, res.body, 1, true)
+  local ok, login_response = decode_object(res.body)
   if not ok or not login_response then
     vlc.msg.err("[VLSub] Failed to parse login response")
     setError(strings.ui_login_failed_invalid_response_format)
@@ -4433,7 +4460,7 @@ openSub.loadSessionCache = function()
   local cache_content = cache_file:read("*all")
   cache_file:close()
 
-  local ok, session_data = pcall(json.decode, cache_content, 1, true)
+  local ok, session_data = decode_object(cache_content)
   if not ok or not session_data then
     dbg("Failed to parse session cache")
     return false
@@ -4934,7 +4961,7 @@ openSub.downloadFromNewAPI = function(item, is_retry)
     vlc.msg.err("[VLSub] " .. message)
     if res.body then
       vlc.msg.err("[VLSub] Error response: " .. res.body)
-      local ok, error_data = pcall(json.decode, res.body, 1, true)
+      local ok, error_data = decode_object(res.body)
       if ok and error_data and error_data.message then
         message = message .. " - " .. error_data.message
       end
@@ -4949,7 +4976,7 @@ openSub.downloadFromNewAPI = function(item, is_retry)
 
   setMessage(openSub.actionLabel..": "..progressBarContent(75))
 
-  local ok, answer = pcall(json.decode, res.body, 1, true)
+  local ok, answer = decode_object(res.body)
   local subtitle_content
   local used, remaining, reset_time
 
@@ -5116,7 +5143,7 @@ openSub.checkLoginAndUserInfo = function()
     local message = tr("ui_user_info_request_failed_with_http_status", tostring(res.status))
     if res.body then
       vlc.msg.err("[VLSub] Error response: " .. res.body)
-      local ok, error_data = pcall(json.decode, res.body, 1, true)
+      local ok, error_data = decode_object(res.body)
       if ok and error_data and error_data.message then
         message = message .. " - " .. error_data.message
       end
@@ -5127,7 +5154,7 @@ openSub.checkLoginAndUserInfo = function()
   if not res.body then
     return fail(strings.ui_empty_response_from_user_info_api)
   end
-  local ok, user_response = pcall(json.decode, res.body, 1, true)
+  local ok, user_response = decode_object(res.body)
   if not ok or not user_response then
     return fail(strings.ui_failed_to_parse_user_info_response)
   end
@@ -6364,9 +6391,10 @@ end
 
 -- The result list of a 200 answer, or nil (plus the decode error, if any).
 local function search_results(res)
-  local ok, parsed_data = pcall(json.decode, res.body, 1, true)
-  if ok and parsed_data and parsed_data.data then
-    return openSub.convertNewAPIResponse(parsed_data.data)
+  local ok, parsed_data = decode_object(res.body)
+  if ok and parsed_data.data then
+    -- "data" that is not a list holds no subtitles
+    return openSub.convertNewAPIResponse(type(parsed_data.data) == "table" and parsed_data.data or {})
   end
   return nil, (not ok) and parsed_data or nil
 end

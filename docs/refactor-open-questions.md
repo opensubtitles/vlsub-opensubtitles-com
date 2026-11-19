@@ -35,3 +35,17 @@ left exactly as they are; each needs a decision.
    rather than the user's profile. This is what v1.3.2 does when that
    directory is writable; on a real Windows it usually is not, and the user
    directory is used. Not verified on a real Windows machine.
+
+
+## Resolved 2026-11-19 (branch `feature/translations`)
+
+- **Non-object JSON answers raised a Lua error** (search and download; both
+  former `known_bug` tests). Fixed on the user's instruction: one
+  `decode_object()` helper is used for every API answer, cache file and the
+  config file. A raw subtitle body (starts with its cue number, which the
+  JSON decoder read as a number) is now saved as the subtitle; a corrupt
+  `vlsub_conf.json` no longer stops the extension from starting. Declared as
+  the 4th exception in the behaviour diff.
+- **Extension missing from the menu on macOS** (`attempt to index global
+  'os'`): the translations code called `os.getenv` at load time. The top
+  level reads no global now; a test enforces it.

@@ -36,3 +36,27 @@ describe("startup", function()
     ok(H.exists(env.dir .. "/vlsub_conf.json"), "config file created")
   end)
 end)
+
+
+H.describe("loading the script", function()
+  -- VLC runs the file once just to call descriptor(), in a Lua state that
+  -- has no os / io (macOS VLC 3.0.x: "attempt to index global 'os' (a nil
+  -- value)" made the extension disappear from the menu). So nothing may be
+  -- looked up at load time: the top level only defines things.
+  H.it("the top level reads no global at all, so it loads in VLC's descriptor scan", function()
+    local used = {}
+    local env = setmetatable({}, { __index = function(_, name) used[#used + 1] = name return nil end })
+    local chunk
+    if setfenv then
+      chunk = assert(loadfile(H.ROOT .. "/vlsubcom.lua"))
+      setfenv(chunk, env)
+    else
+      chunk = assert(loadfile(H.ROOT .. "/vlsubcom.lua", "t", env))
+    end
+    local loaded, problem = pcall(chunk)
+    H.ok(loaded, "top level raised: " .. tostring(problem))
+    H.eq(used, {}, "globals read while loading")
+    H.eq(type(rawget(env, "descriptor")), "function")
+    H.eq(type(rawget(env, "descriptor")().title), "string")
+  end)
+end)

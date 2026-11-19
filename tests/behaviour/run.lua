@@ -54,6 +54,17 @@ EXCEPTIONS[3] = {
      .. "interfaceLanguage / detectedLanguage settings, the stored locale/ files and the "
      .. "requests that fetch them. With English in use everything else must be unchanged.",
 }
+EXCEPTIONS[4] = {
+  name = "answers that made v1.3.2 raise a Lua error",
+  why = "bug fix: a response body that is valid JSON but not an object (a number, true, "
+     .. "or a raw subtitle starting with its cue number) was indexed and raised 'attempt "
+     .. "to index a number/boolean value', leaving the window stuck on its progress bar. "
+     .. "From the step where v1.3.2 raised that error and the current code does not, the "
+     .. "rest of the session is not compared: v1.3.2 was broken from there on.",
+  -- (Lua 5.1/5.2 word the first differently, and their ipairs refuses a
+  -- string where 5.3+ walks it as an empty list)
+  baseline_errors = { "attempt to index %(?a %a+ value", "bad argument #1 to 'ipairs'" },
+}
 local DROP_CONFIG_KEYS = EXCEPTIONS[2].drop_config_keys
 DROP_CONFIG_KEYS.interfaceLanguage = true
 DROP_CONFIG_KEYS.detectedLanguage = true
@@ -292,6 +303,11 @@ local function compare(old, new)
     if not o or not n then
       differ("step " .. i .. " '" .. label .. "': present in only one version", o and "present" or "absent", n and "present" or "absent")
     else
+      local was_broken = false
+      for _, pattern in ipairs(EXCEPTIONS[4].baseline_errors) do
+        if o.error and not n.error and o.error:find(pattern) then was_broken = true end
+      end
+      if was_broken then break end
       if (o.error or "") ~= (n.error or "") then
         differ("step '" .. label .. "': Lua error", o.error or "<none>", n.error or "<none>")
       end
@@ -339,5 +355,6 @@ end
 H.cleanup()
 print(string.format("\n%d sessions, %d steps compared on %s: %d identical, %d different",
   ran, steps, _VERSION, ran - failed, failed))
-print("agreed exceptions: " .. EXCEPTIONS[1].name .. "; " .. EXCEPTIONS[2].name .. "; " .. EXCEPTIONS[3].name)
+print("agreed exceptions: " .. EXCEPTIONS[1].name .. "; " .. EXCEPTIONS[2].name .. "; " .. EXCEPTIONS[3].name
+  .. "; " .. EXCEPTIONS[4].name)
 os.exit(failed == 0 and 0 or 1)

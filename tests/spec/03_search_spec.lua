@@ -432,8 +432,7 @@ describe("search: API errors", function()
     eq(#w.list.values, 1)
   end)
 
-  known_bug("a JSON body that is not an object (true, 1, \"text\") does not raise",
-    "the search code indexes the decoded value without checking that it is a table; found by the behaviour sessions, left as is during the refactor",
+  it("a JSON body that is not an object (true, 1, \"text\") is treated as unreadable, not a crash",
     function()
       for _, body in ipairs({ "true", "1", '"text"' }) do
         local env, w = start()
@@ -441,6 +440,7 @@ describe("search: API errors", function()
         w.title:set_text("big buck bunny")
         w.by_name:_click()
         eq(#w.list.values, 1, "placeholder row for body " .. body)
+        has(env.errors()[1], "Failed to parse API response")
       end
     end)
 

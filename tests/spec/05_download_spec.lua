@@ -204,8 +204,7 @@ describe("download: failures", function()
       has(env.message(), "Invalid file_id")
     end)
 
-  known_bug("/download answering with JSON that is not an object does not raise",
-    "the download code indexes the decoded value without checking that it is a table (a body starting with a number decodes to that number); found by the behaviour sessions, left as is during the refactor",
+  it("/download answering with JSON that is not an object does not raise",
     function()
       local env = searched()
       env.server:on(DOWNLOAD, function() return api.response(200, "1") end)

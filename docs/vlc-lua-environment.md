@@ -133,3 +133,19 @@ network.
 - Dialogs are updated when the callback returns; call `dlg:update()` to show
   progress during a long operation. Everything runs on one thread: while a
   callback runs, VLC's interface does not respond.
+
+## Load time: nothing but definitions
+
+VLC runs an extension file twice: once when it scans the extensions folder,
+only to call `descriptor()`, and again when the user opens the extension. On
+macOS VLC 3.0.24 the scan runs in a state where `os` (and so `io`) is not
+there yet: a top-level `os.getenv(...)` fails with
+`attempt to index global 'os' (a nil value)` and the extension vanishes from
+the menu. Linux VLC 3.0.16 does have `os` at that point, so it cannot be seen
+there.
+
+Rule: the top level of `vlsubcom.lua` only defines locals, tables and
+functions. It reads **no global at all** - not `os`, not `vlc`, not even
+`pairs`. Anything that needs a library is looked up inside a function, when
+it is used. v1.3.2 obeys this; `tests/spec/00_smoke_spec.lua` ("loading the
+script") enforces it by loading the file in an empty environment.
