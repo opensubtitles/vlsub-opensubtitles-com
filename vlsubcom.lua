@@ -24,7 +24,6 @@ REQUIREMENTS:
 - VLC Media Player 3.0 or newer
 - OpenSubtitles.com account (free registration required)
 - Internet connection for searching and downloading
-- curl command-line tool (for downloads - usually pre-installed)
 
 INSTALLATION:
 Quick Install (Recommended):
@@ -55,7 +54,7 @@ and all EU languages.
 TROUBLESHOOTING:
 - "No results found": Ensure video is local for hash search, try name search
 - "Authentication failed": Verify credentials and internet connection
-- "Download failed": Check quota limits, verify curl installation
+- "Download failed": Check quota limits
 - Extension not visible: Restart VLC, check installation directory
 
 DEBUG LOGGING:
@@ -124,7 +123,6 @@ https://github.com/opensubtitles/vlsub-opensubtitles-com/commits/main
 
             --[[ Global var ]]--
 
--- local app_name = "VLSub";
 local app_name = "VLSub OpenSubtitles.com";  
 local app_version = "1.3.2";
 local app_useragent = app_name.." v"..app_version;
@@ -499,7 +497,6 @@ function activate()
   configurationPassed = false
   jsonModuleLoaded = false
   networkTestsFailed = false
-  -- REMOVED: curlAvailable = false
   criticalFailure = false
 
   -- Check if this is the first run BEFORE expensive operations
@@ -579,7 +576,6 @@ function activate()
     append_debug_log("Configuration check passed")
   end
 
-  -- REMOVED: Curl availability check
   -- No longer needed since we use VLC's built-in networking
 
   -- Language initialization
@@ -1239,7 +1235,6 @@ function check_for_updates(force_check)
 
   -- Make API request to GitHub
   local client = Curl.new()
-  -- client:add_header("User-Agent", app_useragent)
   client:add_header("Accept", "application/vnd.github.v3+json")
   client:set_timeout(15)  -- Slightly longer timeout for update checks
   client:set_retries(1)
@@ -1355,7 +1350,6 @@ function detect_ip_based_locale(detected_locales)
 
   -- Use the same curl wrapper as other API calls
   local client = Curl.new()
-  -- client:add_header("User-Agent", app_useragent)
   client:set_timeout(10) -- Short timeout for IP detection
   client:set_retries(1)  -- Single retry
 
@@ -1499,7 +1493,6 @@ function initialize_languages()
   local client = Curl.new()
   client:set_aggressive_timeouts()
   client:add_header("Api-Key", config.api_key)
-  -- client:add_header("User-Agent", app_useragent)
 
   local res = client:get(config.api_languages_url)
 
@@ -1550,11 +1543,6 @@ function deactivate()
   if dlg then
     dlg:hide()
   end
-
-  -- DISABLED: Don't logout or clear token on deactivation
-  -- if openSub.session.token and openSub.session.token ~= "" then
-  --   openSub.logoutRestAPI()
-  -- end
 
   vlc.msg.dbg("[VLsub] Keeping session token for next use")
 end
@@ -1757,7 +1745,6 @@ function interface_config()
   dlg:add_label(lang["int_remove_tag"]..":", 1, 8, 2, 1)
   input_table['removeTag'] = dlg:add_dropdown(3, 8, 1, 1)
 
-  -- REMOVED: Row 9: Use curl option (no longer needed)
 
   -- Row 9: Working directory (moved up from row 10)
   if openSub.conf.dirPath then
@@ -1811,7 +1798,6 @@ function interface_config()
   input_table['removeTag']:add_value(
     lang["int_bool_"..tostring(not openSub.option.removeTag)], 2)
 
-  -- REMOVED: Setup dropdown values for useCurl dropdown
 
   assoc_select_conf('default_language', 'language', openSub.conf.languages, 2, lang["int_all"])
   assoc_select_conf('default_language2', 'language2', openSub.conf.languages, 2, 'None')
@@ -2078,7 +2064,6 @@ function close_dlg()
   vlc.msg.dbg("[VLSub] Closing dialog")
 
   if dlg ~= nil then
-    --~ dlg:delete() -- Throw an error
     dlg:hide()
   end
 
@@ -2359,8 +2344,6 @@ function buildSubtitleDisplayText(item, langCode)
   -- Add filename/release name
   displayText = displayText .. (item.SubFileName or "???")
 
-  -- REMOVED: Add language code in brackets
-  -- displayText = displayText .. " [" .. langCode .. "]"
 
   -- Quality indicators with Unicode icons
   local qualityIndicators = {}
@@ -2649,7 +2632,6 @@ function load_config()
   local resp = tmpFile:read("*all")
   tmpFile:flush()
   tmpFile:close()
-  -- local option = parse_xml(resp)
    local option, pos, err = json.decode (resp)
 
   -- Written by versions up to 1.3.2, which had an (unreachable) interface
@@ -2742,7 +2724,6 @@ function apply_config()
     openSub.option.removeTag = not openSub.option.removeTag
   end
 
-  -- REMOVED: useCurl option handling
 
   -- Handle working directory path
   local dir_path = input_table['dir_path']:get_text()
@@ -2893,7 +2874,6 @@ function save_config()
       local tmpFile = assert(
         io.open(openSub.conf.filePath, "wb"))
         local resp = json.encode (openSub.option, { indent = true })
-      --local resp = dump_xml(openSub.option)
       tmpFile:write(resp)
       tmpFile:flush()
       tmpFile:close()
@@ -3768,7 +3748,6 @@ function add_sub(subPath)
 
     if success then
       -- Force enable subtitles like your working script does
-      -- vlc.var.set(vlc.object.input(), "spu", 1) --this was working
       vlc.var.set(vlc.object.input(), "spu", true)
       vlc.msg.dbg("[VLsub] Subtitle loaded and enabled successfully")
       return true
@@ -4300,7 +4279,6 @@ openSub.loginWithRestAPI = function()
   client:set_aggressive_timeouts()
   client:add_header("Api-Key", config.api_key)
   client:add_header("Content-Type", "application/json")
-  -- client:add_header("User-Agent", openSub.conf.userAgentHTTP)
 
   local res = client:post(config.login_api_url, request_body)
 
@@ -5343,7 +5321,6 @@ openSub.checkLoginAndUserInfo = function()
 
   local client = Curl.new()
   client:add_header("Api-Key", config.api_key)
-  -- client:add_header("User-Agent", openSub.conf.userAgentHTTP)
 
   -- Add authorization header
   local auth_header = openSub.getAuthHeader()
@@ -5593,7 +5570,6 @@ end
 function detect_windows_locale(detected_locales)
   vlc.msg.dbg("[VLSub] Attempting Windows locale detection (safe methods only)...")
 
-  -- REMOVED: All PowerShell and cmd commands that cause popups
   -- Only use safe environment variables and VLC's own settings
 
   -- Method 1: Safe environment variables (no external commands)
@@ -6603,7 +6579,6 @@ function get_downloads_folder()
       end
     end
 
-    -- REMOVED: PowerShell fallback that causes popup window
     -- If standard paths don't work, just use the first one anyway
     if not downloads_path and os.getenv("USERPROFILE") then
       downloads_path = os.getenv("USERPROFILE") .. "\\Downloads"
@@ -6633,7 +6608,6 @@ end
 function test_network_connectivity()
   update_debug_network("Testing network connectivity...")
 
-  -- REMOVED: Windows ping commands that cause popups
   -- For Windows, use only HTTP tests with VLC's built-in networking (no external commands)
   local test_urls = {
     "https://www.google.com",
@@ -6942,7 +6916,6 @@ openSub.searchSubtitlesNewAPI = function(is_retry)
   -- Make the API request with authentication
   local client = Curl.new()
   client:add_header("Api-Key", config.api_key)
-  -- client:add_header("User-Agent", openSub.conf.userAgentHTTP)
 
   -- Add authorization header if we have a token
   local auth_header = openSub.getAuthHeader()
