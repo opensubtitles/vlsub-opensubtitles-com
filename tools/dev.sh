@@ -125,6 +125,19 @@ case "${1:-help}" in
     [ -f "$LOG" ] && tail -8 "$LOG" | cut -c1-220
     REPORTS="$HOME/Library/Logs/DiagnosticReports"
     if [ -d "$REPORTS" ]; then
+      # VLC builds labels with NSAttributedString's HTML importer, which
+      # macOS runs in a helper process (nsattributedstringagent); a fault
+      # there is reported under that name, not VLC's.
+      AGENT="$(ls -t "$REPORTS" 2>/dev/null | grep -i 'nsattributedstringagent' | head -1)"
+      if [ -n "$AGENT" ]; then
+        echo "== HTML importer faults (nsattributedstringagent): $(ls "$REPORTS" | grep -c -i nsattributedstringagent), newest: $AGENT"
+        ls -lT "$REPORTS" 2>/dev/null | grep -i nsattributedstringagent | tail -6 | awk '{print "   " $6, $7, $8, $NF}'
+        echo "-- exception:"
+        grep -o -E '"(type|signal|subtype|codes|message|indicator)" ?: ?"[^"]*"' "$REPORTS/$AGENT" | head -12 | sed 's/^/   /'
+        echo "-- first symbols of the report (crashed thread comes first):"
+        grep -o -E '"symbol" ?: ?"[^"]*"' "$REPORTS/$AGENT" | head -45 | sed 's/"symbol" *: *//' | tr '\n' ' ' | fold -w 200
+        echo
+      fi
       NEWEST="$(ls -t "$REPORTS" 2>/dev/null | grep -i '^vlc' | head -1)"
       if [ -n "$NEWEST" ]; then
         echo "== newest crash report: $REPORTS/$NEWEST"
