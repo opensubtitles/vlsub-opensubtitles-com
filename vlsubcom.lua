@@ -256,12 +256,6 @@ local strings = {
 
   -- Messages that used to be written inline in the code
   ui_could_not_detect_user_locale = "Could not detect user locale",
-  ui_locale_detected = "Locale detected: ",
-  ui_from = " from ",
-  ui_found = "Found ",
-  ui_suggested_languages = " suggested languages: ",
-  ui_set = "Set ",
-  ui_language = " language: ",
   ui_language_not_available = "Language not available: ",
   ui_saving_auto_detected_settings = "Saving auto-detected settings...",
   ui_auto_detected_settings_saved = "Auto-detected settings saved",
@@ -304,16 +298,13 @@ local strings = {
   ui_vlsub_update_available = "<a href='https://github.com/opensubtitles/vlsub-opensubtitles-com'><b>VLSub Update Available</b></a> (",
   ui_installation_instructions = "<b>Installation Instructions:</b>",
   ui_open_powershell_as_administrator_and_run = "Open PowerShell as Administrator and run:",
-  ui_if_this_doesn_t_work_download_a = "If this doesn't work, download <a href='",
-  ui_vlsubcom_lua_and_save_to = "'>vlsubcom.lua</a> and save to:",
-  ui_appdata_vlc_lua_extensions_vlsubcom_lua = "%APPDATA%\\vlc\\lua\\extensions\\vlsubcom.lua",
   ui_open_terminal_and_run = "Open Terminal and run:",
   ui_then_restart_vlc_and_access_via_view = "Then restart VLC and access via View → VLSub OpenSubtitles.com",
   ui_what_s_new_in_v = "<b>What's New in v",
   ui_skip_version = "⏭️ Skip Version",
   ui_later = "⏰ Later",
   ui_close = "❌ Close",
-  ui_you_re_running_the_latest_version = "You're running the latest version (",
+  ui_you_re_running_the_latest_version = "You're running the latest version (%s)",
   ui_year = "Year:",
   ui_sort_by = "Sort by:",
   ui_search_results = "Search Results:",
@@ -422,7 +413,6 @@ local strings = {
   ui_empty_response_from_user_info_api = "Empty response from user info API",
   ui_failed_to_parse_user_info_response = "Failed to parse user info response",
   ui_invalid_user_info_response_format = "Invalid user info response format",
-  ui_downloads_reset_in = " downloads, reset in: ",
   ui_testing_network_connectivity = "Testing network connectivity...",
   ui_testing_connection = "Testing connection ",
   ui_testing = "Testing: ",
@@ -437,7 +427,7 @@ local strings = {
   ui_network_connection_verified = "Network connection verified",
   ui_network_connection_successful = "Network connection successful",
   ui_all_tests_passed_auto_closing_in_3 = "All tests passed - auto-closing in 3 seconds...",
-  ui_auto_close = "✅ Auto-close (",
+  ui_auto_close = "✅ Auto-close (%ss)",
   ui_click_continue_offline_to_proceed_with_limited = "Click 'Continue Offline' to proceed with limited functionality",
   ui_click_continue_offline_to_proceed = "Click 'Continue Offline' to proceed",
   ui_critical_failures_detected_click_continue_anyway = "Critical failures detected - click 'Continue Anyway' or 'Close VLSub'",
@@ -455,10 +445,8 @@ local strings = {
   ui_network_is_redirecting_http_requests_status = "network is redirecting HTTP requests (status ",
   ui_a_proxy_vpn_captive_portal_or_content = ") - a proxy, VPN, captive portal or content filter is intercepting ",
   ui_port_80_disable_it_or_connect_through = "port 80. Disable it or connect through another network.",
-  ui_quota = "Quota: ",
-  ui_downloads = " downloads",
-  ui_reset_in = ", reset in: ",
-  ui_quota_reset_in = "Quota reset in: ",
+  ui_reset_in = ", reset in: %s",
+  ui_quota_reset_in = "Quota reset in: %s",
   ui_for_moviehash = " for moviehash ",
   ui_searched_by_hash_name = " (searched by hash + name)",
   ui_and_title = " and title '",
@@ -488,8 +476,23 @@ local strings = {
   ui_subtitle_not_found_404_file_may_have = "Subtitle not found (404) - file may have been removed or ID is invalid",
   ui_too_many_requests_429_please_wait_and = "Too many requests (429) - please wait and try again",
   ui_server_error_500_please_try_again_later = "Server error (500) - please try again later",
-  ui_service_unavailable_503_server_overloaded = "Service unavailable (503) - server overloaded"
+  ui_service_unavailable_503_server_overloaded = "Service unavailable (503) - server overloaded",
+  ui_locale_detected_from = "Locale detected: %s from %s",
+  ui_found_suggested_languages = "Found %s suggested languages: %s",
+  ui_set_primary_language = "Set primary language: %s",
+  ui_set_secondary_language = "Set secondary language: %s",
+  ui_set_third_language = "Set third language: %s",
+  ui_if_this_doesn_t_work_download = "If this doesn't work, download <a href='%s'>vlsubcom.lua</a> and save to:",
+  ui_quota_downloads = "Quota: %s/%s downloads",
+  ui_account_summary = "%s (%s), %s/%s downloads, reset in: %s"
 }
+
+-- A message with values filled in: tr(key, a, b) uses the string stored
+-- under `key` as a string.format pattern. Whole sentences with %s placeholders, rather than
+-- pieces glued together, let a translation choose its own word order.
+local function tr(key, ...)
+  return string.format(strings[key], ...)
+end
 
 -- default subtitle languages
 local sub_languages = {
@@ -671,7 +674,7 @@ local function apply_detected_languages(detected_locale, log, progress)
     log(strings.ui_could_not_detect_user_locale)
     return
   end
-  log(strings.ui_locale_detected .. detected_locale.locale .. strings.ui_from .. detected_locale.source)
+  log(tr("ui_locale_detected_from", detected_locale.locale, detected_locale.source))
 
   local suggestions = detected_locale.suggested_languages
   if not suggestions or #suggestions == 0 then
@@ -682,12 +685,12 @@ local function apply_detected_languages(detected_locale, log, progress)
   for _, suggestion in ipairs(suggestions) do
     table.insert(lang_codes, suggestion.language)
   end
-  log(strings.ui_found .. #suggestions .. strings.ui_suggested_languages .. table.concat(lang_codes, ", "))
+  log(tr("ui_found_suggested_languages", tostring(#suggestions), table.concat(lang_codes, ", ")))
 
   local slots = {
-    { option = "language", label = "primary" },
-    { option = "language2", label = "secondary" },
-    { option = "language3", label = "third" },
+    { option = "language", message = "ui_set_primary_language" },
+    { option = "language2", message = "ui_set_secondary_language" },
+    { option = "language3", message = "ui_set_third_language" },
   }
   for i, suggestion in ipairs(suggestions) do
     local os_lang = map_to_opensubtitles_language(suggestion.language)
@@ -698,7 +701,7 @@ local function apply_detected_languages(detected_locale, log, progress)
         local slot = slots[i]
         if slot and (not openSub.option[slot.option] or openSub.option[slot.option] == "") then
           openSub.option[slot.option] = lang_pair[1]
-          log(strings.ui_set .. slot.label .. strings.ui_language .. lang_pair[1])
+          log(tr(slot.message, lang_pair[1]))
         end
         break
       end
@@ -970,8 +973,8 @@ function show_update_dialog(latest_version, release_notes, download_url)
     -- Windows instructions - compact with 2-line fallback
     dlg:add_label(strings.ui_open_powershell_as_administrator_and_run, 1, 3, 6, 1)
     dlg:add_label("iwr -useb https://raw.githubusercontent.com/opensubtitles/vlsub-opensubtitles-com/main/scripts/install.ps1 | iex", 1, 4, 6, 1)
-    dlg:add_label(strings.ui_if_this_doesn_t_work_download_a .. download_url .. strings.ui_vlsubcom_lua_and_save_to, 1, 5, 6, 1)
-    dlg:add_label(strings.ui_appdata_vlc_lua_extensions_vlsubcom_lua, 1, 6, 6, 1)
+    dlg:add_label(tr("ui_if_this_doesn_t_work_download", download_url), 1, 5, 6, 1)
+    dlg:add_label("%APPDATA%\\vlc\\lua\\extensions\\vlsubcom.lua", 1, 6, 6, 1)
 
   else
     -- macOS/Linux instructions - compact with 2-line fallback
@@ -985,7 +988,7 @@ function show_update_dialog(latest_version, release_notes, download_url)
 
     dlg:add_label(strings.ui_open_terminal_and_run, 1, 3, 6, 1)
     dlg:add_label("curl -sSL https://raw.githubusercontent.com/opensubtitles/vlsub-opensubtitles-com/main/scripts/install.sh | bash", 1, 4, 6, 1)
-    dlg:add_label(strings.ui_if_this_doesn_t_work_download_a .. download_url .. strings.ui_vlsubcom_lua_and_save_to, 1, 5, 6, 1)
+    dlg:add_label(tr("ui_if_this_doesn_t_work_download", download_url), 1, 5, 6, 1)
     dlg:add_label(install_path, 1, 6, 6, 1)
   end
 
@@ -1375,7 +1378,7 @@ function check_for_updates(force_check)
     if force_check then
       -- If manually triggered, show a message only if we have an interface
       if input_table and input_table["message"] then
-        setMessage(success_tag(strings.ui_you_re_running_the_latest_version .. update_config.current_version .. ")"))
+        setMessage(success_tag(tr("ui_you_re_running_the_latest_version", update_config.current_version)))
       end
     end
   end
@@ -4557,13 +4560,13 @@ local DOWNLOAD_STATUS_MESSAGE = {
 local function quota_text(used, remaining, reset_time)
   local text = ""
   if used ~= nil and remaining ~= nil then
-    text = strings.ui_quota .. used .. "/" .. tostring(used + remaining) .. strings.ui_downloads
+    text = tr("ui_quota_downloads", tostring(used), tostring(used + remaining))
   end
   if reset_time then
     if text ~= "" then
-      text = text .. strings.ui_reset_in .. reset_time
+      text = text .. tr("ui_reset_in", reset_time)
     else
-      text = strings.ui_quota_reset_in .. reset_time
+      text = tr("ui_quota_reset_in", reset_time)
     end
   end
   return text
@@ -4841,7 +4844,8 @@ openSub.checkLoginAndUserInfo = function()
   local username = user_data.username or strings.ui_unknown_2
   local level = user_data.level or strings.ui_unknown_2
   local reset_time = user_data.reset_time or user_data.reset_time_utc or strings.ui_unknown_2
-  local user_info_html = success_tag("" .. username .. " (" .. level .. "), " .. downloads_count .. "/" .. allowed_downloads .. strings.ui_downloads_reset_in .. reset_time)
+  local user_info_html = success_tag(tr("ui_account_summary", username, level,
+    tostring(downloads_count), tostring(allowed_downloads), reset_time))
 
   openSub.lastSuccessMessage = user_info_html
   setMessage(user_info_html)
@@ -5850,7 +5854,7 @@ function checkInitializationStatus()
     -- Update button to show countdown
     if debug_messages and debug_messages.ok_button then
       for countdown = 3, 1, -1 do
-        debug_messages.ok_button:set_text(strings.ui_auto_close .. countdown .. "s)")
+        debug_messages.ok_button:set_text(tr("ui_auto_close", tostring(countdown)))
         if debug_dlg then
           debug_dlg:update()
         end
