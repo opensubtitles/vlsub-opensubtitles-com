@@ -199,72 +199,21 @@ local strings = {
   int_season = 'TV Season',
   int_episode = 'TV Episode',
   int_imdb = 'IMDB ID',
-  int_show_help = 'Help',
-  int_show_conf = 'Config',
-  int_dowload_sel = 'Download selected',
   int_close = 'Close',
-  int_ok = 'Ok',
   int_save = 'Save',
-  int_cancel = 'Cancel',
   int_bool_true = 'Yes',
   int_bool_false = 'No',
-  int_search_transl = 'Search translations',
-  int_searching_transl = 'Searching translations ...',
-  int_int_lang = 'Interface language',
   int_default_lang = '1. Subtitles Language',           -- Updated
   int_second_lang = '2. Subtitles Language',            -- Updated
   int_third_lang = '3. Subtitles Language',             -- Updated
   int_dowload_behav = 'What to do with subtitles',
   int_dowload_save = 'Load and save',
-  int_dowload_load = 'Load only',
   int_dowload_manual =  'Manual download',
   int_display_code = 'Save language code in file name',
   int_remove_tag = 'Remove tags',
-  int_use_curl = 'Use curl (<a href="https://github.com/opensubtitles/vlsub-opensubtitles-com/wiki/VLC-Extension-Development-FAQ:-Networking-and-Header-Limitations">info</a>)',
   int_vlsub_work_dir = 'VLSub working directory',
   int_os_username = 'OpenSubtitles.com Username',
   int_os_password = 'OpenSubtitles.com Password',
-  int_help_mess =[[
-    Download subtitles from
-    <a href='http://www.opensubtitles.org/'>
-    opensubtitles.org
-    </a> and display them while watching a video.<br>
-    <br>
-    <b><u>Usage:</u></b><br>
-    <br>
-    Start your video. If you use Vlsub witout playing a video
-    you will get a link to download the subtitles in your browser
-    but the subtitles won't be saved and loaded automatically.<br>
-    <br>
-    Choose up to 3 languages for your subtitles and click on the
-    button corresponding to one of the two research methods
-    provided by VLSub:<br>
-    <br>
-    <b>Method 1: Search by hash</b><br>
-    It is recommended to try this method first, because it
-    performs a research based on the video file print, so you
-    can find subtitles synchronized with your video.<br>
-    <br>
-    <b>Method 2: Search</b><br>
-    If you have no luck with the first method, just check the
-    title is correct before clicking. If you search subtitles
-    for a series, you can also provide a season and episode
-    number.<br>
-    <br>
-    <b>Downloading Subtitles</b><br>
-    Select one subtitle in the list and click on 'Download'.<br>
-    It will be put in the same directory that your video, with
-    the same name (different extension)
-    so VLC will load them automatically the next time you'll
-    start the video.<br>
-    <br>
-    <b>/!\\ Beware :</b> Existing subtitles are overwritten
-    without asking confirmation, so put them elsewhere if
-    they're important.<br>
-    <br>
-    Find more VLC extensions at
-    <a href='http://addons.videolan.org'>addons.videolan.org</a>.
-    ]],
   int_no_support_mess = [[
     <strong>VLSub is not working with Vlc 2.1.x on
     any platform</strong>
@@ -284,8 +233,6 @@ local strings = {
   ]],
 
   action_login = 'Logging in',
-  action_logout = 'Logging out',
-  action_noop = 'Checking session',
   action_search = 'Searching subtitles',
   action_hash = 'Calculating movie hash',
 
@@ -293,27 +240,263 @@ local strings = {
   mess_error = 'Error',
   mess_no_response = 'Server not responding',
   mess_unauthorized = 'Request unauthorized',
-  mess_expired = 'Session expired, retrying',
-  mess_overloaded = 'Server overloaded, please retry later',
   mess_no_input = 'Please use this method during playing',
-  mess_not_local = 'This method works with local file only (for now)',
   mess_not_found = 'File not found',
-  mess_not_found2 = 'File not found (illegal character?)',
   mess_no_selection = 'No subtitles selected',
-  mess_save_fail = 'Unable to save subtitles',
-  mess_click_link = 'Click here to open the file',
   mess_complete = 'Search complete',
   mess_no_res = 'No result',
   mess_res = 'result(s)',
   mess_loaded = 'Subtitles loaded',
-  mess_not_load = 'Unable to load subtitles',
   mess_downloading = 'Downloading subtitle',
   mess_dowload_link = 'Download link',
   mess_err_conf_access ='Can\'t find a suitable path to save'..
     'config, please set it manually',
   mess_err_wrong_path ='the path contains illegal character, '..
     'please correct it',
-  mess_err_cant_download_interface_translation='could not download interface translation'
+
+  -- Messages that used to be written inline in the code
+  ui_could_not_detect_user_locale = "Could not detect user locale",
+  ui_locale_detected = "Locale detected: ",
+  ui_from = " from ",
+  ui_found = "Found ",
+  ui_suggested_languages = " suggested languages: ",
+  ui_set = "Set ",
+  ui_language = " language: ",
+  ui_language_not_available = "Language not available: ",
+  ui_saving_auto_detected_settings = "Saving auto-detected settings...",
+  ui_auto_detected_settings_saved = "Auto-detected settings saved",
+  ui_failed_to_save_auto_detected_settings = "Failed to save auto-detected settings",
+  ui_initializing_vlsub_first_run = "Initializing VLSub (First Run)...",
+  ui_vlsub_first_time_setup_started = "VLSub first-time setup started",
+  ui_loading_json_module = "Loading JSON module...",
+  ui_error_failed_to_load_json_module = "ERROR: Failed to load JSON module",
+  ui_critical_json_module_load_failed = "CRITICAL: JSON module load failed: ",
+  ui_json_module_loaded_successfully = "JSON module loaded successfully",
+  ui_checking_dkjson_compatibility = "Checking dkjson compatibility...",
+  ui_error_incompatible_dkjson_version = "ERROR: Incompatible dkjson version",
+  ui_critical_dkjson_version_too_old_cannot_parse = "CRITICAL: dkjson version too old - cannot parse floats",
+  ui_dkjson_compatibility_check_passed_version = "dkjson compatibility check passed (version: ",
+  ui_checking_configuration = "Checking configuration...",
+  ui_error_unsupported_vlc_version = "ERROR: Unsupported VLC version",
+  ui_critical_vlc_version_not_supported = "CRITICAL: VLC version not supported",
+  ui_configuration_check_passed = "Configuration check passed",
+  ui_loading_subtitle_languages = "Loading subtitle languages...",
+  ui_using_offline_language_list = "Using offline language list...",
+  ui_using_built_in_language_list_offline_mode = "Using built-in language list (offline mode)",
+  ui_initializing_languages_from_api = "Initializing languages from API...",
+  ui_language_list_loaded_from_api = "Language list loaded from API",
+  ui_detecting_user_locale = "Detecting user locale...",
+  ui_first_run_detected = "First run detected",
+  ui_starting_locale_detection = "Starting locale detection...",
+  ui_temporarily_cleared_user_preference_for_clean_de = "Temporarily cleared user preference for clean detection",
+  ui_getting_file_information = "Getting file information...",
+  ui_file_info_loaded_for_current_media = "File info loaded for current media",
+  ui_no_media_loaded = "No media loaded",
+  ui_checking_authentication = "Checking authentication...",
+  ui_valid_authentication_found_credentials_available = "Valid authentication found - credentials available",
+  ui_no_valid_authentication_missing_credentials = "No valid authentication - missing credentials",
+  ui_initialization_complete = "Initialization complete!",
+  ui_initialization_complete_checking_for_auto_close = "Initialization complete - checking for auto-close...",
+  ui_ready_to_show_main_window_authenticated = "Ready to show main window (authenticated)",
+  ui_ready_to_show_configuration_window_no_auth = "Ready to show configuration window (no auth)",
+  ui_initializing_auto_update_system = "Initializing auto-update system...",
+  ui_setting_up_automatic_update_checking = "Setting up automatic update checking...",
+  ui_vlsub_update_available = "<a href='https://github.com/opensubtitles/vlsub-opensubtitles-com'><b>VLSub Update Available</b></a> (",
+  ui_installation_instructions = "<b>Installation Instructions:</b>",
+  ui_open_powershell_as_administrator_and_run = "Open PowerShell as Administrator and run:",
+  ui_iwr_useb_https_raw_githubusercontent_com_opensub = "iwr -useb https://raw.githubusercontent.com/opensubtitles/vlsub-opensubtitles-com/main/scripts/install.ps1 | iex",
+  ui_if_this_doesn_t_work_download_a = "If this doesn't work, download <a href='",
+  ui_vlsubcom_lua_and_save_to = "'>vlsubcom.lua</a> and save to:",
+  ui_appdata_vlc_lua_extensions_vlsubcom_lua = "%APPDATA%\\vlc\\lua\\extensions\\vlsubcom.lua",
+  ui_open_terminal_and_run = "Open Terminal and run:",
+  ui_curl_ssl_https_raw_githubusercontent_com_opensub = "curl -sSL https://raw.githubusercontent.com/opensubtitles/vlsub-opensubtitles-com/main/scripts/install.sh | bash",
+  ui_then_restart_vlc_and_access_via_view = "Then restart VLC and access via View → VLSub OpenSubtitles.com",
+  ui_what_s_new_in_v = "<b>What's New in v",
+  ui_skip_version = "⏭️ Skip Version",
+  ui_later = "⏰ Later",
+  ui_close = "❌ Close",
+  ui_you_re_running_the_latest_version = "You're running the latest version (",
+  ui_year = "Year:",
+  ui_sort_by = "Sort by:",
+  ui_search_results = "Search Results:",
+  ui_download = "📥 Download",
+  ui_link = "🔗 Link",
+  ui_config = "⚙️ Config",
+  ui_help = "❓ Help",
+  ui_main = "main",
+  ui_a_href_file = "<a href='file:///",
+  ui_a_href = "<a href='",
+  ui_config_2 = "config",
+  ui_check_updates = "🔄 Check Updates",
+  ui_search_methods = "SEARCH METHODS:",
+  ui_hash_search_uses_video_file_fingerprint_for = "Hash Search: Uses video file fingerprint for exact matches",
+  ui_name_search_uses_guessit_api_to_extract = "Name Search: Uses GuessIt API to extract title/year/episode from filename",
+  ui_auto_fallback_from_hash_to_name_search = "Auto-fallback from hash to name search if no results found",
+  ui_language_detection = "LANGUAGE & DETECTION:",
+  ui_auto_detects_locale_from_system_settings_ip = "Auto-detects locale from system settings, IP geolocation, timezone",
+  ui_results_grouped_by_selected_languages_in_priorit = "Results grouped by selected languages in priority order",
+  ui_choose_up_to_3_preferred_subtitle_languages = "Choose up to 3 preferred subtitle languages",
+  ui_technical_info = "TECHNICAL INFO:",
+  ui_guessit_api_extracts_movie_tv_metadata_from = "GuessIt API extracts movie/TV metadata from filenames",
+  ui_shows_quality_indicators_trusted_uploaders_downl = "Shows quality indicators: trusted uploaders, download counts, sync",
+  ui_windows_use_english_characters_in_file_paths = "Windows: Use English characters in file paths for best results",
+  ui_account_quotas = "ACCOUNT & QUOTAS:",
+  ui_free_opensubtitles_com_account_required_for_down = "<a href='https://www.opensubtitles.com'>Free OpenSubtitles.com account required for downloads</a>",
+  ui_extension_displays_your_rank_daily_quota_and = "Extension displays your rank, daily quota and current usage",
+  ui_select_subtitle_and_click_download_or_link = "Select subtitle and click Download or Link button",
+  ui_support_opensubtitles_thank_you_very_much = "<a href='https://www.opensubtitles.com/en/support_us/'>Support OpenSubtitles</a> - thank you very much",
+  ui_github_opensubtitles_vlsub_opensubtitles_com_sou = "<a href='https://github.com/opensubtitles/vlsub-opensubtitles-com'>GitHub: opensubtitles/vlsub-opensubtitles-com</a> - source, issues, releases",
+  ui_continue = "⏳ Continue",
+  ui_auto_close_2s = "✅ Auto-close (2s)",
+  ui_continue_offline = "🌐 Continue Offline",
+  ui_continue_anyway = "⚠️ Continue Anyway",
+  ui_close_vlsub = "❌ Close VLSub",
+  ui_vlsub_is_starting_up = "VLSub is starting up...",
+  ui_progress = "Progress:",
+  ui_starting = "Starting...",
+  ui_status = "Status:",
+  ui_initializing_components = "Initializing components",
+  ui_network = "Network:",
+  ui_checking_connectivity = "Checking connectivity...",
+  ui_debug_log = "Debug Log:",
+  ui_vlsub_initialization_starting = "VLSub initialization starting...",
+  ui_no_subtitles_available_please_search_first = "No subtitles available. Please search first.",
+  ui_please_select_a_subtitle_from_the_list = "Please select a subtitle from the list first.",
+  ui_no_url_available_for_this_subtitle = "No URL available for this subtitle.",
+  ui_vlsub_cannot_start_due_to_incompatible_dkjson = "<b>VLSub cannot start due to incompatible dkjson version</b>",
+  ui_your_vlc_installation_includes_an_old_version = "Your VLC installation includes an old version of dkjson (JSON parser)",
+  ui_that_cannot_parse_floating_point_numbers_properl = "that cannot parse floating point numbers properly.",
+  ui_current_version = "<b>Current version:</b> ",
+  ui_unknown = "unknown",
+  ui_required_version_2_4_or_newer = "<b>Required version:</b> 2.4 or newer",
+  ui_solution_windows_macos = "<b>Solution (Windows/macOS):</b>",
+  ui_upgrade_vlc_to_version_3_0_22 = "Upgrade VLC to version 3.0.22 or newer.",
+  ui_solution_ubuntu_debian_linux = "<b>Solution (Ubuntu/Debian Linux):</b>",
+  ui_ubuntu_ships_vlc_with_the_broken_dkjson = "Ubuntu ships VLC with the broken dkjson — upgrading VLC does not help.",
+  ui_replace_the_bundled_dkjson_luac_with_the = "Replace the bundled <tt>dkjson.luac</tt> with the latest version:",
+  ui_1_download_dkjson_lua_from_dkolf_de = "1. Download <a href='https://dkolf.de/dkjson-lua/'>dkjson.lua from dkolf.de</a>",
+  ui_2_locate_vlc_s_modules_dir_e = "2. Locate VLC's modules dir (e.g. <tt>/usr/lib/x86_64-linux-gnu/vlc/lua/modules/</tt>)",
+  ui_3_back_up_dkjson_luac_and_replace = "3. Back up <tt>dkjson.luac</tt> and replace it with the downloaded file (renamed to <tt>dkjson.luac</tt>)",
+  ui_4_restart_vlc_requires_sudo = "4. Restart VLC.  Requires <tt>sudo</tt>.",
+  ui_more_info_issue_23_middot_issue_11 = "More info: <a href='https://github.com/opensubtitles/vlsub-opensubtitles-com/issues/23'>Issue #23</a> &middot; <a href='https://github.com/opensubtitles/vlsub-opensubtitles-com/issues/11#issuecomment-3391889129'>Issue #11</a>",
+  ui_close_2 = "Close",
+  ui_configuration_saved_please_enter_opensubtitles_c = "Configuration saved. Please enter OpenSubtitles.com credentials for full functionality.",
+  ui_testing_login_credentials = "Testing login credentials...",
+  ui_configuration_saved_you_can_now_close_this = "<br>Configuration saved. You can now close this window.",
+  ui_configuration_saved_and_login_successful_you_can = "Configuration saved and login successful! You can now close this window.",
+  ui_note_other_configuration_settings_were_saved_suc = "<br><small>Note: Other configuration settings were saved successfully.</small>",
+  ui_login_failed_please_check_your_credentials_other = "Login failed - please check your credentials.<br><small>Other configuration settings were saved successfully.</small>",
+  ui_hash_search_only_works_with_local_video = "Hash search only works with local video files",
+  ui_cannot_open_archive_stream_for_hashing = "Cannot open archive stream for hashing",
+  ui_cannot_read_archive_data_for_hashing = "Cannot read archive data for hashing",
+  ui_file_not_accessible_for_hashing = "File not accessible for hashing",
+  ui_cannot_open_local_file_for_hashing = "Cannot open local file for hashing",
+  ui_cannot_read_file_data_for_hashing = "Cannot read file data for hashing",
+  ui_cannot_seek_in_file_for_hashing = "Cannot seek in file for hashing",
+  ui_cannot_read_end_data_for_hashing = "Cannot read end data for hashing",
+  ui_insufficient_data_for_hash_calculation = "Insufficient data for hash calculation",
+  ui_hash_search_requires_local_files_please_enter = "Hash search requires local files. Please enter a title for name search.",
+  ui_hash_calculation_failed_and_no_title_available = "Hash calculation failed and no title available for name search",
+  ui_searching_by_imdb_id = "Searching by IMDB ID...",
+  ui_invalid_imdb_id_format = "Invalid IMDB ID format",
+  ui_login_failed_network_timeout_or_no_internet = "Login failed - network timeout or no internet connection",
+  ui_login_failed = "Login failed - ",
+  ui_login_failed_2 = "Login failed: ",
+  ui_login_failed_with_status = "Login failed with status: ",
+  ui_login_failed_network_error = "Login failed - network error",
+  ui_login_failed_empty_response = "Login failed - empty response",
+  ui_login_failed_invalid_response_format = "Login failed - invalid response format",
+  ui_status_2 = "Status ",
+  ui_login_failed_no_authentication_token_received = "Login failed - no authentication token received",
+  ui_no_subtitles_available_for_download_please_searc = "No subtitles available for download. Please search first.",
+  ui_failed_to_download_from_provided_link = "Failed to download from provided link",
+  ui_failed_to_download_subtitle_content_http = "Failed to download subtitle content (HTTP ",
+  ui_empty_subtitle_content_downloaded = "Empty subtitle content downloaded",
+  ui_no_file_id_available_for_download = "No file ID available for download",
+  ui_authentication_failed_please_check_your_opensubt = "Authentication failed - please check your OpenSubtitles.com credentials",
+  ui_authentication_required_for_download = "Authentication required for download",
+  ui_no_response_from_download_server = "No response from download server",
+  ui_authentication_failed_401_please_check_your_cred = "Authentication failed (401) - please check your credentials",
+  ui_empty_response_from_download_server = "Empty response from download server",
+  ui_api_returned_error = "API returned error: ",
+  ui_verifying_credentials = "Verifying credentials...",
+  ui_username_and_password_are_required_for_authentic = "Username and password are required for authentication",
+  ui_fetching_account_information = "Fetching account information...",
+  ui_no_authentication_token_available = "No authentication token available",
+  ui_no_response_from_user_info_api = "No response from user info API",
+  ui_access_forbidden_403_insufficient_permissions = "Access forbidden (403) - insufficient permissions",
+  ui_empty_response_from_user_info_api = "Empty response from user info API",
+  ui_failed_to_parse_user_info_response = "Failed to parse user info response",
+  ui_invalid_user_info_response_format = "Invalid user info response format",
+  ui_downloads_reset_in = " downloads, reset in: ",
+  ui_testing_network_connectivity = "Testing network connectivity...",
+  ui_testing_connection = "Testing connection ",
+  ui_testing = "Testing: ",
+  ui_connection_ok_responded_in = "Connection OK (responded in ",
+  ui_network_test_passed = "Network test passed: ",
+  ui_network_test_failed = "Network test failed: ",
+  ui_offline_mode_limited_functionality = "⚠️  OFFLINE MODE - LIMITED FUNCTIONALITY",
+  ui_warning_no_internet_connection_detected = "⚠️  WARNING: No internet connection detected!",
+  ui_extension_uses_vlc_s_built_in_networking = "Extension uses VLC's built-in networking (no external tools required)",
+  ui_offline_extension_will_have_limited_functionalit = "⚠️  OFFLINE: Extension will have limited functionality",
+  ui_warning_no_internet_limited_functionality = "⚠️  WARNING: No internet - limited functionality",
+  ui_network_connection_verified = "Network connection verified",
+  ui_network_connection_successful = "Network connection successful",
+  ui_all_tests_passed_auto_closing_in_3 = "All tests passed - auto-closing in 3 seconds...",
+  ui_auto_close = "✅ Auto-close (",
+  ui_click_continue_offline_to_proceed_with_limited = "Click 'Continue Offline' to proceed with limited functionality",
+  ui_click_continue_offline_to_proceed = "Click 'Continue Offline' to proceed",
+  ui_critical_failures_detected_click_continue_anyway = "Critical failures detected - click 'Continue Anyway' or 'Close VLSub'",
+  ui_critical_errors_manual_intervention_needed = "Critical errors - manual intervention needed",
+  ui_network_error_connection_failed = "Network error: Connection failed",
+  ui_api_error_url_parameters_not_sorted_correctly = "API Error: URL parameters not sorted correctly",
+  ui_http = ": HTTP ",
+  ui_too_many_requests_429_the_api_allows = "Too many requests (429) - the API allows only a few requests per ",
+  ui_second_please_wait_a_moment_and_try = "second. Please wait a moment and try again.",
+  ui_authentication_failed_401_please_check_your_open = "Authentication failed (401) - please check your OpenSubtitles.com ",
+  ui_username_and_password_in_the_configuration = "username and password in the configuration.",
+  ui_access_forbidden_403 = "Access forbidden (403).",
+  ui_opensubtitles_com_server_error = "OpenSubtitles.com server error (",
+  ui_please_try_again_later = ") - please try again later.",
+  ui_network_is_redirecting_http_requests_status = "network is redirecting HTTP requests (status ",
+  ui_a_proxy_vpn_captive_portal_or_content = ") - a proxy, VPN, captive portal or content filter is intercepting ",
+  ui_port_80_disable_it_or_connect_through = "port 80. Disable it or connect through another network.",
+  ui_quota = "Quota: ",
+  ui_downloads = " downloads",
+  ui_reset_in = ", reset in: ",
+  ui_quota_reset_in = "Quota reset in: ",
+  ui_for_moviehash = " for moviehash ",
+  ui_searched_by_hash_name = " (searched by hash + name)",
+  ui_and_title = " and title '",
+  ui_for_imdb_id = " for IMDB ID ",
+  ui_found_via_name_search = " (found via name search)",
+  ui_for_title = " for title '",
+  ui_empty_subtitle_content_received = "Empty subtitle content received",
+  ui_saved_with_video_file = " (saved with video file)",
+  ui_saved_to_downloads_folder = " (saved to Downloads folder)",
+  ui_saved_to_vlsub_directory = " (saved to VLSub directory)",
+  ui_cannot_determine_save_location_for_subtitle_file = "Cannot determine save location for subtitle file",
+  ui_cannot_write_to_any_available_location = "Cannot write to any available location: ",
+  ui_cannot_write_subtitle_file_to_any_location = "Cannot write subtitle file to any location",
+  ui_cannot_open_file_for_writing = "Cannot open file for writing: ",
+  ui_subtitles_saved_to_downloads = "Subtitles saved to Downloads",
+  ui_subtitles_saved = "Subtitles saved",
+  ui_subtitle_link = "<b>Subtitle Link:</b>",
+  ui_nbsp = "</span> &nbsp;",
+  ui_view_subtitle = "View Subtitle",
+  ui_a_href_https_www_opensubtitles_com_subtitles = "<a href='https://www.opensubtitles.com/subtitles/",
+  ui_checking_login_status = "Checking login status",
+  ui_user_info_request_failed_with_http_status = "User info request failed with HTTP status: ",
+  ui_unknown_2 = "Unknown",
+  ui_rate_limit_too_many_requests_please_wait = "Rate limit: Too many requests. Please wait.",
+  ui_access_forbidden_check_your_api_permissions = "Access forbidden. Check your API permissions.",
+  ui_resource_not_found = "Resource not found.",
+  ui_server_error_please_try_again_later = "Server error. Please try again later.",
+  ui_service_temporarily_unavailable = "Service temporarily unavailable.",
+  ui_subtitle_not_found_404_file_may_have = "Subtitle not found (404) - file may have been removed or ID is invalid",
+  ui_too_many_requests_429_please_wait_and = "Too many requests (429) - please wait and try again",
+  ui_server_error_500_please_try_again_later = "Server error (500) - please try again later",
+  ui_service_unavailable_503_server_overloaded = "Service unavailable (503) - server overloaded"
 }
 
 -- default subtitle languages
@@ -493,10 +676,10 @@ end
 -- `log` and `progress` write to the first-run progress window.
 local function apply_detected_languages(detected_locale, log, progress)
   if not detected_locale then
-    log("Could not detect user locale")
+    log(strings.ui_could_not_detect_user_locale)
     return
   end
-  log("Locale detected: " .. detected_locale.locale .. " from " .. detected_locale.source)
+  log(strings.ui_locale_detected .. detected_locale.locale .. strings.ui_from .. detected_locale.source)
 
   local suggestions = detected_locale.suggested_languages
   if not suggestions or #suggestions == 0 then
@@ -507,7 +690,7 @@ local function apply_detected_languages(detected_locale, log, progress)
   for _, suggestion in ipairs(suggestions) do
     table.insert(lang_codes, suggestion.language)
   end
-  log("Found " .. #suggestions .. " suggested languages: " .. table.concat(lang_codes, ", "))
+  log(strings.ui_found .. #suggestions .. strings.ui_suggested_languages .. table.concat(lang_codes, ", "))
 
   local slots = {
     { option = "language", label = "primary" },
@@ -523,21 +706,21 @@ local function apply_detected_languages(detected_locale, log, progress)
         local slot = slots[i]
         if slot and (not openSub.option[slot.option] or openSub.option[slot.option] == "") then
           openSub.option[slot.option] = lang_pair[1]
-          log("Set " .. slot.label .. " language: " .. lang_pair[1])
+          log(strings.ui_set .. slot.label .. strings.ui_language .. lang_pair[1])
         end
         break
       end
     end
     if not found_language then
-      log("Language not available: " .. os_lang)
+      log(strings.ui_language_not_available .. os_lang)
     end
   end
 
-  progress("Saving auto-detected settings...")
+  progress(strings.ui_saving_auto_detected_settings)
   if save_config() then
-    log("Auto-detected settings saved")
+    log(strings.ui_auto_detected_settings_saved)
   else
-    log("Failed to save auto-detected settings")
+    log(strings.ui_failed_to_save_auto_detected_settings)
   end
 end
 
@@ -560,72 +743,72 @@ function activate()
 
   if first_run then
     show_debug_window()
-    progress("Initializing VLSub (First Run)...")
-    log("VLSub first-time setup started")
+    progress(strings.ui_initializing_vlsub_first_run)
+    log(strings.ui_vlsub_first_time_setup_started)
     if not test_network_connectivity() then
       networkTestsFailed = true
     end
   end
 
   -- JSON module (shipped with VLC)
-  progress("Loading JSON module...")
+  progress(strings.ui_loading_json_module)
   local json_ok, json_module = pcall(require, "dkjson")
   if not json_ok then
-    status("ERROR: Failed to load JSON module")
-    log("CRITICAL: JSON module load failed: " .. tostring(json_module))
+    status(strings.ui_error_failed_to_load_json_module)
+    log(strings.ui_critical_json_module_load_failed .. tostring(json_module))
     criticalFailure = true
     return false
   end
   json = json_module
   jsonModuleLoaded = true
-  log("JSON module loaded successfully")
+  log(strings.ui_json_module_loaded_successfully)
 
-  progress("Checking dkjson compatibility...")
+  progress(strings.ui_checking_dkjson_compatibility)
   if not check_dkjson_compatibility() then
     vlc.msg.err("[VLSub] Incompatible dkjson version detected")
-    status("ERROR: Incompatible dkjson version")
-    log("CRITICAL: dkjson version too old - cannot parse floats")
+    status(strings.ui_error_incompatible_dkjson_version)
+    log(strings.ui_critical_dkjson_version_too_old_cannot_parse)
     show_dkjson_error_dialog()
     criticalFailure = true
     return false
   end
-  log("dkjson compatibility check passed (version: " .. tostring(json.version) .. ")")
+  log(strings.ui_dkjson_compatibility_check_passed_version .. tostring(json.version) .. ")")
 
   -- Paths, saved settings
-  progress("Checking configuration...")
+  progress(strings.ui_checking_configuration)
   if not check_config() then
-    status("ERROR: Unsupported VLC version")
-    log("CRITICAL: VLC version not supported")
+    status(strings.ui_error_unsupported_vlc_version)
+    log(strings.ui_critical_vlc_version_not_supported)
     criticalFailure = true
     return false
   end
   configurationPassed = true
-  log("Configuration check passed")
+  log(strings.ui_configuration_check_passed)
 
   -- Subtitle languages: built-in list first, then cache or API
-  progress("Loading subtitle languages...")
+  progress(strings.ui_loading_subtitle_languages)
   convert_sub_languages()
   openSub.conf.languages = sub_languages
   if first_run and networkTestsFailed then
-    status("Using offline language list...")
-    log("Using built-in language list (offline mode)")
+    status(strings.ui_using_offline_language_list)
+    log(strings.ui_using_built_in_language_list_offline_mode)
   else
-    status("Initializing languages from API...")
+    status(strings.ui_initializing_languages_from_api)
     pcall(function()
       initialize_languages()
-      log("Language list loaded from API")
+      log(strings.ui_language_list_loaded_from_api)
     end)
   end
 
   -- Preferred languages from the system locale
   if first_run then
-    progress("Detecting user locale...")
-    log("First run detected")
-    log("Starting locale detection...")
+    progress(strings.ui_detecting_user_locale)
+    log(strings.ui_first_run_detected)
+    log(strings.ui_starting_locale_detection)
 
     local saved_user_pref = openSub.option.language
     openSub.option.language = nil
-    log("Temporarily cleared user preference for clean detection")
+    log(strings.ui_temporarily_cleared_user_preference_for_clean_de)
     local detected_locale = detect_user_locale()
     if saved_user_pref then
       openSub.option.language = saved_user_pref
@@ -634,23 +817,23 @@ function activate()
   end
 
   -- What is playing (needed for auto-search)
-  progress("Getting file information...")
+  progress(strings.ui_getting_file_information)
   if vlc.input.item() then
     openSub.getFileInfo()
     openSub.getMovieInfo()
-    log("File info loaded for current media")
+    log(strings.ui_file_info_loaded_for_current_media)
   else
-    log("No media loaded")
+    log(strings.ui_no_media_loaded)
   end
 
-  progress("Checking authentication...")
+  progress(strings.ui_checking_authentication)
   local username = trim(openSub.option.os_username or "")
   local password = trim(openSub.option.os_password or "")
   is_authenticated = (username ~= "" and password ~= "") or has_valid_authentication()
   if is_authenticated then
-    log("Valid authentication found - credentials available")
+    log(strings.ui_valid_authentication_found_credentials_available)
   else
-    log("No valid authentication - missing credentials")
+    log(strings.ui_no_valid_authentication_missing_credentials)
   end
 
   init_results.is_first_run = first_run
@@ -658,17 +841,17 @@ function activate()
   initialization_complete = true
 
   if first_run then
-    progress("Initialization complete!")
-    log("Initialization complete - checking for auto-close...")
+    progress(strings.ui_initialization_complete)
+    log(strings.ui_initialization_complete_checking_for_auto_close)
     if is_authenticated then
-      log("Ready to show main window (authenticated)")
+      log(strings.ui_ready_to_show_main_window_authenticated)
     else
-      log("Ready to show configuration window (no auth)")
+      log(strings.ui_ready_to_show_configuration_window_no_auth)
     end
     checkInitializationStatus()
 
-    progress("Initializing auto-update system...")
-    log("Setting up automatic update checking...")
+    progress(strings.ui_initializing_auto_update_system)
+    log(strings.ui_setting_up_automatic_update_checking)
     initialize_auto_update()
   else
     show_appropriate_window()
@@ -785,18 +968,18 @@ function show_update_dialog(latest_version, release_notes, download_url)
   dlg = vlc.dialog("VLSub Update Available - " .. latest_version)
 
   -- Row 1: Update notification header with link and version info in compact format
-  dlg:add_label("<a href='https://github.com/opensubtitles/vlsub-opensubtitles-com'><b>VLSub Update Available</b></a> (" .. update_config.current_version .. " => " .. latest_version .. ")", 1, 1, 6, 1)
+  dlg:add_label(strings.ui_vlsub_update_available .. update_config.current_version .. " => " .. latest_version .. ")", 1, 1, 6, 1)
 
   -- Row 2: Installation instructions
-  dlg:add_label("<b>Installation Instructions:</b>", 1, 2, 6, 1)
+  dlg:add_label(strings.ui_installation_instructions, 1, 2, 6, 1)
 
   -- Detect OS and show appropriate instructions
   if openSub.conf.os == "win" then
     -- Windows instructions - compact with 2-line fallback
-    dlg:add_label("Open PowerShell as Administrator and run:", 1, 3, 6, 1)
-    dlg:add_label("iwr -useb https://raw.githubusercontent.com/opensubtitles/vlsub-opensubtitles-com/main/scripts/install.ps1 | iex", 1, 4, 6, 1)
-    dlg:add_label("If this doesn't work, download <a href='" .. download_url .. "'>vlsubcom.lua</a> and save to:", 1, 5, 6, 1)
-    dlg:add_label("%APPDATA%\\vlc\\lua\\extensions\\vlsubcom.lua", 1, 6, 6, 1)
+    dlg:add_label(strings.ui_open_powershell_as_administrator_and_run, 1, 3, 6, 1)
+    dlg:add_label(strings.ui_iwr_useb_https_raw_githubusercontent_com_opensub, 1, 4, 6, 1)
+    dlg:add_label(strings.ui_if_this_doesn_t_work_download_a .. download_url .. strings.ui_vlsubcom_lua_and_save_to, 1, 5, 6, 1)
+    dlg:add_label(strings.ui_appdata_vlc_lua_extensions_vlsubcom_lua, 1, 6, 6, 1)
 
   else
     -- macOS/Linux instructions - compact with 2-line fallback
@@ -808,16 +991,16 @@ function show_update_dialog(latest_version, release_notes, download_url)
       install_path = "~/Library/Application Support/org.videolan.vlc/lua/extensions/vlsubcom.lua"
     end
 
-    dlg:add_label("Open Terminal and run:", 1, 3, 6, 1)
-    dlg:add_label("curl -sSL https://raw.githubusercontent.com/opensubtitles/vlsub-opensubtitles-com/main/scripts/install.sh | bash", 1, 4, 6, 1)
-    dlg:add_label("If this doesn't work, download <a href='" .. download_url .. "'>vlsubcom.lua</a> and save to:", 1, 5, 6, 1)
+    dlg:add_label(strings.ui_open_terminal_and_run, 1, 3, 6, 1)
+    dlg:add_label(strings.ui_curl_ssl_https_raw_githubusercontent_com_opensub, 1, 4, 6, 1)
+    dlg:add_label(strings.ui_if_this_doesn_t_work_download_a .. download_url .. strings.ui_vlsubcom_lua_and_save_to, 1, 5, 6, 1)
     dlg:add_label(install_path, 1, 6, 6, 1)
   end
 
-  dlg:add_label("Then restart VLC and access via View → VLSub OpenSubtitles.com", 1, 7, 6, 1)
+  dlg:add_label(strings.ui_then_restart_vlc_and_access_via_view, 1, 7, 6, 1)
 
   -- Row 8: What's new section (compact - exactly 6 lines)
-  dlg:add_label("<b>What's New in v" .. latest_version .. ":</b>", 1, 8, 6, 1)
+  dlg:add_label(strings.ui_what_s_new_in_v .. latest_version .. ":</b>", 1, 8, 6, 1)
 
   -- Process and display release notes - exactly 6 lines
   local processed_notes = process_release_notes(release_notes)
@@ -833,18 +1016,18 @@ function show_update_dialog(latest_version, release_notes, download_url)
   end
 
   -- Row 15: Action buttons (compact layout)
-  dlg:add_button("⏭️ Skip Version", function()
+  dlg:add_button(strings.ui_skip_version, function()
     save_skipped_version(latest_version)
     close_dlg()
     show_appropriate_window()
   end, 2, 15, 1, 1)
 
-  dlg:add_button("⏰ Later", function()
+  dlg:add_button(strings.ui_later, function()
     close_dlg()
     show_appropriate_window()
   end, 4, 15, 1, 1)
 
-  dlg:add_button("❌ Close", function()
+  dlg:add_button(strings.ui_close, function()
     close_dlg()
     show_appropriate_window()
   end, 5, 15, 1, 1)
@@ -1200,7 +1383,7 @@ function check_for_updates(force_check)
     if force_check then
       -- If manually triggered, show a message only if we have an interface
       if input_table and input_table["message"] then
-        setMessage(success_tag("You're running the latest version (" .. update_config.current_version .. ")"))
+        setMessage(success_tag(strings.ui_you_re_running_the_latest_version .. update_config.current_version .. ")"))
       end
     end
   end
@@ -1517,7 +1700,7 @@ function interface_main()
     openSub.movie.episodeNumber or "", 4, 2, 1, 1)
 
   -- Row 3: Year, IMDB ID
-  dlg:add_label("Year:", 1, 3, 1, 1)
+  dlg:add_label(strings.ui_year, 1, 3, 1, 1)
   input_table['year'] = dlg:add_text_input(
     openSub.movie.year or "", 2, 3, 1, 1)
   dlg:add_label(lang["int_imdb"]..":", 3, 3, 1, 1)
@@ -1539,12 +1722,12 @@ function interface_main()
   input_table['language3'] = dlg:add_dropdown(2, 6, 4, 1)
 
   -- Row 7: Sorting controls
-  dlg:add_label("Sort by:", 1, 7, 1, 1)
+  dlg:add_label(strings.ui_sort_by, 1, 7, 1, 1)
   input_table['sort_by'] = dlg:add_dropdown(2, 7, 3, 1)
   input_table['sort_direction'] = dlg:add_dropdown(5, 7, 1, 1)
 
   -- Row 8: Results list label
-  dlg:add_label("Search Results:", 1, 8, 6, 1)
+  dlg:add_label(strings.ui_search_results, 1, 8, 6, 1)
 
   -- Row 9: Results list
   input_table['mainlist'] = dlg:add_list(1, 9, 6, 1)
@@ -1555,16 +1738,16 @@ function interface_main()
 
   -- Row 11: Action buttons - MODIFIED HELP BUTTON
   dlg:add_button(
-    "📥 Download", download_subtitles_v2, 1, 11, 1, 1)
+    strings.ui_download, download_subtitles_v2, 1, 11, 1, 1)
 
   dlg:add_button(
-    "🔗 Link", open_subtitle_link, 2, 11, 1, 1)
+    strings.ui_link, open_subtitle_link, 2, 11, 1, 1)
 
   dlg:add_button(
-    "⚙️ Config", show_conf, 5, 11, 1, 1)
+    strings.ui_config, show_conf, 5, 11, 1, 1)
   dlg:add_button(
-    "❓ Help",
-    function() show_help("main") end, -- Pass "main" to indicate source window
+    strings.ui_help,
+    function() show_help(strings.ui_main) end, -- Pass strings.ui_main to indicate source window
     6, 11, 1, 1)
 
   -- Set up language dropdowns
@@ -1624,11 +1807,11 @@ function interface_config()
       dlg:add_label(lang["int_vlsub_work_dir"], 1, 9, 2, 1)
     elseif openSub.conf.os == "win" then
       dlg:add_label(
-        "<a href='file:///"..openSub.conf.dirPath.."'>"..
+        strings.ui_a_href_file..openSub.conf.dirPath.."'>"..
         lang["int_vlsub_work_dir"].."</a>", 1, 9, 2, 1)
     else
       dlg:add_label(
-        "<a href='"..openSub.conf.dirPath.."'>"..
+        strings.ui_a_href..openSub.conf.dirPath.."'>"..
         lang["int_vlsub_work_dir"].."</a>", 1, 9, 2, 1)
     end
   else
@@ -1649,11 +1832,11 @@ function interface_config()
 
   dlg:add_button(
     "❓ " .. lang["int_help"],
-    function() show_help("config") end,
+    function() show_help(strings.ui_config_2) end,
     2, 11, 1, 1)
 
   dlg:add_button(
-    "🔄 Check Updates",
+    strings.ui_check_updates,
     function() check_for_updates(true) end, 3, 11, 1, 1)
 
   dlg:add_button(
@@ -1681,42 +1864,42 @@ end
 -- Modified interface_help function with improved content
 function interface_help()
   -- Row 1: Search Methods
-  dlg:add_label("SEARCH METHODS:", 1, 1, 6, 1)
-  dlg:add_label("Hash Search: Uses video file fingerprint for exact matches", 1, 2, 6, 1)
-  dlg:add_label("Name Search: Uses GuessIt API to extract title/year/episode from filename", 1, 3, 6, 1)
-  dlg:add_label("Auto-fallback from hash to name search if no results found", 1, 4, 6, 1)
+  dlg:add_label(strings.ui_search_methods, 1, 1, 6, 1)
+  dlg:add_label(strings.ui_hash_search_uses_video_file_fingerprint_for, 1, 2, 6, 1)
+  dlg:add_label(strings.ui_name_search_uses_guessit_api_to_extract, 1, 3, 6, 1)
+  dlg:add_label(strings.ui_auto_fallback_from_hash_to_name_search, 1, 4, 6, 1)
 
   -- Row 5: Language Features
   dlg:add_label("", 1, 5, 6, 1) -- Spacer
-  dlg:add_label("LANGUAGE & DETECTION:", 1, 6, 6, 1)
-  dlg:add_label("Auto-detects locale from system settings, IP geolocation, timezone", 1, 7, 6, 1)
-  dlg:add_label("Results grouped by selected languages in priority order", 1, 8, 6, 1)
-  dlg:add_label("Choose up to 3 preferred subtitle languages", 1, 9, 6, 1)
+  dlg:add_label(strings.ui_language_detection, 1, 6, 6, 1)
+  dlg:add_label(strings.ui_auto_detects_locale_from_system_settings_ip, 1, 7, 6, 1)
+  dlg:add_label(strings.ui_results_grouped_by_selected_languages_in_priorit, 1, 8, 6, 1)
+  dlg:add_label(strings.ui_choose_up_to_3_preferred_subtitle_languages, 1, 9, 6, 1)
 
   -- Row 10: Technical Details
   dlg:add_label("", 1, 10, 6, 1) -- Spacer
-  dlg:add_label("TECHNICAL INFO:", 1, 11, 6, 1)
-  dlg:add_label("GuessIt API extracts movie/TV metadata from filenames", 1, 12, 6, 1)
-  dlg:add_label("Shows quality indicators: trusted uploaders, download counts, sync", 1, 13, 6, 1)
-  dlg:add_label("Windows: Use English characters in file paths for best results", 1, 14, 6, 1)
+  dlg:add_label(strings.ui_technical_info, 1, 11, 6, 1)
+  dlg:add_label(strings.ui_guessit_api_extracts_movie_tv_metadata_from, 1, 12, 6, 1)
+  dlg:add_label(strings.ui_shows_quality_indicators_trusted_uploaders_downl, 1, 13, 6, 1)
+  dlg:add_label(strings.ui_windows_use_english_characters_in_file_paths, 1, 14, 6, 1)
 
   -- Row 15: Account & Download
   dlg:add_label("", 1, 15, 6, 1) -- Spacer
-  dlg:add_label("ACCOUNT & QUOTAS:", 1, 16, 6, 1)
-  dlg:add_label("<a href='https://www.opensubtitles.com'>Free OpenSubtitles.com account required for downloads</a>", 1, 17, 6, 1)
-  dlg:add_label("Extension displays your rank, daily quota and current usage", 1, 18, 6, 1)
-  dlg:add_label("Select subtitle and click Download or Link button", 1, 19, 6, 1)
+  dlg:add_label(strings.ui_account_quotas, 1, 16, 6, 1)
+  dlg:add_label(strings.ui_free_opensubtitles_com_account_required_for_down, 1, 17, 6, 1)
+  dlg:add_label(strings.ui_extension_displays_your_rank_daily_quota_and, 1, 18, 6, 1)
+  dlg:add_label(strings.ui_select_subtitle_and_click_download_or_link, 1, 19, 6, 1)
 
   -- Row 20: Links
   dlg:add_label("", 1, 20, 6, 1) -- Spacer
-  dlg:add_label("<a href='https://www.opensubtitles.com/en/support_us/'>Support OpenSubtitles</a> - thank you very much", 1, 21, 6, 1)
-  dlg:add_label("<a href='https://github.com/opensubtitles/vlsub-opensubtitles-com'>GitHub: opensubtitles/vlsub-opensubtitles-com</a> - source, issues, releases", 1, 22, 6, 1)
+  dlg:add_label(strings.ui_support_opensubtitles_thank_you_very_much, 1, 21, 6, 1)
+  dlg:add_label(strings.ui_github_opensubtitles_vlsub_opensubtitles_com_sou, 1, 22, 6, 1)
 
   -- Row 23: Close button with icon
   dlg:add_label("", 1, 23, 6, 1) -- Spacer
-  dlg:add_button("❌ Close",
+  dlg:add_button(strings.ui_close,
     function()
-      if previous_window == "config" then
+      if previous_window == strings.ui_config_2 then
         show_conf()
       else
         show_main()
@@ -1836,22 +2019,22 @@ function update_debug_buttons()
   if debug_messages.ok_button then
     if not initialization_complete then
       -- Still initializing
-      debug_messages.ok_button:set_text("⏳ Continue")
+      debug_messages.ok_button:set_text(strings.ui_continue)
     elseif allTestsPassed and not networkTestsFailed then
       -- All good - will auto-close
-      debug_messages.ok_button:set_text("✅ Auto-close (2s)")
+      debug_messages.ok_button:set_text(strings.ui_auto_close_2s)
     elseif allTestsPassed and networkTestsFailed then
       -- Core works but offline
-      debug_messages.ok_button:set_text("🌐 Continue Offline")
+      debug_messages.ok_button:set_text(strings.ui_continue_offline)
     else
       -- Has errors
-      debug_messages.ok_button:set_text("⚠️ Continue Anyway")
+      debug_messages.ok_button:set_text(strings.ui_continue_anyway)
     end
   end
 
   -- Update Cancel/Close button
   if debug_messages.cancel_button then
-    debug_messages.cancel_button:set_text("❌ Close VLSub")
+    debug_messages.cancel_button:set_text(strings.ui_close_vlsub)
   end
 
   if debug_dlg then
@@ -1872,26 +2055,26 @@ function show_debug_window()
   debug_dlg = vlc.dialog("VLSub - Initializing...")
 
   -- Create debug interface (6 columns, 16 rows)
-  debug_dlg:add_label("VLSub is starting up...", 1, 1, 6, 1)
+  debug_dlg:add_label(strings.ui_vlsub_is_starting_up, 1, 1, 6, 1)
   debug_dlg:add_label("", 1, 2, 6, 1) -- Spacer
 
   -- Progress area
-  debug_dlg:add_label("Progress:", 1, 3, 1, 1)
-  debug_messages.progress = debug_dlg:add_label("Starting...", 2, 3, 5, 1)
+  debug_dlg:add_label(strings.ui_progress, 1, 3, 1, 1)
+  debug_messages.progress = debug_dlg:add_label(strings.ui_starting, 2, 3, 5, 1)
 
   -- Status area
-  debug_dlg:add_label("Status:", 1, 4, 1, 1)
-  debug_messages.status = debug_dlg:add_label("Initializing components", 2, 4, 5, 1)
+  debug_dlg:add_label(strings.ui_status, 1, 4, 1, 1)
+  debug_messages.status = debug_dlg:add_label(strings.ui_initializing_components, 2, 4, 5, 1)
 
   -- Network status
-  debug_dlg:add_label("Network:", 1, 5, 1, 1)
-  debug_messages.network = debug_dlg:add_label("Checking connectivity...", 2, 5, 5, 1)
+  debug_dlg:add_label(strings.ui_network, 1, 5, 1, 1)
+  debug_messages.network = debug_dlg:add_label(strings.ui_checking_connectivity, 2, 5, 5, 1)
 
   -- Empty row for spacing
   debug_dlg:add_label("", 1, 6, 6, 1)
 
   -- Debug log area - 8 individual rows for messages
-  debug_dlg:add_label("Debug Log:", 1, 7, 6, 1)
+  debug_dlg:add_label(strings.ui_debug_log, 1, 7, 6, 1)
 
   -- Create 8 individual log message rows (rows 8-15)
   for i = 1, 8 do
@@ -1900,15 +2083,15 @@ function show_debug_window()
   end
 
   -- Initialize first message
-  debug_log_rows[1]:set_text("VLSub initialization starting...")
+  debug_log_rows[1]:set_text(strings.ui_vlsub_initialization_starting)
 
   -- Buttons (visible at row 16) - Store references for dynamic updates
-  debug_messages.ok_button = debug_dlg:add_button("⏳ Continue", function()
+  debug_messages.ok_button = debug_dlg:add_button(strings.ui_continue, function()
     close_debug_window()
     show_appropriate_window()
   end, 2, 16, 2, 1)
 
-  debug_messages.cancel_button = debug_dlg:add_button("❌ Close", function()
+  debug_messages.cancel_button = debug_dlg:add_button(strings.ui_close, function()
     close_debug_window()
     vlc.deactivate()
   end, 4, 16, 2, 1)
@@ -2008,14 +2191,14 @@ function display_subtitles()
     local message = "<b>"..lang["mess_complete"]..":</b> "..lang["mess_no_res"]
 
     if openSub.lastSearchMethod == "hash" and openSub.file.hash and openSub.file.hash ~= "" then
-      message = message .. " for moviehash " .. openSub.file.hash
+      message = message .. strings.ui_for_moviehash .. openSub.file.hash
     elseif openSub.lastSearchMethod == "hash_fallback" then
-      message = message .. " (searched by hash + name)"
+      message = message .. strings.ui_searched_by_hash_name
       if openSub.file.hash and openSub.file.hash ~= "" then
-        message = message .. " for moviehash " .. openSub.file.hash
+        message = message .. strings.ui_for_moviehash .. openSub.file.hash
       end
       if openSub.movie.title and openSub.movie.title ~= "" then
-        message = message .. " and title '" .. openSub.movie.title .. "'"
+        message = message .. strings.ui_and_title .. openSub.movie.title .. "'"
       end
     end
 
@@ -2091,17 +2274,17 @@ function display_subtitles()
       #(openSub.itemStore).."  "..lang["mess_res"]
 
     if openSub.lastSearchMethod == "hash" and openSub.file.hash and openSub.file.hash ~= "" then
-      message = message .. " for moviehash " .. openSub.file.hash
+      message = message .. strings.ui_for_moviehash .. openSub.file.hash
     elseif openSub.lastSearchMethod == "imdb" then
-      message = message .. " for IMDB ID " .. (openSub.movie.imdbId or "")
+      message = message .. strings.ui_for_imdb_id .. (openSub.movie.imdbId or "")
     elseif openSub.lastSearchMethod == "hash_fallback" then
-      message = message .. " (found via name search)"
+      message = message .. strings.ui_found_via_name_search
       if openSub.movie.title and openSub.movie.title ~= "" then
-        message = message .. " for title '" .. openSub.movie.title .. "'"
+        message = message .. strings.ui_for_title .. openSub.movie.title .. "'"
       end
     elseif openSub.lastSearchMethod == "name" then
       if openSub.movie.title and openSub.movie.title ~= "" then
-        message = message .. " for title '" .. openSub.movie.title .. "'"
+        message = message .. strings.ui_for_title .. openSub.movie.title .. "'"
       end
     end
 
@@ -2113,14 +2296,14 @@ end
 -- New function to open subtitle link in browser
 function open_subtitle_link()
   if not has_results() then
-    setMessage(error_tag("No subtitles available. Please search first."))
+    setMessage(error_tag(strings.ui_no_subtitles_available_please_search_first))
     return false
   end
 
   local index = get_first_sel(input_table["mainlist"])
 
   if index == 0 then
-    setMessage(error_tag("Please select a subtitle from the list first."))
+    setMessage(error_tag(strings.ui_please_select_a_subtitle_from_the_list))
     return false
   end
 
@@ -2130,17 +2313,17 @@ function open_subtitle_link()
   local subtitle_url = item.url
 
   if not subtitle_url or subtitle_url == "" then
-    setMessage(error_tag("No URL available for this subtitle."))
+    setMessage(error_tag(strings.ui_no_url_available_for_this_subtitle))
     return false
   end
 
 
   -- Create clickable link message
   local link_message = "<span style='color:#181'>"
-  link_message = link_message .. "<b>Subtitle Link:</b>"
-  link_message = link_message .. "</span> &nbsp;"
-  link_message = link_message .. "<a href='" .. subtitle_url .. "'>"
-  link_message = link_message .. (item.SubFileName or "View Subtitle") .. "</a>"
+  link_message = link_message .. strings.ui_subtitle_link
+  link_message = link_message .. strings.ui_nbsp
+  link_message = link_message .. strings.ui_a_href .. subtitle_url .. "'>"
+  link_message = link_message .. (item.SubFileName or strings.ui_view_subtitle) .. "</a>"
 
   setMessage(link_message)
 
@@ -2269,28 +2452,28 @@ end
 function show_dkjson_error_dialog()
   local error_dlg = vlc.dialog("VLSub - Incompatible dkjson Version")
 
-  error_dlg:add_label("<b>VLSub cannot start due to incompatible dkjson version</b>", 1, 1, 6, 1)
+  error_dlg:add_label(strings.ui_vlsub_cannot_start_due_to_incompatible_dkjson, 1, 1, 6, 1)
   error_dlg:add_label("", 1, 2, 6, 1)
-  error_dlg:add_label("Your VLC installation includes an old version of dkjson (JSON parser)", 1, 3, 6, 1)
-  error_dlg:add_label("that cannot parse floating point numbers properly.", 1, 4, 6, 1)
+  error_dlg:add_label(strings.ui_your_vlc_installation_includes_an_old_version, 1, 3, 6, 1)
+  error_dlg:add_label(strings.ui_that_cannot_parse_floating_point_numbers_properl, 1, 4, 6, 1)
   error_dlg:add_label("", 1, 5, 6, 1)
-  error_dlg:add_label("<b>Current version:</b> " .. tostring(json.version or "unknown"), 1, 6, 6, 1)
-  error_dlg:add_label("<b>Required version:</b> 2.4 or newer", 1, 7, 6, 1)
+  error_dlg:add_label(strings.ui_current_version .. tostring(json.version or strings.ui_unknown), 1, 6, 6, 1)
+  error_dlg:add_label(strings.ui_required_version_2_4_or_newer, 1, 7, 6, 1)
   error_dlg:add_label("", 1, 8, 6, 1)
-  error_dlg:add_label("<b>Solution (Windows/macOS):</b>", 1, 9, 6, 1)
-  error_dlg:add_label("Upgrade VLC to version 3.0.22 or newer.", 1, 10, 6, 1)
+  error_dlg:add_label(strings.ui_solution_windows_macos, 1, 9, 6, 1)
+  error_dlg:add_label(strings.ui_upgrade_vlc_to_version_3_0_22, 1, 10, 6, 1)
   error_dlg:add_label("", 1, 11, 6, 1)
-  error_dlg:add_label("<b>Solution (Ubuntu/Debian Linux):</b>", 1, 12, 6, 1)
-  error_dlg:add_label("Ubuntu ships VLC with the broken dkjson — upgrading VLC does not help.", 1, 13, 6, 1)
-  error_dlg:add_label("Replace the bundled <tt>dkjson.luac</tt> with the latest version:", 1, 14, 6, 1)
-  error_dlg:add_label("1. Download <a href='https://dkolf.de/dkjson-lua/'>dkjson.lua from dkolf.de</a>", 1, 15, 6, 1)
-  error_dlg:add_label("2. Locate VLC's modules dir (e.g. <tt>/usr/lib/x86_64-linux-gnu/vlc/lua/modules/</tt>)", 1, 16, 6, 1)
-  error_dlg:add_label("3. Back up <tt>dkjson.luac</tt> and replace it with the downloaded file (renamed to <tt>dkjson.luac</tt>)", 1, 17, 6, 1)
-  error_dlg:add_label("4. Restart VLC.  Requires <tt>sudo</tt>.", 1, 18, 6, 1)
+  error_dlg:add_label(strings.ui_solution_ubuntu_debian_linux, 1, 12, 6, 1)
+  error_dlg:add_label(strings.ui_ubuntu_ships_vlc_with_the_broken_dkjson, 1, 13, 6, 1)
+  error_dlg:add_label(strings.ui_replace_the_bundled_dkjson_luac_with_the, 1, 14, 6, 1)
+  error_dlg:add_label(strings.ui_1_download_dkjson_lua_from_dkolf_de, 1, 15, 6, 1)
+  error_dlg:add_label(strings.ui_2_locate_vlc_s_modules_dir_e, 1, 16, 6, 1)
+  error_dlg:add_label(strings.ui_3_back_up_dkjson_luac_and_replace, 1, 17, 6, 1)
+  error_dlg:add_label(strings.ui_4_restart_vlc_requires_sudo, 1, 18, 6, 1)
   error_dlg:add_label("", 1, 19, 6, 1)
-  error_dlg:add_label("More info: <a href='https://github.com/opensubtitles/vlsub-opensubtitles-com/issues/23'>Issue #23</a> &middot; <a href='https://github.com/opensubtitles/vlsub-opensubtitles-com/issues/11#issuecomment-3391889129'>Issue #11</a>", 1, 20, 6, 1)
+  error_dlg:add_label(strings.ui_more_info_issue_23_middot_issue_11, 1, 20, 6, 1)
   error_dlg:add_label("", 1, 21, 6, 1)
-  error_dlg:add_button("Close", function() error_dlg:delete() end, 3, 22, 2, 1)
+  error_dlg:add_button(strings.ui_close_2, function() error_dlg:delete() end, 3, 22, 2, 1)
 end
 
 function check_config()
@@ -2598,13 +2781,13 @@ function apply_config()
   -- Check if we have credentials for login test
   if username == "" or password == "" then
     -- No credentials provided - still show success for saved settings
-    setMessage(success_tag("Configuration saved. Please enter OpenSubtitles.com credentials for full functionality."))
+    setMessage(success_tag(strings.ui_configuration_saved_please_enter_opensubtitles_c))
     is_authenticated = false
     return
   end
 
   -- We have credentials, test login
-  setMessage(loading_tag("Testing login credentials..."))
+  setMessage(loading_tag(strings.ui_testing_login_credentials))
 
   -- Clear any existing session to force fresh login for verification
   openSub.session.token = ""
@@ -2618,9 +2801,9 @@ function apply_config()
     -- Keep the successful message that was set by checkLoginAndUserInfo
     local current_message = input_table["message"]:get_text()
     if current_message and string.find(current_message, "Success") then
-      setMessage(current_message .. "<br>Configuration saved. You can now close this window.")
+      setMessage(current_message .. strings.ui_configuration_saved_you_can_now_close_this)
     else
-      setMessage(success_tag("Configuration saved and login successful! You can now close this window."))
+      setMessage(success_tag(strings.ui_configuration_saved_and_login_successful_you_can))
     end
 
     -- Refresh the interface to show the enabled close button
@@ -2635,10 +2818,10 @@ function apply_config()
     -- Check if there's already an error message from the login attempt
     if current_message and (string.find(current_message, "Error") or string.find(current_message, "failed")) then
       -- Append config saved notice to existing error message
-      setMessage(current_message .. "<br><small>Note: Other configuration settings were saved successfully.</small>")
+      setMessage(current_message .. strings.ui_note_other_configuration_settings_were_saved_suc)
     else
       -- Generic login failure message with config saved notice
-      setMessage(error_tag("Login failed - please check your credentials.<br><small>Other configuration settings were saved successfully.</small>"))
+      setMessage(error_tag(strings.ui_login_failed_please_check_your_credentials_other))
     end
 
     dbg("Login failed but configuration was saved")
@@ -3004,7 +3187,7 @@ end,
 
   -- SAFETY CHECK: Only proceed with local files
   if not openSub.isLocalFileForHashing() then
-    setError("Hash search only works with local video files")
+    setError(strings.ui_hash_search_only_works_with_local_video)
     return false
   end
 
@@ -3024,7 +3207,7 @@ end,
     local file = vlc.stream(openSub.file.uri)
     if not file then
       dbg("Cannot open stream for archive")
-      setError("Cannot open archive stream for hashing")
+      setError(strings.ui_cannot_open_archive_stream_for_hashing)
       return false
     end
 
@@ -3035,7 +3218,7 @@ end,
     data_start = file:read(chunk_size)
     if not data_start then
       dbg("Cannot read start data from archive stream")
-      setError("Cannot read archive data for hashing")
+      setError(strings.ui_cannot_read_archive_data_for_hashing)
       return false
     end
 
@@ -3051,27 +3234,27 @@ end,
   and openSub.file.stat then
     -- This case should not happen with our safety check, but keeping for completeness
     dbg("File doesn't exist but has stat - this shouldn't happen with safety checks")
-    setError("File not accessible for hashing")
+    setError(strings.ui_file_not_accessible_for_hashing)
     return false
   else
     local file = io.open(openSub.file.path, "rb")
     if not file then
       dbg("Cannot open local file")
-      setError("Cannot open local file for hashing")
+      setError(strings.ui_cannot_open_local_file_for_hashing)
       return false
     end
 
     data_start = file:read(chunk_size)
     if not data_start then
       file:close()
-      setError("Cannot read file data for hashing")
+      setError(strings.ui_cannot_read_file_data_for_hashing)
       return false
     end
 
     size = file:seek("end", -chunk_size)
     if not size then
       file:close()
-      setError("Cannot seek in file for hashing")
+      setError(strings.ui_cannot_seek_in_file_for_hashing)
       return false
     end
     size = size + chunk_size
@@ -3079,7 +3262,7 @@ end,
     data_end = file:read(chunk_size)
     if not data_end then
       file:close()
-      setError("Cannot read end data for hashing")
+      setError(strings.ui_cannot_read_end_data_for_hashing)
       return false
     end
 
@@ -3088,7 +3271,7 @@ end,
 
   -- Validate we have the data we need
   if not data_start or not data_end or #data_start == 0 or #data_end == 0 then
-    setError("Insufficient data for hash calculation")
+    setError(strings.ui_insufficient_data_for_hash_calculation)
     return false
   end
 
@@ -3206,7 +3389,7 @@ function searchHash()
     else
       dbg("Cannot perform search: no local file for hashing and no title for name search")
       openSub.itemStore = {}
-      setError("Hash search requires local files. Please enter a title for name search.")
+      setError(strings.ui_hash_search_requires_local_files_please_enter)
     end
     display_subtitles()
     return
@@ -3220,7 +3403,7 @@ function searchHash()
       name_search(false)
     else
       openSub.itemStore = {}
-      setError("Hash calculation failed and no title available for name search")
+      setError(strings.ui_hash_calculation_failed_and_no_title_available)
     end
     display_subtitles()
     return
@@ -3301,7 +3484,7 @@ function searchIMBD_v2()
       openSub.movie.seasonNumber = nil
       openSub.movie.episodeNumber = nil
 
-      setMessage(loading_tag("Searching by IMDB ID..."))
+      setMessage(loading_tag(strings.ui_searching_by_imdb_id))
 
       -- Perform IMDB-based search
       openSub.searchSubtitlesByIMDB(imdbId)
@@ -3309,7 +3492,7 @@ function searchIMBD_v2()
       display_subtitles()
       return
     else
-      setMessage(error_tag("Invalid IMDB ID format"))
+      setMessage(error_tag(strings.ui_invalid_imdb_id_format))
       return
     end
   end
@@ -3506,16 +3689,16 @@ end
 -- Text shown under the result list when a search request failed.
 function api_error_message(status)
   if status == 429 then
-    return "Too many requests (429) - the API allows only a few requests per "..
-      "second. Please wait a moment and try again."
+    return strings.ui_too_many_requests_429_the_api_allows..
+      strings.ui_second_please_wait_a_moment_and_try
   elseif status == 401 then
-    return "Authentication failed (401) - please check your OpenSubtitles.com "..
-      "username and password in the configuration."
+    return strings.ui_authentication_failed_401_please_check_your_open..
+      strings.ui_username_and_password_in_the_configuration
   elseif status == 403 then
-    return "Access forbidden (403)."
+    return strings.ui_access_forbidden_403
   elseif status and status >= 500 and status <= 599 then
-    return "OpenSubtitles.com server error ("..tostring(status)..
-      ") - please try again later."
+    return strings.ui_opensubtitles_com_server_error..tostring(status)..
+      strings.ui_please_try_again_later
   end
   return network_redirect_message(status)
 end
@@ -3523,9 +3706,9 @@ end
 function network_redirect_message(status)
   if status == 301 or status == 302 or status == 303
   or status == 307 or status == 308 or status == 310 then
-    return "network is redirecting HTTP requests (status "..tostring(status)..
-      ") - a proxy, VPN, captive portal or content filter is intercepting "..
-      "port 80. Disable it or connect through another network."
+    return strings.ui_network_is_redirecting_http_requests_status..tostring(status)..
+      strings.ui_a_proxy_vpn_captive_portal_or_content..
+      strings.ui_port_80_disable_it_or_connect_through
   end
   return nil
 end
@@ -3852,7 +4035,7 @@ openSub.loginWithRestAPI = function()
 
   if not res then
     vlc.msg.err("[VLSub] Login request failed - network timeout")
-    setError("Login failed - network timeout or no internet connection")
+    setError(strings.ui_login_failed_network_timeout_or_no_internet)
     return false
   end
 
@@ -3860,25 +4043,25 @@ openSub.loginWithRestAPI = function()
     vlc.msg.err("[VLSub] Login failed with status: " .. res.status)
     local redirect_mess = network_redirect_message(res.status)
     if redirect_mess then
-      setError("Login failed - " .. redirect_mess)
+      setError(strings.ui_login_failed .. redirect_mess)
       return false
     end
     if res.body then
       local ok, error_data = pcall(json.decode, res.body, 1, true)
       if ok and error_data and error_data.message then
-        setError("Login failed: " .. error_data.message)
+        setError(strings.ui_login_failed_2 .. error_data.message)
       else
-        setError("Login failed with status: " .. res.status)
+        setError(strings.ui_login_failed_with_status .. res.status)
       end
     else
-      setError("Login failed - network error")
+      setError(strings.ui_login_failed_network_error)
     end
     return false
   end
 
   if not res.body then
     vlc.msg.err("[VLSub] Login response has no body")
-    setError("Login failed - empty response")
+    setError(strings.ui_login_failed_empty_response)
     return false
   end
 
@@ -3887,19 +4070,19 @@ openSub.loginWithRestAPI = function()
   local ok, login_response = pcall(json.decode, res.body, 1, true)
   if not ok or not login_response then
     vlc.msg.err("[VLSub] Failed to parse login response")
-    setError("Login failed - invalid response format")
+    setError(strings.ui_login_failed_invalid_response_format)
     return false
   end
 
   if login_response.status and login_response.status ~= 200 then
     vlc.msg.err("[VLSub] Login failed, API status: " .. (login_response.status or "unknown"))
-    setError("Login failed: " .. (login_response.message or ("Status " .. (login_response.status or "unknown"))))
+    setError(strings.ui_login_failed_2 .. (login_response.message or (strings.ui_status_2 .. (login_response.status or strings.ui_unknown))))
     return false
   end
 
   if not login_response.token then
     vlc.msg.err("[VLSub] No token in login response")
-    setError("Login failed - no authentication token received")
+    setError(strings.ui_login_failed_no_authentication_token_received)
     return false
   end
 
@@ -4024,7 +4207,7 @@ end
 -- Enhanced saveAndLoadSubtitle function with Downloads folder support
 openSub.saveAndLoadSubtitle = function(subtitle_content, item)
   if not subtitle_content or subtitle_content == "" then
-    local errorMsg = "Empty subtitle content received"
+    local errorMsg = strings.ui_empty_subtitle_content_received
     vlc.msg.err("[VLSub] " .. errorMsg)
     setMessage(error_tag(errorMsg))
     return false
@@ -4079,20 +4262,20 @@ openSub.saveAndLoadSubtitle = function(subtitle_content, item)
   -- First priority: save with video file if available
   if openSub.file.hasInput and openSub.file.dir and is_dir(openSub.file.dir) then
     target = openSub.file.dir..subfileName
-    saveLocation = " (saved with video file)"
+    saveLocation = strings.ui_saved_with_video_file
 
   else
     local downloads_folder = get_downloads_folder()
     if downloads_folder then
       target = downloads_folder .. slash .. subfileName
-      saveLocation = " (saved to Downloads folder)"
+      saveLocation = strings.ui_saved_to_downloads_folder
       saved_to_downloads = true
 
     elseif openSub.conf.dirPath then
       target = openSub.conf.dirPath..slash..subfileName
-      saveLocation = " (saved to VLSub directory)"
+      saveLocation = strings.ui_saved_to_vlsub_directory
     else
-      local errorMsg = "Cannot determine save location for subtitle file"
+      local errorMsg = strings.ui_cannot_determine_save_location_for_subtitle_file
       vlc.msg.err("[VLSub] " .. errorMsg)
       setMessage(error_tag(errorMsg))
       return false
@@ -4108,7 +4291,7 @@ openSub.saveAndLoadSubtitle = function(subtitle_content, item)
       local downloads_folder = get_downloads_folder()
       if downloads_folder then
         target = downloads_folder .. slash .. subfileName
-        saveLocation = " (saved to Downloads folder)"
+        saveLocation = strings.ui_saved_to_downloads_folder
         saved_to_downloads = true
 
         if not file_touch(target) then
@@ -4120,11 +4303,11 @@ openSub.saveAndLoadSubtitle = function(subtitle_content, item)
     -- Fallback 2: VLSub directory if not already tried
     if not file_touch(target) and openSub.conf.dirPath then
       target = openSub.conf.dirPath..slash..subfileName
-      saveLocation = " (saved to VLSub directory)"
+      saveLocation = strings.ui_saved_to_vlsub_directory
       saved_to_downloads = false
 
       if not file_touch(target) then
-        local errorMsg = "Cannot write to any available location: " .. target
+        local errorMsg = strings.ui_cannot_write_to_any_available_location .. target
         vlc.msg.err("[VLSub] " .. errorMsg)
         setMessage(error_tag(errorMsg))
         return false
@@ -4132,7 +4315,7 @@ openSub.saveAndLoadSubtitle = function(subtitle_content, item)
     end
 
     if not file_touch(target) then
-      local errorMsg = "Cannot write subtitle file to any location"
+      local errorMsg = strings.ui_cannot_write_subtitle_file_to_any_location
       vlc.msg.err("[VLSub] " .. errorMsg)
       setMessage(error_tag(errorMsg))
       return false
@@ -4144,7 +4327,7 @@ openSub.saveAndLoadSubtitle = function(subtitle_content, item)
   -- Write subtitle content to file
   local subfile = io.open(target, "wb")
   if not subfile then
-    local errorMsg = "Cannot open file for writing: " .. target
+    local errorMsg = strings.ui_cannot_open_file_for_writing .. target
     vlc.msg.err("[VLSub] " .. errorMsg)
     setMessage(error_tag(errorMsg))
     return false
@@ -4168,9 +4351,9 @@ openSub.saveAndLoadSubtitle = function(subtitle_content, item)
     successMsg = lang["mess_loaded"] .. saveLocation
   else
     if saved_to_downloads then
-      successMsg = "Subtitles saved to Downloads"  -- Removed duplicate saveLocation
+      successMsg = strings.ui_subtitles_saved_to_downloads  -- Removed duplicate saveLocation
     else
-      successMsg = "Subtitles saved" .. saveLocation
+      successMsg = strings.ui_subtitles_saved .. saveLocation
     end
   end
 
@@ -4186,7 +4369,7 @@ function download_subtitles_v2()
   openSub.getFileInfo()
 
   if not has_results() then
-    setMessage(error_tag("No subtitles available for download. Please search first."))
+    setMessage(error_tag(strings.ui_no_subtitles_available_for_download_please_searc))
     return false
   end
 
@@ -4207,8 +4390,8 @@ function download_subtitles_v2()
     -- For manual download, provide the web URL
     local link = "<span style='color:#181'>"
     link = link.."<b>"..lang["mess_dowload_link"]..":</b>"
-    link = link.."</span> &nbsp;"
-    link = link.."<a href='https://www.opensubtitles.com/subtitles/"..
+    link = link..strings.ui_nbsp
+    link = link..strings.ui_a_href_https_www_opensubtitles_com_subtitles..
       (item.SubtitleID or item.SubHash).."'>"
     link = link..(item.MovieReleaseName or item.SubFileName).."</a>"
 
@@ -4428,11 +4611,11 @@ local function download_failed(message)
 end
 
 local DOWNLOAD_STATUS_MESSAGE = {
-  [403] = "Access forbidden (403) - insufficient permissions",
-  [404] = "Subtitle not found (404) - file may have been removed or ID is invalid",
-  [429] = "Too many requests (429) - please wait and try again",
-  [500] = "Server error (500) - please try again later",
-  [503] = "Service unavailable (503) - server overloaded",
+  [403] = strings.ui_access_forbidden_403_insufficient_permissions,
+  [404] = strings.ui_subtitle_not_found_404_file_may_have,
+  [429] = strings.ui_too_many_requests_429_please_wait_and,
+  [500] = strings.ui_server_error_500_please_try_again_later,
+  [503] = strings.ui_service_unavailable_503_server_overloaded,
 }
 
 -- "Quota: 3/20 downloads, reset in: 5 hours" from the fields of a /download
@@ -4440,13 +4623,13 @@ local DOWNLOAD_STATUS_MESSAGE = {
 local function quota_text(used, remaining, reset_time)
   local text = ""
   if used ~= nil and remaining ~= nil then
-    text = "Quota: " .. used .. "/" .. tostring(used + remaining) .. " downloads"
+    text = strings.ui_quota .. used .. "/" .. tostring(used + remaining) .. strings.ui_downloads
   end
   if reset_time then
     if text ~= "" then
-      text = text .. ", reset in: " .. reset_time
+      text = text .. strings.ui_reset_in .. reset_time
     else
-      text = "Quota reset in: " .. reset_time
+      text = strings.ui_quota_reset_in .. reset_time
     end
   end
   return text
@@ -4462,11 +4645,11 @@ local function fetch_subtitle(link)
 
   local res = client:get(link)
   if not res then
-    return download_failed("Failed to download from provided link")
+    return download_failed(strings.ui_failed_to_download_from_provided_link)
   elseif res.status ~= 200 then
-    return download_failed("Failed to download subtitle content (HTTP " .. res.status .. ")")
+    return download_failed(strings.ui_failed_to_download_subtitle_content_http .. res.status .. ")")
   elseif not res.body then
-    return download_failed("Empty subtitle content downloaded")
+    return download_failed(strings.ui_empty_subtitle_content_downloaded)
   end
   return res.body
 end
@@ -4475,10 +4658,10 @@ end
 -- load it into the player. Returns true on success.
 openSub.downloadFromNewAPI = function(item, is_retry)
   if not item.FileID then
-    return download_failed("No file ID available for download")
+    return download_failed(strings.ui_no_file_id_available_for_download)
   end
   if not openSub.checkSession() then
-    return download_failed("Authentication failed - please check your OpenSubtitles.com credentials")
+    return download_failed(strings.ui_authentication_failed_please_check_your_opensubt)
   end
 
   dbg("Downloading subtitle file ID: " .. item.FileID)
@@ -4486,7 +4669,7 @@ openSub.downloadFromNewAPI = function(item, is_retry)
 
   local auth_header = openSub.getAuthHeader()
   if not auth_header then
-    return download_failed("Authentication required for download")
+    return download_failed(strings.ui_authentication_required_for_download)
   end
 
   local client = Curl.new()
@@ -4501,7 +4684,7 @@ openSub.downloadFromNewAPI = function(item, is_retry)
   local res = client:post("http://api.opensubtitles.com/api/v1/download",
                           json.encode({ file_id = item.FileID }))
   if not res then
-    return download_failed("No response from download server")
+    return download_failed(strings.ui_no_response_from_download_server)
   end
 
   if res.status == 401 then
@@ -4509,7 +4692,7 @@ openSub.downloadFromNewAPI = function(item, is_retry)
     if not is_retry and openSub.refreshSession() then
       return openSub.downloadFromNewAPI(item, true)
     end
-    return download_failed("Authentication failed (401) - please check your credentials")
+    return download_failed(strings.ui_authentication_failed_401_please_check_your_cred)
   elseif DOWNLOAD_STATUS_MESSAGE[res.status] then
     return download_failed(DOWNLOAD_STATUS_MESSAGE[res.status])
   elseif res.status ~= 200 then
@@ -4527,7 +4710,7 @@ openSub.downloadFromNewAPI = function(item, is_retry)
   end
 
   if not res.body or res.body == "" then
-    return download_failed("Empty response from download server")
+    return download_failed(strings.ui_empty_response_from_download_server)
   end
 
   setMessage(openSub.actionLabel..": "..progressBarContent(75))
@@ -4554,7 +4737,7 @@ openSub.downloadFromNewAPI = function(item, is_retry)
     elseif answer.error or answer.message then
       -- e.g. 200 {"message":"Invalid file_id"}: an answer without a link
       -- is an explanation, never the subtitle itself
-      return download_failed("API returned error: " .. tostring(answer.error or answer.message))
+      return download_failed(strings.ui_api_returned_error .. tostring(answer.error or answer.message))
     else
       subtitle_content = res.body
       dbg("Using entire response as subtitle content (fallback)")
@@ -4655,15 +4838,15 @@ end
 
 
 openSub.checkLoginAndUserInfo = function()
-  openSub.actionLabel = "Checking login status"
-  setMessage(loading_tag("Verifying credentials..."))
+  openSub.actionLabel = strings.ui_checking_login_status
+  setMessage(loading_tag(strings.ui_verifying_credentials))
 
   -- First ensure we have credentials
   local username = trim(openSub.option.os_username or "")
   local password = trim(openSub.option.os_password or "")
 
   if username == "" or password == "" then
-    setMessage(error_tag("Username and password are required for authentication"))
+    setMessage(error_tag(strings.ui_username_and_password_are_required_for_authentic))
     return false
   end
 
@@ -4676,7 +4859,7 @@ openSub.checkLoginAndUserInfo = function()
   end
 
   -- Now get user information
-  setMessage(loading_tag("Fetching account information..."))
+  setMessage(loading_tag(strings.ui_fetching_account_information))
 
   local user_info_url = "http://api.opensubtitles.com/api/v1/infos/user"
 
@@ -4688,7 +4871,7 @@ openSub.checkLoginAndUserInfo = function()
   if auth_header then
     client:add_header("Authorization", auth_header)
   else
-    setMessage(error_tag("No authentication token available"))
+    setMessage(error_tag(strings.ui_no_authentication_token_available))
     return false
   end
 
@@ -4698,21 +4881,21 @@ openSub.checkLoginAndUserInfo = function()
   local res = client:get(user_info_url)
 
   if not res then
-    setMessage(error_tag("No response from user info API"))
+    setMessage(error_tag(strings.ui_no_response_from_user_info_api))
     return false
   end
 
   if res.status == 401 then
-    setMessage(error_tag("Authentication failed (401) - please check your credentials"))
+    setMessage(error_tag(strings.ui_authentication_failed_401_please_check_your_cred))
     -- Clear invalid token
     openSub.session.token = ""
     openSub.session.token_expires = 0
     return false
   elseif res.status == 403 then
-    setMessage(error_tag("Access forbidden (403) - insufficient permissions"))
+    setMessage(error_tag(strings.ui_access_forbidden_403_insufficient_permissions))
     return false
   elseif res.status ~= 200 then
-    local errorMsg = "User info request failed with HTTP status: " .. res.status
+    local errorMsg = strings.ui_user_info_request_failed_with_http_status .. res.status
     if res.body then
       vlc.msg.err("[VLSub] Error response: " .. res.body)
       -- Try to parse error message
@@ -4726,19 +4909,19 @@ openSub.checkLoginAndUserInfo = function()
   end
 
   if not res.body then
-    setMessage(error_tag("Empty response from user info API"))
+    setMessage(error_tag(strings.ui_empty_response_from_user_info_api))
     return false
   end
 
   -- Parse the user info response
   local ok, user_response = pcall(json.decode, res.body, 1, true)
   if not ok or not user_response then
-    setMessage(error_tag("Failed to parse user info response"))
+    setMessage(error_tag(strings.ui_failed_to_parse_user_info_response))
     return false
   end
 
   if not user_response.data then
-    setMessage(error_tag("Invalid user info response format"))
+    setMessage(error_tag(strings.ui_invalid_user_info_response_format))
     return false
   end
 
@@ -4747,11 +4930,11 @@ openSub.checkLoginAndUserInfo = function()
   -- Simple one-line format
   local downloads_count = user_data.downloads_count or 0
   local allowed_downloads = user_data.allowed_downloads or 0
-  local username = user_data.username or "Unknown"
-  local level = user_data.level or "Unknown"
-  local reset_time = user_data.reset_time or user_data.reset_time_utc or "Unknown"
+  local username = user_data.username or strings.ui_unknown_2
+  local level = user_data.level or strings.ui_unknown_2
+  local reset_time = user_data.reset_time or user_data.reset_time_utc or strings.ui_unknown_2
 
-  local user_info_html = success_tag("" .. username .. " (" .. level .. "), " .. downloads_count .. "/" .. allowed_downloads .. " downloads, reset in: " .. reset_time)
+  local user_info_html = success_tag("" .. username .. " (" .. level .. "), " .. downloads_count .. "/" .. allowed_downloads .. strings.ui_downloads_reset_in .. reset_time)
 
   -- Store this message in a way that won't get cleared
   openSub.lastSuccessMessage = user_info_html
@@ -5689,7 +5872,7 @@ end
 
 -- 1. FIXED: test_network_connectivity function - remove ping commands for Windows
 function test_network_connectivity()
-  update_debug_network("Testing network connectivity...")
+  update_debug_network(strings.ui_testing_network_connectivity)
 
   -- For Windows, use only HTTP tests with VLC's built-in networking (no external commands)
   local test_urls = {
@@ -5699,8 +5882,8 @@ function test_network_connectivity()
   }
 
   for i, url in ipairs(test_urls) do
-    update_debug_network("Testing connection " .. i .. "/" .. #test_urls .. "...")
-    append_debug_log("Testing: " .. url)
+    update_debug_network(strings.ui_testing_connection .. i .. "/" .. #test_urls .. "...")
+    append_debug_log(strings.ui_testing .. url)
 
     local test_client = Curl.new() -- This uses VLC's networking, not curl
     test_client:set_aggressive_timeouts()
@@ -5713,17 +5896,17 @@ function test_network_connectivity()
     local elapsed_ms = math.floor((end_time - start_time) * 1000)
 
     if res and res.status and res.status >= 200 and res.status < 400 then
-      update_debug_network("Connection OK (responded in " .. elapsed_ms .. "ms)")
-      append_debug_log("Network test passed: " .. url .. " (" .. elapsed_ms .. "ms)")
+      update_debug_network(strings.ui_connection_ok_responded_in .. elapsed_ms .. "ms)")
+      append_debug_log(strings.ui_network_test_passed .. url .. " (" .. elapsed_ms .. "ms)")
       return true
     else
-      append_debug_log("Network test failed: " .. url .. " (" .. elapsed_ms .. "ms)")
+      append_debug_log(strings.ui_network_test_failed .. url .. " (" .. elapsed_ms .. "ms)")
     end
   end
 
-  update_debug_network("⚠️  OFFLINE MODE - LIMITED FUNCTIONALITY")
-  append_debug_log("⚠️  WARNING: No internet connection detected!")
-  append_debug_log("Extension uses VLC's built-in networking (no external tools required)")
+  update_debug_network(strings.ui_offline_mode_limited_functionality)
+  append_debug_log(strings.ui_warning_no_internet_connection_detected)
+  append_debug_log(strings.ui_extension_uses_vlc_s_built_in_networking)
   networkTestsFailed = true
   return false
 end
@@ -5748,12 +5931,12 @@ function checkInitializationStatus()
 
   -- Handle network test results
   if networkTestsFailed then
-    append_debug_log("⚠️  OFFLINE: Extension will have limited functionality")
-    update_debug_status("⚠️  WARNING: No internet - limited functionality")
+    append_debug_log(strings.ui_offline_extension_will_have_limited_functionalit)
+    update_debug_status(strings.ui_warning_no_internet_limited_functionality)
     shouldStayOpen = true  -- Keep debug window open for offline mode
   else
-    update_debug_status("Network connection verified")
-    append_debug_log("Network connection successful")
+    update_debug_status(strings.ui_network_connection_verified)
+    append_debug_log(strings.ui_network_connection_successful)
   end
 
   -- Update button labels based on current status
@@ -5761,12 +5944,12 @@ function checkInitializationStatus()
 
   -- Only auto-close if we have both: working core functionality AND network
   if allTestsPassed and not hasCriticalFailure and not networkTestsFailed then
-    append_debug_log("All tests passed - auto-closing in 3 seconds...")
+    append_debug_log(strings.ui_all_tests_passed_auto_closing_in_3)
 
     -- Update button to show countdown
     if debug_messages and debug_messages.ok_button then
       for countdown = 3, 1, -1 do
-        debug_messages.ok_button:set_text("✅ Auto-close (" .. countdown .. "s)")
+        debug_messages.ok_button:set_text(strings.ui_auto_close .. countdown .. "s)")
         if debug_dlg then
           debug_dlg:update()
         end
@@ -5787,12 +5970,12 @@ function checkInitializationStatus()
     if shouldStayOpen then
       if networkTestsFailed and allTestsPassed then
         dbg("Core functionality OK but offline - keeping debug window open")
-        append_debug_log("Click 'Continue Offline' to proceed with limited functionality")
-        update_debug_status("Click 'Continue Offline' to proceed")
+        append_debug_log(strings.ui_click_continue_offline_to_proceed_with_limited)
+        update_debug_status(strings.ui_click_continue_offline_to_proceed)
       else
         dbg("Critical initialization failure - keeping debug window open")
-        append_debug_log("Critical failures detected - click 'Continue Anyway' or 'Close VLSub'")
-        update_debug_status("Critical errors - manual intervention needed")
+        append_debug_log(strings.ui_critical_failures_detected_click_continue_anyway)
+        update_debug_status(strings.ui_critical_errors_manual_intervention_needed)
       end
     end
   end
@@ -6117,11 +6300,11 @@ end
 
 -- Hash search: status -> { error log line, message shown to the user }
 local HASH_STATUS = {
-  [429] = { "Rate limit exceeded (HTTP 429). Too many requests.", "Rate limit: Too many requests. Please wait." },
-  [403] = { "Access forbidden (HTTP 403)", "Access forbidden. Check your API permissions." },
-  [404] = { "Resource not found (HTTP 404)", "Resource not found." },
-  [500] = { "Server error (HTTP 500)", "Server error. Please try again later." },
-  [503] = { "Service unavailable (HTTP 503)", "Service temporarily unavailable." },
+  [429] = { "Rate limit exceeded (HTTP 429). Too many requests.", strings.ui_rate_limit_too_many_requests_please_wait },
+  [403] = { "Access forbidden (HTTP 403)", strings.ui_access_forbidden_check_your_api_permissions },
+  [404] = { "Resource not found (HTTP 404)", strings.ui_resource_not_found },
+  [500] = { "Server error (HTTP 500)", strings.ui_server_error_please_try_again_later },
+  [503] = { "Service unavailable (HTTP 503)", strings.ui_service_temporarily_unavailable },
 }
 
 -- Search by file hash. Unlike the other two it reports its outcome itself:
@@ -6154,7 +6337,7 @@ openSub.searchSubtitlesByHashNewAPI = function(is_retry)
   local url, res, crash = search_get(params, true)
   if crash then
     vlc.msg.err("[VLSub] HTTP request crashed with error: " .. tostring(crash))
-    nothing("Network error: Connection failed")
+    nothing(strings.ui_network_error_connection_failed)
     display_subtitles()
     return
   end
@@ -6180,7 +6363,7 @@ openSub.searchSubtitlesByHashNewAPI = function(is_retry)
   elseif status == 301 then
     vlc.msg.err("[VLSub] 301 Redirect in hash search - URL parameters may not be sorted correctly")
     vlc.msg.err("[VLSub] URL was: " .. url)
-    nothing("API Error: URL parameters not sorted correctly")
+    nothing(strings.ui_api_error_url_parameters_not_sorted_correctly)
   elseif status == 401 then
     dbg("Authentication failed during hash search, attempting re-login")
     if not is_retry and openSub.refreshSession() then
@@ -6202,7 +6385,7 @@ openSub.searchSubtitlesByHashNewAPI = function(is_retry)
       openSub.lastTransportError = redirect_mess
       setMessage(error_tag(redirect_mess))
     else
-      setMessage(error_tag(lang["mess_error"] .. ": HTTP " .. status))
+      setMessage(error_tag(lang["mess_error"] .. strings.ui_http .. status))
     end
   else
     vlc.msg.err("[VLSub] Hash search API request failed - no response")
