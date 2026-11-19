@@ -4475,235 +4475,167 @@ function get_first_sel(list)
   return 0
 end
 
--- Enhanced downloadFromNewAPI function that properly uses POST
+            --[[ Download ]]--
+
+-- Log an error, show it in the window, and report failure.
+local function download_failed(message)
+  vlc.msg.err("[VLSub] " .. message)
+  setMessage(error_tag(message))
+  return false
+end
+
+local DOWNLOAD_STATUS_MESSAGE = {
+  [403] = "Access forbidden (403) - insufficient permissions",
+  [404] = "Subtitle not found (404) - file may have been removed or ID is invalid",
+  [429] = "Too many requests (429) - please wait and try again",
+  [500] = "Server error (500) - please try again later",
+  [503] = "Service unavailable (503) - server overloaded",
+}
+
+-- "Quota: 3/20 downloads, reset in: 5 hours" from the fields of a /download
+-- answer; "" when the answer carried none of them.
+local function quota_text(used, remaining, reset_time)
+  local text = ""
+  if used ~= nil and remaining ~= nil then
+    text = "Quota: " .. used .. "/" .. tostring(used + remaining) .. " downloads"
+  end
+  if reset_time then
+    if text ~= "" then
+      text = text .. ", reset in: " .. reset_time
+    else
+      text = "Quota reset in: " .. reset_time
+    end
+  end
+  return text
+end
+
+-- Fetch the subtitle a /download answer points to. Returns the content, or
+-- false after reporting why there is none.
+local function fetch_subtitle(link)
+  local client = Curl.new()
+  client:set_timeout(60)
+  client:set_retries(3)
+  client:set_raw(true) -- subtitle text must reach the file byte for byte
+
+  local res = client:get(link)
+  if not res then
+    return download_failed("Failed to download from provided link")
+  elseif res.status ~= 200 then
+    return download_failed("Failed to download subtitle content (HTTP " .. res.status .. ")")
+  elseif not res.body then
+    return download_failed("Empty subtitle content downloaded")
+  end
+  return res.body
+end
+
+-- Ask the API for a download link for `item`, fetch the subtitle, save it and
+-- load it into the player. Returns true on success.
 openSub.downloadFromNewAPI = function(item, is_retry)
-    if not item.FileID then
-        local errorMsg = "No file ID available for download"
-        vlc.msg.err("[VLSub] " .. errorMsg)
-        setMessage(error_tag(errorMsg))
-        return false
+  if not item.FileID then
+    return download_failed("No file ID available for download")
+  end
+  if not openSub.checkSession() then
+    return download_failed("Authentication failed - please check your OpenSubtitles.com credentials")
+  end
+
+  dbg("Downloading subtitle file ID: " .. item.FileID)
+  setMessage(openSub.actionLabel..": "..progressBarContent(50))
+
+  local auth_header = openSub.getAuthHeader()
+  if not auth_header then
+    return download_failed("Authentication required for download")
+  end
+
+  local client = Curl.new()
+  client:add_header("Api-Key", config.api_key)
+  client:add_header("Content-Type", "application/json")
+  client:add_header("Authorization", auth_header)
+  client:set_timeout(30)
+  client:set_retries(2)
+
+  setMessage(openSub.actionLabel..": "..progressBarContent(60))
+
+  local res = client:post("http://api.opensubtitles.com/api/v1/download",
+                          json.encode({ file_id = item.FileID }))
+  if not res then
+    return download_failed("No response from download server")
+  end
+
+  if res.status == 401 then
+    -- The cached token was rejected: log in again and try once more
+    if not is_retry and openSub.refreshSession() then
+      return openSub.downloadFromNewAPI(item, true)
     end
-
-    -- Check session first
-    if not openSub.checkSession() then
-        local errorMsg = "Authentication failed - please check your OpenSubtitles.com credentials"
-        vlc.msg.err("[VLSub] " .. errorMsg)
-        setMessage(error_tag(errorMsg))
-        return false
+    return download_failed("Authentication failed (401) - please check your credentials")
+  elseif DOWNLOAD_STATUS_MESSAGE[res.status] then
+    return download_failed(DOWNLOAD_STATUS_MESSAGE[res.status])
+  elseif res.status ~= 200 then
+    local message = "Download failed with HTTP status: " .. res.status
+    vlc.msg.err("[VLSub] " .. message)
+    if res.body then
+      vlc.msg.err("[VLSub] Error response: " .. res.body)
+      local ok, error_data = pcall(json.decode, res.body, 1, true)
+      if ok and error_data and error_data.message then
+        message = message .. " - " .. error_data.message
+      end
     end
+    setMessage(error_tag(message))
+    return false
+  end
 
-    dbg("Downloading subtitle file ID: " .. item.FileID)
-    setMessage(openSub.actionLabel..": "..progressBarContent(50))
+  if not res.body or res.body == "" then
+    return download_failed("Empty response from download server")
+  end
 
-    -- Use the correct OpenSubtitles API endpoint with POST method
-    local download_url = "http://api.opensubtitles.com/api/v1/download"
+  setMessage(openSub.actionLabel..": "..progressBarContent(75))
 
-    -- Create the request body with file_id
-    -- IMPORTANT: Send FileID as string to avoid scientific notation for large numbers
-    local request_body = json.encode({
-        file_id = item.FileID
-    })
+  local ok, answer = pcall(json.decode, res.body, 1, true)
+  local subtitle_content
+  local used, remaining, reset_time
 
+  if ok and answer then
+    if answer.requests ~= nil then used = tonumber(tostring(answer.requests)) end
+    if answer.remaining ~= nil then remaining = tonumber(tostring(answer.remaining)) end
+    reset_time = answer.reset_time or nil
+    if reset_time == "N/A" then reset_time = nil end
 
-    -- Make the API request with authentication using the fixed HTTP client
-    local client = Curl.new()
-    client:add_header("Api-Key", config.api_key)
-    client:add_header("User-Agent", openSub.conf.userAgentHTTP)
-    client:add_header("Content-Type", "application/json")
-
-    -- Add authorization header
-    local auth_header = openSub.getAuthHeader()
-    if auth_header then
-        client:add_header("Authorization", auth_header)
+    if answer.link then
+      setMessage(openSub.actionLabel..": "..progressBarContent(80))
+      subtitle_content = fetch_subtitle(answer.link)
+      if not subtitle_content then
+        return false
+      end
+    elseif answer.content then
+      subtitle_content = answer.content
+      dbg("Got direct subtitle content from API response")
+    elseif answer.error or answer.message then
+      -- e.g. 200 {"message":"Invalid file_id"}: an answer without a link
+      -- is an explanation, never the subtitle itself
+      return download_failed("API returned error: " .. tostring(answer.error or answer.message))
     else
-        local errorMsg = "Authentication required for download"
-        vlc.msg.err("[VLSub] " .. errorMsg)
-        setMessage(error_tag(errorMsg))
-        return false
+      subtitle_content = res.body
+      dbg("Using entire response as subtitle content (fallback)")
     end
+  else
+    dbg("Response is not JSON, treating as direct subtitle content")
+    subtitle_content = res.body
+  end
 
-    client:set_timeout(30)
-    client:set_retries(2)
+  setMessage(openSub.actionLabel..": "..progressBarContent(90))
 
-    setMessage(openSub.actionLabel..": "..progressBarContent(60))
-
-    -- Use POST request with JSON body
-    local res = client:post(download_url, request_body)
-
-    if not res then
-        local errorMsg = "No response from download server"
-        vlc.msg.err("[VLSub] " .. errorMsg)
-        setMessage(error_tag(errorMsg))
-        return false
+  local saved = openSub.saveAndLoadSubtitle(subtitle_content, item)
+  if saved then
+    -- saveAndLoadSubtitle has set a success message; append the quota to it
+    local message = string.gsub(input_table["message"]:get_text(), "<[^>]*>", "")
+    message = string.gsub(message, "Success:%s*", "")
+    local quota = quota_text(used, remaining, reset_time)
+    if quota ~= "" then
+      message = message .. ". " .. quota .. "."
     end
+    setMessage(success_tag(message))
+  end
 
-    -- Handle different HTTP status codes
-    if res.status == 401 then
-        -- The cached token was rejected: log in again and try once more
-        if not is_retry and openSub.refreshSession() then
-            return openSub.downloadFromNewAPI(item, true)
-        end
-        local errorMsg = "Authentication failed (401) - please check your credentials"
-        vlc.msg.err("[VLSub] " .. errorMsg)
-        setMessage(error_tag(errorMsg))
-        return false
-    elseif res.status == 403 then
-        local errorMsg = "Access forbidden (403) - insufficient permissions"
-        vlc.msg.err("[VLSub] " .. errorMsg)
-        setMessage(error_tag(errorMsg))
-        return false
-    elseif res.status == 404 then
-        local errorMsg = "Subtitle not found (404) - file may have been removed or ID is invalid"
-        vlc.msg.err("[VLSub] " .. errorMsg)
-        setMessage(error_tag(errorMsg))
-        return false
-    elseif res.status == 429 then
-        local errorMsg = "Too many requests (429) - please wait and try again"
-        vlc.msg.err("[VLSub] " .. errorMsg)
-        setMessage(error_tag(errorMsg))
-        return false
-    elseif res.status == 500 then
-        local errorMsg = "Server error (500) - please try again later"
-        vlc.msg.err("[VLSub] " .. errorMsg)
-        setMessage(error_tag(errorMsg))
-        return false
-    elseif res.status == 503 then
-        local errorMsg = "Service unavailable (503) - server overloaded"
-        vlc.msg.err("[VLSub] " .. errorMsg)
-        setMessage(error_tag(errorMsg))
-        return false
-    elseif res.status ~= 200 then
-        local errorMsg = "Download failed with HTTP status: " .. res.status
-        vlc.msg.err("[VLSub] " .. errorMsg)
-        if res.body then
-            vlc.msg.err("[VLSub] Error response: " .. res.body)
-            local ok, error_data = pcall(json.decode, res.body, 1, true)
-            if ok and error_data and error_data.message then
-                errorMsg = errorMsg .. " - " .. error_data.message
-            end
-        end
-        setMessage(error_tag(errorMsg))
-        return false
-    end
-
-    if not res.body or res.body == "" then
-        local errorMsg = "Empty response from download server"
-        vlc.msg.err("[VLSub] " .. errorMsg)
-        setMessage(error_tag(errorMsg))
-        return false
-    end
-
-    setMessage(openSub.actionLabel..": "..progressBarContent(75))
-
-    -- Parse the download response
-    local ok, download_response = pcall(json.decode, res.body, 1, true)
-    local subtitle_content
-    local downloads_used = "N/A"
-    local downloads_remaining = "N/A"
-    local reset_time_display = "N/A"
-
-    if ok and download_response then
-        -- Extract quota information
-        if download_response.requests ~= nil then
-            downloads_used = tostring(download_response.requests)
-        end
-        if download_response.remaining ~= nil then
-            downloads_remaining = tostring(download_response.remaining)
-        end
-        if download_response.reset_time then
-            reset_time_display = download_response.reset_time
-        end
-
-        if download_response.link then
-            setMessage(openSub.actionLabel..": "..progressBarContent(80))
-
-            -- Download from the provided link using GET
-            local download_client = Curl.new()
-            download_client:set_timeout(60)
-            download_client:set_retries(3)
-            download_client:set_raw(true)  -- subtitle body must not be JSON-cleaned
-
-            local subtitle_res = download_client:get(download_response.link)
-            if not subtitle_res then
-                local errorMsg = "Failed to download from provided link"
-                vlc.msg.err("[VLSub] " .. errorMsg)
-                setMessage(error_tag(errorMsg))
-                return false
-            elseif subtitle_res.status ~= 200 then
-                local errorMsg = "Failed to download subtitle content (HTTP " .. subtitle_res.status .. ")"
-                vlc.msg.err("[VLSub] " .. errorMsg)
-                setMessage(error_tag(errorMsg))
-                return false
-            elseif not subtitle_res.body then
-                local errorMsg = "Empty subtitle content downloaded"
-                vlc.msg.err("[VLSub] " .. errorMsg)
-                setMessage(error_tag(errorMsg))
-                return false
-            end
-            subtitle_content = subtitle_res.body
-        elseif download_response.content then
-            subtitle_content = download_response.content
-            dbg("Got direct subtitle content from API response")
-        elseif download_response.error or download_response.message then
-            -- e.g. 200 {"message":"Invalid file_id"}: an answer without a link
-            -- is an explanation, never the subtitle itself
-            local errorMsg = "API returned error: " .. tostring(download_response.error or download_response.message)
-            vlc.msg.err("[VLSub] " .. errorMsg)
-            setMessage(error_tag(errorMsg))
-            return false
-        else
-            subtitle_content = res.body
-            dbg("Using entire response as subtitle content (fallback)")
-        end
-    else
-        dbg("Response is not JSON, treating as direct subtitle content")
-        subtitle_content = res.body
-    end
-
-    setMessage(openSub.actionLabel..": "..progressBarContent(90))
-
-    -- Save and load subtitle, then update message with quota
-    local success_load_save = openSub.saveAndLoadSubtitle(subtitle_content, item)
-    if success_load_save then
-        -- Build enhanced message with quota info
-        local base_message = input_table["message"]:get_text()
-
-        -- Extract the base success message (before any quota info)
-        local clean_message = string.gsub(base_message, "<[^>]*>", "") -- Remove HTML tags
-        clean_message = string.gsub(clean_message, "Success:%s*", "") -- Remove "Success:" prefix
-
-        -- Calculate quota info
-        local num_downloads_used = tonumber(downloads_used)
-        local num_downloads_remaining = tonumber(downloads_remaining)
-        local total_allowed_downloads = "N/A"
-
-        if num_downloads_used ~= nil and num_downloads_remaining ~= nil then
-             total_allowed_downloads = tostring(num_downloads_used + num_downloads_remaining)
-        end
-
-        -- Format the quota message
-        local quota_display = ""
-        if num_downloads_used ~= nil and total_allowed_downloads ~= "N/A" then
-            quota_display = "Quota: " .. num_downloads_used .. "/" .. total_allowed_downloads .. " downloads"
-        end
-
-        if reset_time_display ~= "N/A" then
-            if quota_display ~= "" then
-                quota_display = quota_display .. ", reset in: " .. reset_time_display
-            else
-                quota_display = "Quota reset in: " .. reset_time_display
-            end
-        end
-
-        local final_message = clean_message
-        if quota_display ~= "" then
-            final_message = final_message .. ". " .. quota_display .. "."
-        end
-
-        setMessage(success_tag(final_message))
-    end
-
-    return success_load_save
+  return saved
 end
 
 
