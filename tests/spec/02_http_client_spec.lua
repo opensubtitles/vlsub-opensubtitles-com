@@ -289,7 +289,7 @@ H.describe("network down: the window is blocked once, not again and again", func
   it("Save: one connection attempt, then a clear message; the settings are saved", function()
     local env, before = offline()
     trigger_menu(2)
-    env.ui():_at(1, 12, "button"):_click()
+    env.ui():_at(1, 13, "button"):_click()
     eq(attempts(env), 1, "connection attempts")
     eq(H.waited() - before, 30, "seconds the window was blocked")
     has(env.message(), "no internet connection")
@@ -304,7 +304,7 @@ H.describe("network down: the window is blocked once, not again and again", func
     local d = env.ui()
     openSub.option.interfaceLanguage = "en"
     d:_at(2, 9, "dropdown"):_choose_text("^Automatic")
-    d:_at(1, 12, "button"):_click()
+    d:_at(1, 13, "button"):_click()
     eq(attempts(env), 1, "connection attempts")
     eq(H.waited() - before, 30)
   end)

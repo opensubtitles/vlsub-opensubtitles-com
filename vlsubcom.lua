@@ -522,6 +522,16 @@ local strings = {
   -- AI on-demand translation
   ui_ai_on_demand = "AI on demand (uses credits)",
   ui_ai_creating_translation = "Creating the AI translation - this can take a minute, VLC will not respond meanwhile...",
+  ui_ai_still_translating = "The AI translation is still being made, asking again (%s of %s)...",
+  ui_ai_credits = "AI credits",
+  ui_ai_show_credits = "🤖 Show balance / buy",
+  ui_ai_credits_balance = "AI credits: %s",
+  ui_ai_credits_login_first = "Log in to see your AI credits: enter username and password, then Save.",
+  ui_ai_credits_unavailable = "The AI credit balance could not be read. Please try again later.",
+  ui_ai_buy_credits = "Buy AI credits:",
+  ui_ai_no_credits = "This subtitle is an AI translation made on demand and needs AI credits - your balance is %s.",
+  ui_ai_creating_translation_credits = "Creating the AI translation (AI credits: %s) - this can take a minute, VLC will not respond meanwhile...",
+  ui_ai_credits_left = "AI credits left: %s",
   ui_ai_no_answer = "The AI translation did not arrive in time. It may still be in the making: try again in a minute."
 }
 
@@ -1999,47 +2009,52 @@ function interface_config()
   dlg:add_label(strings.ui_interface_language..":", 1, 9, 1, 1)
   input_table['interfaceLanguage'] = dlg:add_dropdown(2, 9, 2, 1)
 
-  -- Row 10: Working directory
+  -- Row 10: AI credits (asked for on click: no request just for opening
+  -- this window)
+  dlg:add_label(strings.ui_ai_credits..":", 1, 10, 1, 1)
+  dlg:add_button(strings.ui_ai_show_credits, show_ai_credits, 2, 10, 1, 1)
+
+  -- Row 11: Working directory
   if openSub.conf.dirPath then
     if openSub.conf.os == "lin" then
-      dlg:add_label(lang["int_vlsub_work_dir"], 1, 10, 1, 1)
+      dlg:add_label(lang["int_vlsub_work_dir"], 1, 11, 1, 1)
     elseif openSub.conf.os == "win" then
       dlg:add_label(
         "<a href='file:///"..openSub.conf.dirPath.."'>"..
-        lang["int_vlsub_work_dir"].."</a>", 1, 10, 1, 1)
+        lang["int_vlsub_work_dir"].."</a>", 1, 11, 1, 1)
     else
       dlg:add_label(
         "<a href='"..openSub.conf.dirPath.."'>"..
-        lang["int_vlsub_work_dir"].."</a>", 1, 10, 1, 1)
+        lang["int_vlsub_work_dir"].."</a>", 1, 11, 1, 1)
     end
   else
-    dlg:add_label(lang["int_vlsub_work_dir"], 1, 10, 1, 1)
+    dlg:add_label(lang["int_vlsub_work_dir"], 1, 11, 1, 1)
   end
 
   input_table['dir_path'] = dlg:add_text_input(
-    openSub.conf.dirPath, 2, 10, 2, 1)
+    openSub.conf.dirPath, 2, 11, 2, 1)
 
-  -- Row 11: Status message
+  -- Row 12: Status message
   input_table['message'] = nil
-  input_table['message'] = dlg:add_label('', 1, 11, 4, 1)
+  input_table['message'] = dlg:add_label('', 1, 12, 4, 1)
 
-  -- Row 12: Action buttons
+  -- Row 13: Action buttons
   dlg:add_button(
     "💾 " .. lang["int_save"],
-    apply_config, 1, 12, 1, 1)
+    apply_config, 1, 13, 1, 1)
 
   dlg:add_button(
     "❓ " .. lang["int_help"],
     function() show_help("config") end,
-    2, 12, 1, 1)
+    2, 13, 1, 1)
 
   dlg:add_button(
     strings.ui_check_updates,
-    function() check_for_updates(true) end, 3, 12, 1, 1)
+    function() check_for_updates(true) end, 3, 13, 1, 1)
 
   dlg:add_button(
     "❌ " .. lang["int_close"],
-    show_main, 4, 12, 1, 1)
+    show_main, 4, 13, 1, 1)
 
   -- Setup dropdown values for existing dropdowns
   input_table['langExt']:add_value(
@@ -5097,6 +5112,83 @@ local function fetch_subtitle(link)
   return res.body
 end
 
+-- AI credits of the logged-in account (GET /ai/credits), or nil when they
+-- cannot be read. One short request.
+local function ai_credits()
+  local auth_header = openSub.getAuthHeader()
+  if not auth_header then
+    return nil
+  end
+  local client = Curl.new()
+  client:add_header("Api-Key", config.api_key)
+  client:add_header("Authorization", auth_header)
+  client:set_timeout(10)
+  client:set_retries(0)
+  local res = client:get("http://api.opensubtitles.com/api/v1/ai/credits")
+  if not res or res.status ~= 200 then
+    return nil
+  end
+  local ok, answer = decode_object(res.body or "")
+  if ok and type(answer.data) == "table" then
+    return tonumber(answer.data.credits)
+  end
+  return nil
+end
+
+-- Links to the credit packages (GET /ai/credits/buy) as one line of HTML, or
+-- "" when there are none. The checkout addresses carry a per-user tag: they
+-- are shown to the user and never written to the log.
+local function ai_buy_links()
+  local auth_header = openSub.getAuthHeader()
+  if not auth_header then
+    return ""
+  end
+  local client = Curl.new()
+  client:add_header("Api-Key", config.api_key)
+  client:add_header("Authorization", auth_header)
+  client:set_timeout(10)
+  client:set_retries(0)
+  local res = client:get("http://api.opensubtitles.com/api/v1/ai/credits/buy")
+  local ok, answer = decode_object(res and res.status == 200 and res.body or "")
+  if not ok or type(answer.data) ~= "table" then
+    return ""
+  end
+  local links = {}
+  for _, offer in ipairs(answer.data) do
+    local url = type(offer) == "table" and offer.checkout_url
+    -- only a plain https address of opensubtitles.com is made clickable
+    if type(url) == "string" and string.match(url, "^https://[%w%.%-]*opensubtitles%.com/[%w%-%._~:/%?#%[%]@!%$&%(%)%*%+,;=%%]*$")
+       and not string.find(url, "'", 1, true) and #links < 4 then
+      local label = tostring(offer.name or "") .. " - " .. tostring(offer.value or "")
+      label = string.gsub(label, "[<>&]", "")
+      links[#links + 1] = "<a href='" .. url .. "'>" .. label .. "</a>"
+    end
+  end
+  if #links == 0 then
+    return ""
+  end
+  return strings.ui_ai_buy_credits .. " " .. table.concat(links, " &nbsp;|&nbsp; ")
+end
+
+-- Button of the configuration window: balance and where to buy more.
+function show_ai_credits()
+  if not openSub.checkSession() then
+    setMessage(error_tag(strings.ui_ai_credits_login_first))
+    return
+  end
+  local credits = ai_credits()
+  if not credits then
+    setMessage(error_tag(strings.ui_ai_credits_unavailable))
+    return
+  end
+  local message = "<b>" .. tr("ui_ai_credits_balance", tostring(credits)) .. "</b>"
+  local links = ai_buy_links()
+  if links ~= "" then
+    message = message .. "<br>" .. links
+  end
+  setMessage(message)
+end
+
 -- Ask the API for a download link for `item`, fetch the subtitle, save it and
 -- load it into the player. Returns true on success.
 openSub.downloadFromNewAPI = function(item, is_retry)
@@ -5134,16 +5226,74 @@ openSub.downloadFromNewAPI = function(item, is_retry)
     if type(item.FileID) == "string" and string.match(item.FileID, "^%d+$") then
       request_body = '{"file_id":' .. item.FileID .. '}'
     end
-    setMessage(loading_tag(strings.ui_ai_creating_translation))
+    -- the balance first: nothing is asked of the server without credits
+    local credits = ai_credits()
+    if credits and credits <= 0 then
+      local message = error_tag(tr("ui_ai_no_credits", tostring(credits)))
+      local links = ai_buy_links()
+      if links ~= "" then
+        message = message .. "<br>" .. links
+      end
+      setMessage(message)
+      return false
+    end
+    setMessage(loading_tag(credits and tr("ui_ai_creating_translation_credits", tostring(credits))
+                                    or strings.ui_ai_creating_translation))
   else
     setMessage(openSub.actionLabel..": "..progressBarContent(60))
   end
 
-  local res = client:post("http://api.opensubtitles.com/api/v1/download", request_body)
-  if os.getenv("VLSUB_TRACE_HTTP") == "1" then
+  local trace = os.getenv("VLSUB_TRACE_HTTP") == "1"
+  local function traced(what, answer)
     -- developer switch (tools/dev.sh run -v): the raw answer, to learn what
     -- the server says. Off in normal use: answers are never logged.
-    vlc.msg.warn("[VLSub] trace /download -> " .. (res and (tostring(res.status) .. " " .. tostring(res.body)) or "no answer"))
+    if trace then
+      vlc.msg.warn("[VLSub] trace " .. what .. " -> " .. (answer and (tostring(answer.status)
+        .. " location=" .. tostring(answer.headers and answer.headers["location"])
+        .. " body=" .. tostring(answer.body)) or "no answer"))
+    end
+    return answer
+  end
+
+  -- An on-demand translation is not ready when it is asked for. Measured on
+  -- the live API: the POST is answered with a redirect (302) to the place
+  -- where the result will be; that is fetched with the same credentials. If
+  -- it has no link yet the translation is still being made: wait and ask
+  -- again, a few times, saying so each time.
+  local rounds = item.OnDemand and 4 or 1
+  local res
+  for round = 1, rounds do
+    res = traced("POST /download", client:post("http://api.opensubtitles.com/api/v1/download", request_body))
+    if not item.OnDemand or not res then
+      break
+    end
+    local location = res.headers and res.headers["location"]
+    if res.status >= 301 and res.status <= 308 and location then
+      -- the same host only (the token goes with it), over plain HTTP like
+      -- every other API request
+      local path = string.match(location, "^https?://api%.opensubtitles%.com(/.*)$")
+        or string.match(location, "^(/.*)$")
+      if not path then
+        break
+      end
+      res = traced("GET " .. path, client:get("http://api.opensubtitles.com" .. path))
+      if not res then
+        break
+      end
+    end
+    if res.status ~= 200 or not res.body or res.body == "" then
+      break
+    end
+    local ok, answer = decode_object(res.body)
+    if not ok or answer.link or answer.content or round == rounds then
+      if ok and not (answer.link or answer.content) and not (answer.error or answer.message) then
+        return report_failure(strings.ui_ai_no_answer)
+      end
+      break
+    end
+    setMessage(loading_tag(tr("ui_ai_still_translating", tostring(round), tostring(rounds - 1))))
+    local waiting_since = os.time()
+    while os.time() - waiting_since < 5 do end
   end
   if not res then
     return report_failure(item.OnDemand and strings.ui_ai_no_answer or strings.ui_no_response_from_download_server)
@@ -5217,6 +5367,11 @@ openSub.downloadFromNewAPI = function(item, is_retry)
     local message = string.gsub(input_table["message"]:get_text(), "<[^>]*>", "")
     message = string.gsub(message, string.gsub(strings.mess_success, "%p", "%%%0") .. ":%s*", "")
     local quota = quota_text(used, remaining, reset_time)
+    if item.OnDemand then
+      -- paid with credits, not with the daily quota
+      local credits = ai_credits()
+      quota = credits and tr("ui_ai_credits_left", tostring(credits)) or ""
+    end
     if quota ~= "" then
       message = tr("ui_message_with_quota", message, quota)
     end

@@ -332,9 +332,24 @@ So that the feature can be seen in VLC before the download is measured:
 - `tools/dev.sh run -v` also prints the raw `/download` answer
   (`VLSUB_TRACE_HTTP=1`), to learn what the server really says.
 
-Missing: credits before / after, the no-credits message with a buy link, the
-"still translating" case, the configuration window line, translations of the
-3 new texts, the download fixtures and their tests.
+Measured on the user's Mac the same day: `POST /download` for an on-demand
+id is answered with **HTTP 302** and an empty body. Added after that:
+
+- the redirect is followed: `GET` of the `Location` (only on
+  `api.opensubtitles.com`, over plain HTTP, with the same credentials); an
+  answer without a link is taken as "still translating": wait 5 s and post
+  again, at most 3 more times, saying so each time;
+- credits: read before an on-demand download (balance 0: nothing is asked
+  for, a message with links to the credit packages instead) and after it
+  ("AI credits left: N"); the configuration window has an "AI credits" row
+  with a button that shows the balance and the packages on click (no request
+  for merely opening the window). Checkout links are shown, never logged,
+  and only made clickable when they are plain `https://…opensubtitles.com/`
+  addresses.
+
+Still missing: what the redirect target really answers (first while
+translating, then when done) as fixtures and tests; translations of the new
+texts; help text; README / CHANGELOG.
 
 ## Open questions
 

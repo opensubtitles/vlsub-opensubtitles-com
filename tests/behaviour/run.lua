@@ -80,6 +80,12 @@ EXCEPTIONS[6] = {
      .. "username / password fields (labels were two columns wide). Every field starts in "
      .. "column 2 now. In the configuration window a drop-down's column is not compared.",
 }
+EXCEPTIONS[7] = {
+  name = "AI on-demand subtitles (2.0)",
+  why = "new feature: an 'AI credits' row in the configuration window; entries the API "
+     .. "offers only to 2.x User-Agents are marked and paid with credits. Nothing else "
+     .. "may change: the row is left out of the comparison.",
+}
 local DROP_CONFIG_KEYS = EXCEPTIONS[2].drop_config_keys
 DROP_CONFIG_KEYS.interfaceLanguage = true
 DROP_CONFIG_KEYS.detectedLanguage = true
@@ -178,13 +184,16 @@ local function snapshot(env, norm, cursor)
     -- Exception 3: the configuration window has one more row. Leave that row
     -- out and number the remaining rows consecutively, in both recordings.
     local is_config = d.title:find("Configuration", 1, true) ~= nil
-    local skip_row, rows, row_number = nil, {}, {}
+    local skip, rows, row_number = {}, {}, {}
     if is_config then
       for _, x in ipairs(d.widgets) do
-        if x.kind == "label" and x.text == "Interface language:" then skip_row = x.row end
+        -- exception 3 (interface language) and 7 (AI credits): rows v1.3.2 did not have
+        if x.kind == "label" and (x.text == "Interface language:" or x.text == "AI credits:") then
+          skip[x.row] = true
+        end
       end
       for _, x in ipairs(d.widgets) do
-        if x.row and x.row ~= skip_row and not row_number[x.row] then
+        if x.row and not skip[x.row] and not row_number[x.row] then
           row_number[x.row] = true
           rows[#rows + 1] = x.row
         end
@@ -193,7 +202,7 @@ local function snapshot(env, norm, cursor)
       for position, row in ipairs(rows) do row_number[row] = position end
     end
     for _, x in ipairs(d.widgets) do
-      if not (is_config and x.row == skip_row and skip_row) then
+      if not (is_config and skip[x.row]) then
         local row = is_config and row_number[x.row] or x.row
         local col = (is_config and x.kind == "dropdown") and "*" or tostring(x.col) -- exception 6
         local line = string.format("%s @%s,%s %q", x.kind, col, tostring(row), norm(x.text or ""))
@@ -387,5 +396,5 @@ print(string.format("\n%d sessions, %d steps compared on %s: %d identical, %d di
   ran, steps, _VERSION, ran - failed, failed))
 print("agreed exceptions: " .. EXCEPTIONS[1].name .. "; " .. EXCEPTIONS[2].name .. "; " .. EXCEPTIONS[3].name
   .. "; " .. EXCEPTIONS[4].name .. "; " .. EXCEPTIONS[5].name
-  .. "; " .. EXCEPTIONS[6].name)
+  .. "; " .. EXCEPTIONS[6].name .. "; " .. EXCEPTIONS[7].name)
 os.exit(failed == 0 and 0 or 1)

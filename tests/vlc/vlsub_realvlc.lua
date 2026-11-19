@@ -317,7 +317,7 @@ step("interface language: fetch Slovak from the repository, window rebuilt in Sl
   local language = ui():_at(2, 9, "dropdown")
   line("     offered: " .. table.concat(language:_texts(), " | "))
   language:_choose_text("^Sloven")
-  ui():_at(1, 12, "button"):_click()
+  ui():_at(1, 13, "button"):_click()
   line("     window: " .. ui().title)
   line("     message: " .. message():gsub("<[^>]+>", ""))
   check(ui().title:find("Nastavenie", 1, true), "the window is not in Slovak")

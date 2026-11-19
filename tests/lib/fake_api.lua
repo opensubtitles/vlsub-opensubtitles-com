@@ -128,6 +128,7 @@ function M.new(opts)
     user = { allowed_downloads = 100, allowed_translations = 5, level = "Sub leecher",
              user_id = 66, ext_installed = false, vip = false },
     downloads_used = 0,
+    ai_credits = 2019,        -- GET /ai/credits (the specification's example value)
     rate_limit = nil,         -- number: 429 after that many requests
   }
 
@@ -231,6 +232,22 @@ function M.new(opts)
       return M.fixture("search_name_multi")
     end
     return M.fixture("search_name_en")
+  end))
+
+  -- AI credits: the shapes are the examples of the API specification
+  -- (/ai/credits, /ai/credits/buy); srv.ai_credits is the balance.
+  s:on("GET " .. API .. "/ai/credits", guard(function(req, srv)
+    if not authorized(req, srv) then return M.response(401, { message = "Unauthorized", status = 401 }) end
+    return M.response(200, { data = { credits = srv.ai_credits } })
+  end))
+  s:on("GET " .. API .. "/ai/credits/buy", guard(function(req, srv)
+    if not authorized(req, srv) then return M.response(401, { message = "Unauthorized", status = 401 }) end
+    return M.response(200, { data = {
+      { name = "500 credits", value = "5 USD", discount_percent = 0,
+        checkout_url = "https://ai.opensubtitles.com/assets/buy_credits.php?tag=EXAMPLE" },
+      { name = "1100 credits", value = "10 USD", discount_percent = 10,
+        checkout_url = "https://ai.opensubtitles.com/assets/buy_credits.php?tag=EXAMPLE1" },
+    } })
   end))
 
   s:on("GET " .. API .. "/utilities/guessit", guard(function(req)

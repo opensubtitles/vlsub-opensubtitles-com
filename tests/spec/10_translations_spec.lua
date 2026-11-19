@@ -20,7 +20,7 @@ end
 local function config_window(env)
   trigger_menu(2)
   local d = env.ui()
-  return { dialog = d, language = d:_at(2, 9, "dropdown"), save = d:_at(1, 12, "button") }
+  return { dialog = d, language = d:_at(2, 9, "dropdown"), save = d:_at(1, 13, "button") }
 end
 
 local function labels(d)

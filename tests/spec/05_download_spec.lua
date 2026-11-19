@@ -294,6 +294,63 @@ H.describe("AI on-demand entry (recorded search answer)", function()
     eq(#env.server:seen(DOWNLOAD), 1)
   end)
 
+  it("the balance is read first; without credits nothing is asked for and the buy links are shown", function()
+    local env = searched()
+    env.server.ai_credits = 0
+    env.results():_select(1)
+    env.ui():_button("Download"):_click()
+    eq(#env.server:seen(DOWNLOAD), 0, "no download request")
+    has(env.message(), "needs AI credits - your balance is 0")
+    has(env.message(), "<a href='https://ai.opensubtitles.com/assets/buy_credits.php?tag=EXAMPLE'>500 credits - 5 USD</a>")
+    for _, line in ipairs(env.vlc._messages()) do
+      ok(not line:find("buy_credits", 1, true), "checkout address in the log: " .. line)
+    end
+  end)
+
+  it("with credits the message names the balance before the request", function()
+    local env = searched()
+    local shown = {}
+    env.server:on(DOWNLOAD, function()
+      shown[#shown + 1] = env.message()
+      return api.response(503, { message = "busy" })
+    end)
+    env.results():_select(1)
+    env.ui():_button("Download"):_click()
+    has(shown[1], "Creating the AI translation (AI credits: 2019)")
+  end)
+
+  it("configuration window: the AI credits button shows the balance and where to buy", function()
+    local env = H.launch()
+    trigger_menu(2)
+    env.server:reset()
+    env.ui():_button("Show balance"):_click()
+    has(env.message(), "AI credits: 2019")
+    has(env.message(), "Buy AI credits:")
+    has(env.message(), "1100 credits - 10 USD")
+    eq(#env.server:seen("GET api.opensubtitles.com/api/v1/ai/credits"), 2, "the balance and the packages")
+  end)
+
+  it("opening the configuration window asks the server nothing about credits", function()
+    local env = H.launch()
+    env.server:reset()
+    trigger_menu(2)
+    eq(#env.server:seen("GET api.opensubtitles.com/api/v1/ai/credits"), 0)
+  end)
+
+  it("a checkout address that is not a plain https opensubtitles.com link is not made clickable", function()
+    local env = H.launch()
+    env.server:on("GET api.opensubtitles.com/api/v1/ai/credits/buy", function()
+      return api.response(200, { data = {
+        { name = "x", value = "1", checkout_url = "https://evil.example/buy" },
+        { name = "y", value = "2", checkout_url = "https://ai.opensubtitles.com/a'><b>" },
+        { name = "z", value = "3", checkout_url = "http://ai.opensubtitles.com/plain" } } })
+    end)
+    trigger_menu(2)
+    env.ui():_button("Show balance"):_click()
+    has(env.message(), "AI credits: 2019")
+    ok(not env.message():find("<a ", 1, true), env.message())
+  end)
+
   it("ordinary entries are not marked", function()
     local env = H.launch()
     local d = env.ui()
