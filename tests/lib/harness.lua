@@ -181,11 +181,16 @@ end
 --   login      false = no credentials saved            (default: valid ones)
 --   config     overrides for the saved vlsub_conf.json
 --   first_run  true = no config on disk at all
+--   macos      true = VLC for macOS: its folder layout and its label rendering (widget:_shown())
 --   server     table of fake_api options, or a prepared server
 --   activate   false = load only, do not call activate()
 function H.launch(o)
   o = o or {}
   local env = { home = H.tmpdir() }
+  if o.macos then -- VLC's folder on macOS; the mock then renders labels as macOS does
+    env.home = env.home .. "/Library/Application Support/org.videolan.vlc"
+    H.real_execute('mkdir -p "' .. env.home .. '"')
+  end
   env.dir = env.home .. "/lua/extensions/userdata/vlsub.com"
   env.server = (o.server and o.server.handle) and o.server or fake_api.new(o.server)
   env.vlc = mock.new({ dir = env.home, server = env.server, config = o.vlc_config,

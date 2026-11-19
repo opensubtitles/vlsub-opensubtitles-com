@@ -146,28 +146,29 @@ local update_config = {
 }
 
 -- Supported API sorting fields for /subtitles endpoint
+-- { value sent to the API, key of the text shown }
 local subtitle_sort_by_options = {
-  {"language", "Language"},
-  {"download_count", "Downloads"},
-  {"new_download_count", "New downloads"},
-  {"hearing_impaired", "Hearing impaired"},
-  {"hd", "HD"},
-  {"fps", "FPS"},
-  {"votes", "Votes"},
-  {"points", "Points"},
-  {"ratings", "Ratings"},
-  {"from_trusted", "Trusted"},
-  {"foreign_parts_only", "Foreign parts only"},
-  {"ai_translated", "AI translated"},
-  {"machine_translated", "Machine translated"},
-  {"upload_date", "Upload date"},
-  {"release", "Release"},
-  {"comments", "Comments"}
+  {"language", "ui_sort_language"},
+  {"download_count", "ui_sort_download_count"},
+  {"new_download_count", "ui_sort_new_download_count"},
+  {"hearing_impaired", "ui_sort_hearing_impaired"},
+  {"hd", "ui_sort_hd"},
+  {"fps", "ui_sort_fps"},
+  {"votes", "ui_sort_votes"},
+  {"points", "ui_sort_points"},
+  {"ratings", "ui_sort_ratings"},
+  {"from_trusted", "ui_sort_from_trusted"},
+  {"foreign_parts_only", "ui_sort_foreign_parts_only"},
+  {"ai_translated", "ui_sort_ai_translated"},
+  {"machine_translated", "ui_sort_machine_translated"},
+  {"upload_date", "ui_sort_upload_date"},
+  {"release", "ui_sort_release"},
+  {"comments", "ui_sort_comments"}
 }
 
 local subtitle_sort_direction_options = {
-  {"desc", "Desc"},
-  {"asc", "Asc"}
+  {"desc", "ui_sort_desc"},
+  {"asc", "ui_sort_asc"}
 }
 
 -- First, update the options structure to support 3 languages
@@ -494,7 +495,30 @@ local strings = {
   ui_saved_with_video = "Subtitles saved (saved with video file)",
   ui_saved_in_vlsub = "Subtitles saved (saved to VLSub directory)",
   ui_quota_downloads_reset = "Quota: %s/%s downloads, reset in: %s",
-  ui_message_with_quota = "%s. %s."
+  ui_message_with_quota = "%s. %s.",
+
+  -- Main window: sorting drop-downs and the idle message
+  ui_sort_language = "Language",
+  ui_sort_download_count = "Downloads",
+  ui_sort_new_download_count = "New downloads",
+  ui_sort_hearing_impaired = "Hearing impaired",
+  ui_sort_hd = "HD",
+  ui_sort_fps = "FPS",
+  ui_sort_votes = "Votes",
+  ui_sort_points = "Points",
+  ui_sort_ratings = "Ratings",
+  ui_sort_from_trusted = "Trusted",
+  ui_sort_foreign_parts_only = "Foreign parts only",
+  ui_sort_ai_translated = "AI translated",
+  ui_sort_machine_translated = "Machine translated",
+  ui_sort_upload_date = "Upload date",
+  ui_sort_release = "Release",
+  ui_sort_comments = "Comments",
+  ui_sort_desc = "Desc",
+  ui_sort_asc = "Asc",
+  ui_sort_default = "Default",
+  ui_ready_for_search = "Ready for search",
+  ui_none = "None"
 }
 
 -- A message with values filled in: tr(key, a, b) uses the string stored
@@ -620,6 +644,68 @@ local sub_languages = {
 -- Never pass request or response bodies, passwords or tokens.
 local function dbg(message)
   vlc.msg.dbg("[VLSub] " .. tostring(message))
+end
+
+-- macOS only: VLC's dialog there builds every label and HTML widget from
+-- the text converted to Latin-1 (VLCExtensionsDialogProvider.m), so a text
+-- with any character outside Latin-1 - "Hľadať", Cyrillic, Greek, CJK ... -
+-- comes out as an EMPTY label. Buttons, drop-downs and text fields are not
+-- affected. The widget parses its text as HTML, so numeric character
+-- references get through: "H&#318;ada&#357;". Qt (Linux, Windows) shows
+-- UTF-8 as it is and would show such references literally, hence macOS only.
+local function html_entities(text)
+  return (string.gsub(text, "[\194-\244][\128-\191]*", function(sequence)
+    local first = string.byte(sequence)
+    local code
+    if first < 224 then code = first - 192
+    elseif first < 240 then code = first - 224
+    else code = first - 240 end
+    for i = 2, #sequence do
+      code = code * 64 + (string.byte(sequence, i) - 128)
+    end
+    return "&#" .. code .. ";"
+  end))
+end
+
+local function on_macos()
+  local dir = vlc.config.userdatadir() or ""
+  return string.find(dir, "/Library/Application Support/", 1, true) ~= nil
+end
+
+-- vlc.dialog(), with the macOS label problem handled in one place: the
+-- returned dialog (and the labels it creates) take and return the text as
+-- written; what reaches VLC is the encoded form.
+local function new_dialog(title)
+  local real = vlc.dialog(title)
+  if not on_macos() then
+    return real
+  end
+  local originals = {} -- wrapped label -> real widget
+  local function wrap_label(widget, text)
+    local label = { text = text }
+    originals[label] = widget
+    return setmetatable(label, { __index = function(_, method)
+      if method == "set_text" then
+        return function(self, value)
+          self.text = value
+          return widget:set_text(html_entities(value))
+        end
+      elseif method == "get_text" then
+        return function(self) return self.text end
+      end
+      return function(_, ...) return widget[method](widget, ...) end
+    end })
+  end
+  return setmetatable({}, { __index = function(_, method)
+    if method == "add_label" or method == "add_html" then
+      return function(_, text, ...)
+        return wrap_label(real[method](real, html_entities(text or ""), ...), text or "")
+      end
+    elseif method == "del_widget" then
+      return function(_, widget) return real:del_widget(originals[widget] or widget) end
+    end
+    return function(_, ...) return real[method](real, ...) end
+  end })
 end
 
 local json = nil
@@ -883,12 +969,16 @@ function activate()
     initialize_auto_update()
   else
     show_appropriate_window()
-    if should_check_for_updates() then
-      -- at most once a day we are online anyway: also keep the list of
-      -- translations (and the one in use) fresh, at most once a week
-      if interface_language_is_stale() then
-        pcall(refresh_interface_language)
-      end
+    local check_updates = should_check_for_updates()
+    -- The list of translations (and the one in use) is kept fresh at most
+    -- once a week, when the daily update check is online anyway. An install
+    -- that has no list at all (just upgraded) fetches it right away, or the
+    -- "Interface language" drop-down would have nothing to offer.
+    local stale, never_fetched = interface_language_is_stale()
+    if (check_updates and stale) or never_fetched then
+      pcall(refresh_interface_language)
+    end
+    if check_updates then
       pcall(function()
         check_for_updates(false)
       end)
@@ -998,7 +1088,7 @@ function show_update_dialog(latest_version, release_notes, download_url)
   -- Close current dialog and show update dialog
   close_dlg()
 
-  dlg = vlc.dialog("VLSub Update Available - " .. latest_version)
+  dlg = new_dialog("VLSub Update Available - " .. latest_version)
 
   -- Row 1: Update notification header with link and version info in compact format
   dlg:add_label(tr("ui_update_available", update_config.current_version, latest_version), 1, 1, 6, 1)
@@ -1766,7 +1856,7 @@ function interface_main()
 
   -- Row 10: Status message
   input_table['message'] = nil
-  input_table['message'] = dlg:add_label('Ready for search', 1, 10, 6, 1)
+  input_table['message'] = dlg:add_label(strings.ui_ready_for_search, 1, 10, 6, 1)
 
   -- Row 11: Action buttons - MODIFIED HELP BUTTON
   dlg:add_button(
@@ -1784,10 +1874,18 @@ function interface_main()
 
   -- Set up language dropdowns
   assoc_select_conf('language', 'language', openSub.conf.languages, 2, lang["int_all"])
-  assoc_select_conf('language2', 'language2', openSub.conf.languages, 2, 'None')
-  assoc_select_conf('language3', 'language3', openSub.conf.languages, 2, 'None')
-  assoc_select_conf('sort_by', 'sortBy', openSub.conf.sortByOptions, 2, 'Default')
-  assoc_select_conf('sort_direction', 'sortDirection', openSub.conf.sortDirectionOptions, 2)
+  assoc_select_conf('language2', 'language2', openSub.conf.languages, 2, strings.ui_none)
+  assoc_select_conf('language3', 'language3', openSub.conf.languages, 2, strings.ui_none)
+  -- same order as the option tables, so a drop-down id is an index into them
+  local function shown(options)
+    local list = {}
+    for i, option in ipairs(options) do
+      list[i] = { option[1], strings[option[2]] }
+    end
+    return list
+  end
+  assoc_select_conf('sort_by', 'sortBy', shown(openSub.conf.sortByOptions), 2, strings.ui_sort_default)
+  assoc_select_conf('sort_direction', 'sortDirection', shown(openSub.conf.sortDirectionOptions), 2)
 
   -- Only call display_subtitles if we actually have search results to display
   if has_results() then
@@ -1891,8 +1989,8 @@ function interface_config()
 
 
   assoc_select_conf('default_language', 'language', openSub.conf.languages, 2, lang["int_all"])
-  assoc_select_conf('default_language2', 'language2', openSub.conf.languages, 2, 'None')
-  assoc_select_conf('default_language3', 'language3', openSub.conf.languages, 2, 'None')
+  assoc_select_conf('default_language2', 'language2', openSub.conf.languages, 2, strings.ui_none)
+  assoc_select_conf('default_language3', 'language3', openSub.conf.languages, 2, strings.ui_none)
   assoc_select_conf('downloadBehaviour', 'downloadBehaviour', openSub.conf.downloadBehaviours, 1)
 
   -- English, automatic, then the reviewed translations known so far
@@ -1959,17 +2057,17 @@ function trigger_menu(dlg_id)
   current_window_id = dlg_id
   if dlg_id == 1 then
     close_dlg()
-    dlg = vlc.dialog(
+    dlg = new_dialog(
       openSub.conf.useragent)
     interface_main()
   elseif dlg_id == 2 then
     close_dlg()
-    dlg = vlc.dialog(
+    dlg = new_dialog(
       openSub.conf.useragent..': '..lang["int_configuration"])
     interface_config()
   elseif dlg_id == 3 then
     close_dlg()
-    dlg = vlc.dialog(
+    dlg = new_dialog(
       openSub.conf.useragent..': '..lang["int_help"])
     interface_help()
   end
@@ -2098,7 +2196,7 @@ function show_debug_window()
   debug_messages = {}
   debug_log_rows = {} -- Array for individual log rows
 
-  debug_dlg = vlc.dialog("VLSub - Initializing...")
+  debug_dlg = new_dialog("VLSub - Initializing...")
 
   -- Create debug interface (6 columns, 16 rows)
   debug_dlg:add_label(strings.ui_vlsub_is_starting_up, 1, 1, 6, 1)
@@ -2489,7 +2587,7 @@ end
 
 -- Show error dialog for incompatible dkjson version
 function show_dkjson_error_dialog()
-  local error_dlg = vlc.dialog("VLSub - Incompatible dkjson Version")
+  local error_dlg = new_dialog("VLSub - Incompatible dkjson Version")
 
   error_dlg:add_label(strings.ui_vlsub_cannot_start_due_to_incompatible_dkjson, 1, 1, 6, 1)
   error_dlg:add_label("", 1, 2, 6, 1)
@@ -2752,7 +2850,7 @@ end
 function interface_language_is_stale()
   local index = read_locale_file("index.json")
   local fetched = index and tonumber(index.fetched) or 0
-  return (os.time() - fetched) > LOCALE_REFRESH_SECONDS
+  return (os.time() - fetched) > LOCALE_REFRESH_SECONDS, fetched == 0
 end
 
 function check_config()
@@ -2871,7 +2969,7 @@ function check_config()
   lang = strings -- just a short cut
 
   if not vlc.net or not vlc.net.poll then
-    dlg = vlc.dialog(
+    dlg = new_dialog(
       openSub.conf.useragent..': '..lang["mess_error"])
     interface_no_support()
     dlg:show()

@@ -151,6 +151,28 @@ local function new_widget(kind, dialog)
   end
   function w:_select(id) self.selected = { [id] = true } end -- list: user clicks row
   function w:_click() return self.func() end                -- button
+  -- What the user sees. On macOS a label / HTML widget is built from the
+  -- text converted to Latin-1 and parsed as HTML (VLCExtensionsDialogProvider.m):
+  -- any character outside Latin-1 makes the whole widget EMPTY; numeric
+  -- character references are decoded. Qt shows the text as it is.
+  function w:_shown()
+    local text = self.text or ""
+    if not (self.dialog.macos and (kind == "label" or kind == "html")) then return text end
+    for sequence in text:gmatch("[\194-\244][\128-\191]*") do
+      local first = sequence:byte()
+      if first >= 196 then return "" end -- U+0100 and above: not Latin-1
+    end
+    return (text:gsub("&#(%d+);", function(code)
+      code = tonumber(code)
+      if code < 128 then return string.char(code) end
+      if code < 2048 then return string.char(192 + math.floor(code / 64), 128 + code % 64) end
+      if code < 65536 then
+        return string.char(224 + math.floor(code / 4096), 128 + math.floor(code / 64) % 64, 128 + code % 64)
+      end
+      return string.char(240 + math.floor(code / 262144), 128 + math.floor(code / 4096) % 64,
+                         128 + math.floor(code / 64) % 64, 128 + code % 64)
+    end))
+  end
   function w:_texts()
     local out = {}
     for i, v in ipairs(self.values) do out[i] = v.text end
@@ -172,7 +194,8 @@ end
 local function new_dialog(vlc, title)
   assert(type(title) == "string", "vlc.dialog() needs a title string")
   -- VLC shows a dialog by itself once the calling function returns.
-  local d = { title = title, widgets = {}, updates = 0, deleted = false, visible = true }
+  local d = { title = title, widgets = {}, updates = 0, deleted = false, visible = true,
+              macos = vlc._macos }
   local api = {}
   for kind, names in pairs(WIDGET_ARGS) do
     api["add_" .. kind] = function(self, ...)
@@ -378,6 +401,8 @@ function M.new(opts)
                 intf = "" }
   for k, v in pairs(opts.config or {}) do cfg[k] = v end
   vlc._config = cfg
+  -- macOS is recognised the way the extension does it: by VLC's folder
+  vlc._macos = ((opts.userdatadir or dir):find("/Library/Application Support/", 1, true)) ~= nil
   ns("config", {
     get = function(name) return cfg[name] end,
     set = function(name, value) cfg[name] = value end,

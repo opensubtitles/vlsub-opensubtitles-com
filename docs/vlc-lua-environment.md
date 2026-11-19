@@ -149,3 +149,18 @@ functions. It reads **no global at all** - not `os`, not `vlc`, not even
 `pairs`. Anything that needs a library is looked up inside a function, when
 it is used. v1.3.2 obeys this; `tests/spec/00_smoke_spec.lua` ("loading the
 script") enforces it by loading the file in an empty environment.
+
+## macOS: labels lose text outside Latin-1
+
+VLC for macOS builds every label and HTML widget from the text converted to
+Latin-1 and parsed as HTML. A text with any character beyond U+00FF
+("Hľadať", Cyrillic, Greek, CJK ...) becomes an **empty** label: with a
+Slovak translation "Názov:" showed and "Používateľské meno:" was blank.
+Buttons, drop-downs, text fields and window titles are not affected, and Qt
+(Linux, Windows) shows UTF-8 as it is.
+
+Numeric character references survive (`H&#318;ada&#357;`), so on macOS the
+extension creates dialogs through `new_dialog()`, which encodes label / HTML
+text on the way in and returns the original text from `get_text()`. The test
+mock renders labels the macOS way (`widget:_shown()`, launch option
+`macos = true`), and a test opens every window in every language with it.

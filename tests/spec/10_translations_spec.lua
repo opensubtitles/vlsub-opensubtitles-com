@@ -74,6 +74,15 @@ describe("interface language: defaults", function()
        { "English", "Automatic (system language)", "Sloven\196\141ina (not reviewed)" })
   end)
 
+  it("an install without any list fetches it at start, even when today's update check is done", function()
+    local first = H.launch({ server = server_with("ready") })
+    local stamp = H.read_file(first.dir .. "/last_update_check.json")
+    local env = H.launch({ server = server_with("ready"), files = { ["last_update_check.json"] = stamp } })
+    eq(#locale_requests(env), 1, "the list")
+    eq(config_window(env).language:_texts(),
+       { "English", "Automatic (system language)", "Sloven\196\141ina" })
+  end)
+
   it("the list of languages is fetched at most once a week", function()
     local env = H.launch({ server = server_with("ready") })
     eq(#locale_requests(env), 1, "first start: the list")
@@ -392,5 +401,168 @@ describe("interface language: shipped translations", function()
       has(labels(env.ui()), translation.int_os_username)
       eq(env.errors(), {}, code)
     end
+  end)
+end)
+
+
+-- Everything the user can read in a dialog: { kind, text as shown }
+local function visible_texts(d)
+  local out = {}
+  for _, w in ipairs(d.widgets) do
+    if w.kind == "label" or w.kind == "html" or w.kind == "button" then
+      out[#out + 1] = { kind = w.kind, raw = w.text, shown = w:_shown() }
+    elseif w.kind == "dropdown" then
+      for _, v in ipairs(w.values) do out[#out + 1] = { kind = "dropdown", raw = v.text, shown = v.text } end
+    end
+  end
+  return out
+end
+
+local function with_translation(code, translation, o)
+  o = o or {}
+  local server = api.new()
+  server.locale["index.json"] = json.encode({ format = 1, languages = {
+    { code = code, name = "Test", english_name = "Test", status = "ready" } } })
+  server.locale[code .. ".json"] = json.encode(translation)
+  o.server = server
+  o.config = { interfaceLanguage = code }
+  o.files = { ["locale/index.json"] = json.encode({ format = 1, fetched = os.time(), languages = {
+                { code = code, name = "Test", english_name = "Test", status = "ready" } } }),
+              ["locale/" .. code .. ".json"] = json.encode({ fetched = os.time(), strings = translation }) }
+  return H.launch(o)
+end
+
+describe("interface language: nothing is left in English", function()
+  -- A pseudo-translation: every string of the table marked with "~". Any
+  -- text on screen without the mark did not come from the table, so no
+  -- translation can ever reach it ("Ready for search", "Default", "Desc"
+  -- were found this way, on a Mac, by a user).
+  local MARK = "~"
+  local pseudo = {}
+  for key, value in pairs(ENGLISH) do
+    if key ~= "int_no_support_mess" then pseudo[key] = MARK .. value end
+  end
+
+  -- Text that is rightly not translated
+  local function exempt(text, env)
+    return text == "" or text:find("^%s*$")
+      or text:find("^<[^>]*>%s*$")                 -- markup only (spacers, rules)
+      or text:find("^VLSub OpenSubtitles.com v")   -- product name and version
+      or text:find("^curl ") or text:find("^iwr ") -- install commands
+      or text:find(env.dir, 1, true)               -- a path
+      or text == "Test"                            -- the pseudo language's own name
+  end
+
+  local function unmarked(env, d, allowed)
+    local offenders = {}
+    for _, item in ipairs(visible_texts(d)) do
+      if not item.raw:find(MARK, 1, true) and not exempt(item.raw, env) and not (allowed and allowed[item.raw]) then
+        offenders[#offenders + 1] = item.kind .. ": " .. item.raw
+      end
+    end
+    return offenders
+  end
+
+  -- names of subtitle languages come from the API, in English
+  local function language_names()
+    local names = {}
+    for _, l in ipairs(api.fixture_json("languages").data) do names[l.language_name] = true end
+    return names
+  end
+
+  it("main window: every label, button and drop-down entry comes from the strings table", function()
+    local env = with_translation("xx", pseudo)
+    eq(unmarked(env, env.ui(), language_names()), {})
+  end)
+
+  it("configuration window: the same", function()
+    local env = with_translation("xx", pseudo)
+    trigger_menu(2)
+    eq(unmarked(env, env.ui(), language_names()), {})
+  end)
+
+  it("help window: the same", function()
+    local env = with_translation("xx", pseudo)
+    trigger_menu(3)
+    eq(unmarked(env, env.ui()), {})
+  end)
+
+  it("after a search and a download: the messages too", function()
+    local dir = H.tmpdir()
+    local env = with_translation("xx", pseudo, { media = "file://" .. dir .. "/Big.Buck.Bunny.2008.mkv" })
+    local d = env.ui()
+    d:_at(2, 1, "text_input"):set_text("big buck bunny")
+    d:_button("Search$"):_click()
+    has(env.message(), MARK)
+    eq(unmarked(env, env.ui(), language_names()), {})
+    env.results():_select(1)
+    env.ui():_button("Download"):_click()
+    has(env.message(), MARK)
+    eq(env.errors(), {})
+  end)
+end)
+
+describe("interface language: VLC for macOS", function()
+  -- macOS VLC shows a label whose text has any character outside Latin-1 as
+  -- an empty label (found by a user: half of the Slovak labels were blank,
+  -- the whole help window empty). See new_dialog() in the extension.
+  local index = json.decode(H.read_file(H.ROOT .. "/locale/index.json"))
+
+  local function windows(env)
+    local list = { { "main", env.ui() } }
+    trigger_menu(2) list[#list + 1] = { "configuration", env.ui() }
+    trigger_menu(3) list[#list + 1] = { "help", env.ui() }
+    return list
+  end
+
+  it("the mock renders labels as macOS does: non-Latin-1 text is blank unless written as &#N;", function()
+    local env = H.launch({ macos = true })
+    local d = env.vlc.dialog("x")
+    eq(d:add_label("N\195\161zov", 1, 1):_shown(), "N\195\161zov", "Latin-1 survives")
+    eq(d:add_label("H\196\190ada\197\165", 1, 2):_shown(), "", "beyond Latin-1: blank")
+    eq(d:add_label("H&#318;ada&#357;", 1, 3):_shown(), "H\196\190ada\197\165", "references are decoded")
+    eq(d:add_button("H\196\190ada\197\165", function() end, 1, 4):_shown(), "H\196\190ada\197\165", "buttons are fine")
+  end)
+
+  it("no label is blank and every label reads as translated, in every language and window", function()
+    for _, language in ipairs(index.languages) do
+      local translation = json.decode(H.read_file(H.ROOT .. "/locale/" .. language.code .. ".json"))
+      local env = with_translation(language.code, translation, { macos = true })
+      has(env.ui().widgets[1]:_shown(), translation.int_title, language.code .. ": first label of the main window")
+      for _, window in ipairs(windows(env)) do
+        for _, item in ipairs(visible_texts(window[2])) do
+          if (item.kind == "label" or item.kind == "html") and item.raw ~= "" then
+            ok(item.shown ~= "", language.code .. " " .. window[1] .. ": blank label for " .. item.raw)
+            ok(not item.shown:find("&#%d+;"), language.code .. " " .. window[1] .. ": reference left in " .. item.shown)
+          end
+        end
+      end
+      eq(env.errors(), {}, language.code)
+    end
+  end)
+
+  it("search and download in Slovak on macOS: messages are readable, the script still reads its own labels", function()
+    local dir = H.tmpdir()
+    local env = with_translation("sk", SLOVAK, { macos = true, media = "file://" .. dir .. "/Big.Buck.Bunny.2008.mkv" })
+    local d = env.ui()
+    d:_at(2, 1, "text_input"):set_text("big buck bunny")
+    d:_button(SLOVAK.int_search_name .. "$"):_click()
+    env.results():_select(1)
+    env.ui():_button(SLOVAK.ui_download:gsub("^[^%w]+", "")):_click()
+    local message
+    for _, w in ipairs(env.ui().widgets) do
+      if w.kind == "label" and w:_shown():find(SLOVAK.mess_success, 1, true) then message = w:_shown() end
+    end
+    ok(message, "success message shown")
+    has(message, SLOVAK.ui_loaded_with_video)
+    eq(env.errors(), {})
+  end)
+
+  it("Linux / Windows: label text is passed through untouched", function()
+    local env = with_translation("sk", SLOVAK)
+    for _, item in ipairs(visible_texts(env.ui())) do
+      ok(not item.raw:find("&#%d+;"), "reference in " .. item.raw)
+    end
+    has(labels(env.ui()), SLOVAK.int_title)
   end)
 end)
