@@ -4794,119 +4794,86 @@ function is_first_run()
 end
 
 
+-- Configuration window, after saving credentials: log in and show the
+-- account's level and download quota. Returns true when both worked.
 openSub.checkLoginAndUserInfo = function()
+  local function fail(message)
+    setMessage(error_tag(message))
+    return false
+  end
+
   openSub.actionLabel = strings.ui_checking_login_status
   setMessage(loading_tag(strings.ui_verifying_credentials))
 
-  -- First ensure we have credentials
-  local username = trim(openSub.option.os_username or "")
-  local password = trim(openSub.option.os_password or "")
-
-  if username == "" or password == "" then
-    setMessage(error_tag(strings.ui_username_and_password_are_required_for_authentic))
-    return false
+  if trim(openSub.option.os_username or "") == "" or trim(openSub.option.os_password or "") == "" then
+    return fail(strings.ui_username_and_password_are_required_for_authentic)
+  end
+  if not openSub.loginWithRestAPI() then
+    return false -- loginWithRestAPI has set the message
   end
 
-  -- Force fresh login (don't use cached token for verification)
-  local authenticated = openSub.loginWithRestAPI()
-
-  if not authenticated then
-    -- Error message should already be set by loginWithRestAPI
-    return false
-  end
-
-  -- Now get user information
   setMessage(loading_tag(strings.ui_fetching_account_information))
 
-  local user_info_url = "http://api.opensubtitles.com/api/v1/infos/user"
-
+  local auth_header = openSub.getAuthHeader()
+  if not auth_header then
+    return fail(strings.ui_no_authentication_token_available)
+  end
   local client = Curl.new()
   client:add_header("Api-Key", config.api_key)
-
-  -- Add authorization header
-  local auth_header = openSub.getAuthHeader()
-  if auth_header then
-    client:add_header("Authorization", auth_header)
-  else
-    setMessage(error_tag(strings.ui_no_authentication_token_available))
-    return false
-  end
-
+  client:add_header("Authorization", auth_header)
   client:set_timeout(30)
   client:set_retries(2)
 
-  local res = client:get(user_info_url)
-
+  local res = client:get("http://api.opensubtitles.com/api/v1/infos/user")
   if not res then
-    setMessage(error_tag(strings.ui_no_response_from_user_info_api))
-    return false
+    return fail(strings.ui_no_response_from_user_info_api)
   end
 
   if res.status == 401 then
-    setMessage(error_tag(strings.ui_authentication_failed_401_please_check_your_cred))
-    -- Clear invalid token
     openSub.session.token = ""
     openSub.session.token_expires = 0
-    return false
+    return fail(strings.ui_authentication_failed_401_please_check_your_cred)
   elseif res.status == 403 then
-    setMessage(error_tag(strings.ui_access_forbidden_403_insufficient_permissions))
-    return false
+    return fail(strings.ui_access_forbidden_403_insufficient_permissions)
   elseif res.status ~= 200 then
-    local errorMsg = strings.ui_user_info_request_failed_with_http_status .. res.status
+    local message = strings.ui_user_info_request_failed_with_http_status .. res.status
     if res.body then
       vlc.msg.err("[VLSub] Error response: " .. res.body)
-      -- Try to parse error message
       local ok, error_data = pcall(json.decode, res.body, 1, true)
       if ok and error_data and error_data.message then
-        errorMsg = errorMsg .. " - " .. error_data.message
+        message = message .. " - " .. error_data.message
       end
     end
-    setMessage(error_tag(errorMsg))
-    return false
+    return fail(message)
   end
 
   if not res.body then
-    setMessage(error_tag(strings.ui_empty_response_from_user_info_api))
-    return false
+    return fail(strings.ui_empty_response_from_user_info_api)
   end
-
-  -- Parse the user info response
   local ok, user_response = pcall(json.decode, res.body, 1, true)
   if not ok or not user_response then
-    setMessage(error_tag(strings.ui_failed_to_parse_user_info_response))
-    return false
+    return fail(strings.ui_failed_to_parse_user_info_response)
   end
-
   if not user_response.data then
-    setMessage(error_tag(strings.ui_invalid_user_info_response_format))
-    return false
+    return fail(strings.ui_invalid_user_info_response_format)
   end
 
   local user_data = user_response.data
-
-  -- Simple one-line format
   local downloads_count = user_data.downloads_count or 0
   local allowed_downloads = user_data.allowed_downloads or 0
   local username = user_data.username or strings.ui_unknown_2
   local level = user_data.level or strings.ui_unknown_2
   local reset_time = user_data.reset_time or user_data.reset_time_utc or strings.ui_unknown_2
-
   local user_info_html = success_tag("" .. username .. " (" .. level .. "), " .. downloads_count .. "/" .. allowed_downloads .. strings.ui_downloads_reset_in .. reset_time)
 
-  -- Store this message in a way that won't get cleared
   openSub.lastSuccessMessage = user_info_html
-
-  -- Force update the message display and ensure it persists
   setMessage(user_info_html)
   if dlg then
     dlg:update()
   end
 
-  -- Update session with fresh user info
   openSub.session.user_info = user_data
-
   dbg("User info check successful for: " .. (user_data.username or "unknown"))
-
   return true
 end
 
