@@ -192,3 +192,17 @@ Decided 2026-11-19: translations are hosted in the repository and downloaded
 on demand; existing installs stay English, new installs use Auto; only
 reviewed languages are listed; reuse of the original VLSub translations is
 fine (GPL).
+
+Implemented on branch `feature/translations` (2026-11-19). Differences from
+the plan above, decided with the user:
+
+- **Automatic download for the detected language on first run** (the plan
+  said no download on first run). It happens after the network test has
+  passed, next to requests the first run already makes.
+- The list of languages (`index.json`) is refreshed at start-up at most once
+  a week, in the moment the daily update check runs; the translation in use
+  is refreshed with it.
+- `"translationPreview": true` in the config file shows unreviewed
+  translations, for reviewers.
+- The old VLSub translations were not imported (only 28 of 271 strings still
+  match); Slovak was translated from scratch and is marked `review`.

@@ -145,8 +145,12 @@ do
 end
 
 local function message()
-  for _, w in ipairs(ui().widgets) do
-    if w.kind == "label" and w.row == 10 then return w.text end
+  -- the status line: row 10 in the main window, row 11 in the configuration
+  -- window (which is the one with a password field)
+  local d = ui()
+  local row = (#d:_all("password") > 0) and 11 or 10
+  for _, w in ipairs(d.widgets) do
+    if w.kind == "label" and w.row == row then return w.text end
   end
   return ""
 end

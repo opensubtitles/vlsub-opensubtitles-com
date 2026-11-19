@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Interface translations.** The configuration window has an "Interface language" setting: English, Automatic (system language), or any reviewed translation. Translations live in the repository (`locale/`) and are downloaded on demand, so new ones arrive without a new release. New installations follow the detected system language when a reviewed translation exists; existing installations stay English until changed. First translation: Slovak (awaiting review).
+
 ### Changed
 - **Internal clean-up of the script with no change in behaviour** (9,173 → 6,875 lines): dead code removed (old XML-RPC API, a second HTTP client, the unreachable interface-translation code), the three search paths share one request function, long functions split into steps, debug output cut to the useful lines. Verified with a new behaviour-diff test that runs 96 scripted sessions against both v1.3.2 and the current script and compares every request, window, message and file.
 - `vlsub_conf.json` now contains only settings (it used to include about 9 kB of interface text). Existing files keep working.

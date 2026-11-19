@@ -3,10 +3,12 @@
 One file per language: `locale/<code>.json`, where `<code>` is the language
 code OpenSubtitles uses (`sk`, `de`, `pt-br`, ...).
 
-> **Status:** the files here are data only. The extension does not load them
-> yet; that is phase 2 of `docs/refactor-brief.md` (a language drop-down in the
-> configuration window, files fetched from this folder on demand, English as
-> the fallback for every string that is missing).
+The extension itself carries English only. When a user picks another
+language in the configuration window (or a new installation detects one), the
+extension downloads `locale/<code>.json` from the `main` branch of this
+repository, stores it in its own folder and refreshes it at most once a week.
+A translation merged here therefore reaches users within a week, without a
+release.
 
 ## Files
 
@@ -19,7 +21,9 @@ code OpenSubtitles uses (`sk`, `de`, `pt-br`, ...).
 ## Status of a language
 
 - `review` - translated, but nobody who speaks the language has read it
-  through. **Not offered to users.**
+  through. **Not offered to users.** To look at one anyway, add
+  `"translationPreview": true` to `vlsub_conf.json`; it then appears in the
+  drop-down marked "(not reviewed)".
 - `ready` - a native speaker has read every string in context. Offered in the
   language drop-down.
 
@@ -41,6 +45,23 @@ the status and says who reviewed it.
 6. Emoji at the start of button labels stay.
 7. Do not translate product names: VLSub, OpenSubtitles.com, VLC, GuessIt,
    dkjson, IMDB.
+
+## What the extension does with a file
+
+It does not trust it. A translated string is used only if its key exists, it
+is a non-empty string of sane length, and its `%s` placeholders, HTML tags and
+edge spaces match the English string. Anything else is ignored and the
+English text is shown for that one string - so the rules above are enforced
+twice, here by the tests and in VLC by the extension.
+
+## Trying a translation before it is merged
+
+```bash
+VLSUB_LOCALE_URL=https://raw.githubusercontent.com/<you>/<fork>/<branch>/locale/ \
+  tools/dev.sh run
+```
+
+`tools/dev.sh realvlc` does this automatically for the branch you are on.
 
 ## Contributing
 
