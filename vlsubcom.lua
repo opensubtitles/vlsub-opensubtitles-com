@@ -182,7 +182,6 @@ local options = {
   removeTag = false,
   showMediaInformation = true,
   progressBarSize = 80,
-  debugLogging = false,
   translation = {
     int_all = 'All',
     int_descr = 'Download subtitles from OpenSubtitles.com',
@@ -433,6 +432,12 @@ local sub_languages = {
 
 -- initial declarations
 
+-- Debug output. VLC shows it at verbosity 2 (Tools > Messages, or --verbose=2).
+-- Never pass request or response bodies, passwords or tokens.
+local function dbg(message)
+  vlc.msg.dbg("[VLSub] " .. tostring(message))
+end
+
 local json = nil
 local dlg = nil
 local current_window_id = nil -- 1 = main, 2 = configuration, 3 = help (see trigger_menu)
@@ -491,7 +496,7 @@ end
 
 -- Enhanced activation to ensure file info is ready for auto-search
 function activate()
-  vlc.msg.dbg("[VLSub] Starting activation")
+  dbg("Starting activation")
 
   -- Reset status tracking variables
   configurationPassed = false
@@ -504,7 +509,7 @@ function activate()
 
   -- Only show debug window and run full tests on first run
   if is_first_run_detected then
-    vlc.msg.dbg("[VLSub] First run detected - showing debug window and running full initialization")
+    dbg("First run detected - showing debug window and running full initialization")
     show_debug_window()
     update_debug_progress("Initializing VLSub (First Run)...")
     append_debug_log("VLSub first-time setup started")
@@ -515,7 +520,7 @@ function activate()
       networkTestsFailed = true
     end
   else
-    vlc.msg.dbg("[VLSub] Subsequent run - skipping debug window and network tests for speed")
+    dbg("Subsequent run - skipping debug window and network tests for speed")
     networkTestsFailed = false
   end
 
@@ -542,9 +547,7 @@ function activate()
   if is_first_run_detected then
     update_debug_progress("Checking dkjson compatibility...")
   end
-  if openSub.option.debugLogging then
-    vlc.msg.dbg("[VLSub] Checking dkjson version: " .. tostring(json.version))
-  end
+  dbg("Checking dkjson version: " .. tostring(json.version))
   if not check_dkjson_compatibility() then
     vlc.msg.err("[VLSub] Incompatible dkjson version detected")
     if is_first_run_detected then
@@ -608,7 +611,7 @@ function activate()
     update_debug_progress("Detecting user locale...")
     append_debug_log("First run detected")
 
-    vlc.msg.dbg("[VLSub] Starting locale detection...")
+    dbg("Starting locale detection...")
     append_debug_log("Starting locale detection...")
 
     local saved_user_pref = openSub.option.language
@@ -681,16 +684,12 @@ function activate()
     if is_first_run_detected then
       append_debug_log("File info loaded for current media")
     end
-    if openSub.option.debugLogging then
-      vlc.msg.dbg("[VLSub] Media detected - will check for auto-search opportunity")
-    end
+    dbg("Media detected - will check for auto-search opportunity")
   else
     if is_first_run_detected then
       append_debug_log("No media loaded")
     end
-    if openSub.option.debugLogging then
-      vlc.msg.dbg("[VLSub] No media loaded - auto-search not possible")
-    end
+    dbg("No media loaded - auto-search not possible")
   end
 
   -- Authentication check (fast check for subsequent runs)
@@ -717,13 +716,11 @@ function activate()
   init_results.is_first_run = is_first_run_detected
   init_results.has_auth = is_authenticated
 
-  if openSub.option.debugLogging then
-    vlc.msg.dbg("[VLSub] Storing initialization results:")
-    vlc.msg.dbg("[VLSub]   - is_first_run: " .. tostring(init_results.is_first_run))
-    vlc.msg.dbg("[VLSub]   - has_auth: " .. tostring(init_results.has_auth))
-    vlc.msg.dbg("[VLSub]   - media_loaded: " .. tostring(vlc.input.item() ~= nil))
-    vlc.msg.dbg("[VLSub]   - has_file_info: " .. tostring(openSub.file.hasInput))
-  end
+  dbg("Storing initialization results:")
+  dbg("  - is_first_run: " .. tostring(init_results.is_first_run))
+  dbg("  - has_auth: " .. tostring(init_results.has_auth))
+  dbg("  - media_loaded: " .. tostring(vlc.input.item() ~= nil))
+  dbg("  - has_file_info: " .. tostring(openSub.file.hasInput))
 
   -- Mark initialization as complete
   initialization_complete = true
@@ -745,9 +742,7 @@ function activate()
     checkInitializationStatus()
   else
     -- Subsequent run - go directly to appropriate window with auto-search
-    if openSub.option.debugLogging then
-      vlc.msg.dbg("[VLSub] Subsequent run - going to appropriate window with auto-search check")
-    end
+    dbg("Subsequent run - going to appropriate window with auto-search check")
     show_appropriate_window()
   end
 
@@ -758,18 +753,14 @@ function activate()
     initialize_auto_update()
   else
     if should_check_for_updates() then
-      if openSub.option.debugLogging then
-        vlc.msg.dbg("[VLSub] Checking for updates in background")
-      end
+      dbg("Checking for updates in background")
       pcall(function()
         check_for_updates(false)
       end)
     end
   end
 
-  if openSub.option.debugLogging then
-    vlc.msg.dbg("[VLSub] Activation complete")
-  end
+  dbg("Activation complete")
 end
 
 
@@ -792,7 +783,7 @@ function get_last_update_check()
     elseif datadir then
       check_dir = datadir .. slash .. "lua" .. slash .. "extensions" .. slash .. "userdata" .. slash .. "vlsub.com"
     else
-      vlc.msg.dbg("[VLSub] No directory available for update check storage")
+      dbg("No directory available for update check storage")
       return 0
     end
 
@@ -805,13 +796,13 @@ function get_last_update_check()
   local check_file_path = check_dir .. slash .. update_config.last_check_file
 
   if not file_exist(check_file_path) then
-    vlc.msg.dbg("[VLSub] No previous update check file found")
+    dbg("No previous update check file found")
     return 0
   end
 
   local file = io.open(check_file_path, "rb")
   if not file then
-    vlc.msg.dbg("[VLSub] Cannot read update check file")
+    dbg("Cannot read update check file")
     return 0
   end
 
@@ -820,15 +811,11 @@ function get_last_update_check()
 
   local ok, data = pcall(json.decode, content, 1, true)
   if ok and data and data.last_check then
-    if openSub.option.debugLogging then
-      vlc.msg.dbg("[VLSub] Last update check: " .. data.last_check)
-    end
+    dbg("Last update check: " .. data.last_check)
     return tonumber(data.last_check) or 0
   end
 
-  if openSub.option.debugLogging then
-    vlc.msg.dbg("[VLSub] Invalid update check file format")
-  end
+  dbg("Invalid update check file format")
   return 0
 end
 
@@ -840,9 +827,7 @@ function should_check_for_updates()
   local now = os.time()
   local time_since_last_check = now - last_check
 
-  if openSub.option.debugLogging then
-    vlc.msg.dbg("[VLSub] Last update check: " .. last_check .. ", time since: " .. time_since_last_check .. "s")
-  end
+  dbg("Last update check: " .. last_check .. ", time since: " .. time_since_last_check .. "s")
 
   return time_since_last_check >= update_config.check_interval_seconds
 end
@@ -883,7 +868,7 @@ function show_update_dialog(latest_version, release_notes, download_url)
     return -- No dialog available
   end
 
-  vlc.msg.dbg("[VLSub] Showing update dialog for version: " .. latest_version)
+  dbg("Showing update dialog for version: " .. latest_version)
 
   -- Close current dialog and show update dialog
   close_dlg()
@@ -1205,7 +1190,7 @@ function save_last_update_check()
       file:write(content)
       file:flush()
       file:close()
-      vlc.msg.dbg("[VLSub] Update check timestamp saved")
+      dbg("Update check timestamp saved")
       return true
     end
   end
@@ -1217,21 +1202,21 @@ end
 
 -- Main function to check for updates (ENHANCED)
 function check_for_updates(force_check)
-  vlc.msg.dbg("[VLSub] check_for_updates called, force=" .. tostring(force_check))
+  dbg("check_for_updates called, force=" .. tostring(force_check))
 
   -- Don't check if no internet connection (unless forced)
   if networkTestsFailed and not force_check then
-    vlc.msg.dbg("[VLSub] Skipping update check - no internet connection")
+    dbg("Skipping update check - no internet connection")
     return
   end
 
   -- Check if we should perform the check (unless forced)
   if not force_check and not should_check_for_updates() then
-    vlc.msg.dbg("[VLSub] Skipping update check - too soon since last check")
+    dbg("Skipping update check - too soon since last check")
     return
   end
 
-  vlc.msg.dbg("[VLSub] Proceeding with update check...")
+  dbg("Proceeding with update check...")
 
   -- Make API request to GitHub
   local client = Curl.new()
@@ -1272,8 +1257,8 @@ function check_for_updates(force_check)
   -- Remove 'v' prefix if present
   latest_version = string.gsub(latest_version, "^v", "")
 
-  vlc.msg.dbg("[VLSub] Current version: " .. update_config.current_version)
-  vlc.msg.dbg("[VLSub] Latest version: " .. latest_version)
+  dbg("Current version: " .. update_config.current_version)
+  dbg("Latest version: " .. latest_version)
 
   -- Save that we performed the check (IMPORTANT: do this regardless of result)
   save_last_update_check()
@@ -1283,11 +1268,11 @@ function check_for_updates(force_check)
 
   if version_comparison > 0 then
     -- New version available
-    vlc.msg.dbg("[VLSub] Update available: " .. latest_version)
+    dbg("Update available: " .. latest_version)
 
     -- Check if this version was skipped (only if not forced)
     if is_version_skipped(latest_version) and not force_check then
-      vlc.msg.dbg("[VLSub] Version " .. latest_version .. " was previously skipped")
+      dbg("Version " .. latest_version .. " was previously skipped")
       return
     end
 
@@ -1308,7 +1293,7 @@ function check_for_updates(force_check)
     show_update_dialog(latest_version, release_notes, download_url)
 
   else
-    vlc.msg.dbg("[VLSub] No update available")
+    dbg("No update available")
     if force_check then
       -- If manually triggered, show a message only if we have an interface
       if input_table and input_table["message"] then
@@ -1320,18 +1305,18 @@ end
 
 -- Function to initialize auto-update checking (FIXED)
 function initialize_auto_update()
-  vlc.msg.dbg("[VLSub] Initializing auto-update system...")
+  dbg("Initializing auto-update system...")
 
   -- Always attempt update check, regardless of config state
   -- The only requirements are: json module loaded and some network connectivity
 
   if not jsonModuleLoaded then
-    vlc.msg.dbg("[VLSub] Skipping auto-update: JSON module not loaded")
+    dbg("Skipping auto-update: JSON module not loaded")
     return
   end
 
   -- Don't require full config - we can check for updates even without OpenSubtitles credentials
-  vlc.msg.dbg("[VLSub] Auto-update check starting...")
+  dbg("Auto-update check starting...")
 
   -- Perform update check in background (non-blocking)
   pcall(function()
@@ -1344,7 +1329,7 @@ end
 
 -- IP-based geolocation detection using api.myip.com
 function detect_ip_based_locale(detected_locales)
-  vlc.msg.dbg("[VLSub] Attempting IP-based geolocation detection...")
+  dbg("Attempting IP-based geolocation detection...")
 
   local ip_api_url = "https://api.myip.com"
 
@@ -1356,29 +1341,29 @@ function detect_ip_based_locale(detected_locales)
   local res = client:get(ip_api_url)
 
   if not res then
-    vlc.msg.dbg("[VLSub] IP geolocation: No response from API")
+    dbg("IP geolocation: No response from API")
     return
   end
 
 if not res or res.status ~= 200 then
   local status = (res and res.status) or "N/A"
-  vlc.msg.dbg("[VLSub] IP geolocation: API request failed with status: " .. status)
+  dbg("IP geolocation: API request failed with status: " .. status)
   return
 end
 
   if not res.body or res.body == "" then
-    vlc.msg.dbg("[VLSub] IP geolocation: Empty response body")
+    dbg("IP geolocation: Empty response body")
     return
   end
 
   -- Parse the JSON response
   local ok, ip_data = pcall(json.decode, res.body, 1, true)
   if not ok or not ip_data then
-    vlc.msg.dbg("[VLSub] IP geolocation: Failed to parse response: " .. (res.body or "no body"))
+    dbg("IP geolocation: Failed to parse response: " .. (res.body or "no body"))
     return
   end
 
-  vlc.msg.dbg("[VLSub] IP geolocation result: " .. json.encode(ip_data, { indent = true }))
+  dbg("IP geolocation result: " .. json.encode(ip_data, { indent = true }))
 
   -- Extract country code and map to language
   local country_code = ip_data.cc
@@ -1386,7 +1371,7 @@ end
   local ip_address = ip_data.ip
 
   if country_code and country_code ~= "" then
-    vlc.msg.dbg("[VLSub] Detected country from IP: " .. country_name .. " (" .. country_code .. ")")
+    dbg("Detected country from IP: " .. country_name .. " (" .. country_code .. ")")
 
     -- Map country codes to primary languages
     local country_language_map = {
@@ -1431,18 +1416,18 @@ end
 
     local primary_language = country_language_map[country_code]
     if primary_language then
-      vlc.msg.dbg("[VLSub] Mapped country " .. country_code .. " to primary language: " .. primary_language)
+      dbg("Mapped country " .. country_code .. " to primary language: " .. primary_language)
       table.insert(detected_locales, {source = "ip_geolocation", locale = primary_language})
 
       -- For some countries, add country-specific locale
       local country_specific = primary_language .. "_" .. country_code
       table.insert(detected_locales, {source = "ip_country_specific", locale = country_specific})
-      vlc.msg.dbg("[VLSub] Also added country-specific locale: " .. country_specific)
+      dbg("Also added country-specific locale: " .. country_specific)
     else
-      vlc.msg.dbg("[VLSub] No language mapping found for country: " .. country_code)
+      dbg("No language mapping found for country: " .. country_code)
     end
   else
-    vlc.msg.dbg("[VLSub] No country code in IP geolocation response")
+    dbg("No country code in IP geolocation response")
   end
 end
 
@@ -1457,7 +1442,7 @@ function initialize_languages()
   if file_exist(cache_file_path) then
     local file_stat = vlc.net.stat(cache_file_path)
     if file_stat and (os.time() - file_stat.modification_time < config.cache_languages_duration_seconds) then
-      vlc.msg.dbg("[VLSub] Loading languages from cache")
+      dbg("Loading languages from cache")
 
       local cache_file = io.open(cache_file_path, "rb")
       if cache_file then
@@ -1474,7 +1459,7 @@ function initialize_languages()
           end
 
           if #formatted_langs > 0 then
-            vlc.msg.dbg("[VLSub] Successfully loaded " .. #formatted_langs .. " languages from cache")
+            dbg("Successfully loaded " .. #formatted_langs .. " languages from cache")
             openSub.conf.languages = formatted_langs
             return
           end
@@ -1485,10 +1470,10 @@ function initialize_languages()
 
   -- Use built-in languages as fallback
   openSub.conf.languages = sub_languages
-  vlc.msg.dbg("[VLSub] Using built-in language list (" .. #sub_languages .. " languages)")
+  dbg("Using built-in language list (" .. #sub_languages .. " languages)")
 
   -- Try to fetch from API with aggressive timeouts
-  vlc.msg.dbg("[VLSub] Attempting to fetch fresh language list from API")
+  dbg("Attempting to fetch fresh language list from API")
 
   local client = Curl.new()
   client:set_aggressive_timeouts()
@@ -1506,7 +1491,7 @@ function initialize_languages()
           cache_file:write(res.body)
           cache_file:flush()
           cache_file:close()
-          vlc.msg.dbg("[VLSub] Cached " .. #parsed_data.data .. " languages")
+          dbg("Cached " .. #parsed_data.data .. " languages")
         end
       end
 
@@ -1519,7 +1504,7 @@ function initialize_languages()
       end
       if #formatted_langs > 0 then
         openSub.conf.languages = formatted_langs
-        vlc.msg.dbg("[VLSub] Updated with " .. #formatted_langs .. " languages from API")
+        dbg("Updated with " .. #formatted_langs .. " languages from API")
       end
     else
       vlc.msg.err("[VLSub] Failed to parse API language response")
@@ -1528,7 +1513,7 @@ function initialize_languages()
     vlc.msg.err("[VLSub] Failed to fetch languages from API, using built-in list")
   end
 
-  vlc.msg.dbg("[VLSub] Final language count: " .. #openSub.conf.languages)
+  dbg("Final language count: " .. #openSub.conf.languages)
 end
 
 
@@ -1539,12 +1524,12 @@ function close()
 end
 
 function deactivate()
-  vlc.msg.dbg("[VLsub] Bye bye!")
+  dbg("Bye bye!")
   if dlg then
     dlg:hide()
   end
 
-  vlc.msg.dbg("[VLsub] Keeping session token for next use")
+  dbg("Keeping session token for next use")
 end
 
 function menu()
@@ -1884,7 +1869,7 @@ function show_main()
 
   -- After showing the main interface, check if we should auto-search
   if should_auto_search() then
-    vlc.msg.dbg("[VLSub] Auto-searching subtitles for loaded media...")
+    dbg("Auto-searching subtitles for loaded media...")
 
     -- Small delay to ensure interface is fully loaded
     local start_time = os.clock()
@@ -1913,19 +1898,19 @@ end
 function should_auto_search()
   -- Check if we have media loaded
   if not openSub.file.hasInput then
-    vlc.msg.dbg("[VLSub] No media loaded - skipping auto-search")
+    dbg("No media loaded - skipping auto-search")
     return false
   end
 
   -- Check if we already have search results (avoid re-searching)
   if openSub.itemStore and type(openSub.itemStore) == "table" and #openSub.itemStore > 0 then
-    vlc.msg.dbg("[VLSub] Already have search results - skipping auto-search")
+    dbg("Already have search results - skipping auto-search")
     return false
   end
 
   -- Check if we have authentication (required for searching)
   if not is_authenticated then
-    vlc.msg.dbg("[VLSub] No authentication - skipping auto-search")
+    dbg("No authentication - skipping auto-search")
     return false
   end
 
@@ -1938,12 +1923,10 @@ function should_auto_search()
     if (guessit.title and guessit.title ~= "") or
        (guessit.season and guessit.episode) then
       has_useful_guessit_data = true
-      if openSub.option.debugLogging then
-        vlc.msg.dbg("[VLSub] GuessIt provided useful data - title: " ..
-                    (guessit.title or "none") .. ", season: " ..
-                    (guessit.season or "none") .. ", episode: " ..
-                    (guessit.episode or "none"))
-      end
+      dbg("GuessIt provided useful data - title: " ..
+                  (guessit.title or "none") .. ", season: " ..
+                  (guessit.season or "none") .. ", episode: " ..
+                  (guessit.episode or "none"))
     end
   end
 
@@ -1951,18 +1934,16 @@ function should_auto_search()
   local has_basic_movie_info = false
   if openSub.movie.title and openSub.movie.title ~= "" then
     has_basic_movie_info = true
-    if openSub.option.debugLogging then
-      vlc.msg.dbg("[VLSub] Have basic movie info - title: " .. openSub.movie.title)
-    end
+    dbg("Have basic movie info - title: " .. openSub.movie.title)
   end
 
   -- Auto-search if we have either GuessIt data or basic movie info
   if has_useful_guessit_data or has_basic_movie_info then
-    vlc.msg.dbg("[VLSub] Conditions met for auto-search")
+    dbg("Conditions met for auto-search")
     return true
   end
 
-  vlc.msg.dbg("[VLSub] No useful metadata found - skipping auto-search")
+  dbg("No useful metadata found - skipping auto-search")
   return false
 end
 
@@ -2061,7 +2042,7 @@ end
 
 
 function close_dlg()
-  vlc.msg.dbg("[VLSub] Closing dialog")
+  dbg("Closing dialog")
 
   if dlg ~= nil then
     dlg:hide()
@@ -2152,28 +2133,24 @@ function display_subtitles()
   local hasResults = false
 
   if not openSub.itemStore then
-    vlc.msg.dbg("[VLSub] itemStore is nil")
+    dbg("itemStore is nil")
     hasNoResults = true
   elseif type(openSub.itemStore) == "string" then
     if openSub.itemStore == "0" then
-      vlc.msg.dbg("[VLSub] itemStore is string '0'")
+      dbg("itemStore is string '0'")
       hasNoResults = true
     end
   elseif type(openSub.itemStore) == "number" then
     if openSub.itemStore == 0 then
-      vlc.msg.dbg("[VLSub] itemStore is number 0")
+      dbg("itemStore is number 0")
       hasNoResults = true
     end
   elseif type(openSub.itemStore) == "table" then
     if #openSub.itemStore == 0 then
-      if openSub.option.debugLogging then
-        vlc.msg.dbg("[VLSub] itemStore is empty table")
-      end
+      dbg("itemStore is empty table")
       hasNoResults = true
     else
-      if openSub.option.debugLogging then
-        vlc.msg.dbg("[VLSub] itemStore has " .. #openSub.itemStore .. " items")
-      end
+      dbg("itemStore has " .. #openSub.itemStore .. " items")
       hasResults = true
     end
   end
@@ -2318,7 +2295,7 @@ function open_subtitle_link()
     return false
   end
 
-  vlc.msg.dbg("[VLSub] Opening subtitle URL from API: " .. subtitle_url)
+  dbg("Opening subtitle URL from API: " .. subtitle_url)
 
   -- Create clickable link message
   local link_message = "<span style='color:#181'>"
@@ -2425,18 +2402,14 @@ function check_dkjson_compatibility()
 
   local version_str = tostring(json.version or "unknown")
 
-  if openSub.option.debugLogging then
-    vlc.msg.dbg("[VLSub] Testing dkjson compatibility (version: " .. version_str .. ")")
-  end
+  dbg("Testing dkjson compatibility (version: " .. version_str .. ")")
 
   -- Test integer parsing first (should always work)
   local int_json = '{"fps":25}'
   local ok_int, parsed_int = pcall(json.decode, int_json, 1, true)
 
   if ok_int and parsed_int then
-    if openSub.option.debugLogging then
-      vlc.msg.dbg("[VLSub] Integer parsing test passed")
-    end
+    dbg("Integer parsing test passed")
   else
     vlc.msg.err("[VLSub] Integer parsing test failed: " .. tostring(parsed_int))
     return false
@@ -2447,9 +2420,7 @@ function check_dkjson_compatibility()
   local ok_float, parsed_float = pcall(json.decode, float_json, 1, true)
 
   if ok_float and parsed_float then
-    if openSub.option.debugLogging then
-      vlc.msg.dbg("[VLSub] Float parsing test passed")
-    end
+    dbg("Float parsing test passed")
   else
     vlc.msg.err("[VLSub] Float parsing test failed: " .. tostring(parsed_float))
     vlc.msg.err("[VLSub] dkjson cannot parse floats - version too old")
@@ -2458,9 +2429,7 @@ function check_dkjson_compatibility()
     return false
   end
 
-  if openSub.option.debugLogging then
-    vlc.msg.dbg("[VLSub] dkjson compatibility check passed")
-  end
+  dbg("dkjson compatibility check passed")
   return true
 end
 
@@ -2581,27 +2550,26 @@ function check_config()
   end
 
   if openSub.conf.dirPath then
-    vlc.msg.dbg("[VLSub] Working directory: " ..
+    dbg("Working directory: " ..
       (openSub.conf.dirPath or "not found"))
 
     openSub.conf.filePath = openSub.conf.dirPath..filePath
 
     if config_saved
     and file_exist(openSub.conf.filePath) then
-      vlc.msg.dbg(
-        "[VLSub] Loading config file: "..openSub.conf.filePath)
+      dbg("Loading config file: "..openSub.conf.filePath)
       load_config()
     else
-      vlc.msg.dbg("[VLSub] No config file")
+      dbg("No config file")
       getenv_lang()
       config_saved = save_config()
       if not config_saved then
-        vlc.msg.dbg("[VLSub] Unable to save config")
+        dbg("Unable to save config")
       end
     end
 
   else
-    vlc.msg.dbg("[VLSub] Unable to find a suitable path"..
+    dbg("Unable to find a suitable path"..
       "to save config, please set it manually")
   end
 
@@ -2636,7 +2604,8 @@ function load_config()
 
   -- Written by versions up to 1.3.2, which had an (unreachable) interface
   -- translation feature. Accepted in old files and ignored.
-  local obsolete = { translation = true, translations_avail = true, intLang = true }
+  local obsolete = { translation = true, translations_avail = true, intLang = true,
+                     debugLogging = true }
 
   for key, value in pairs(option) do
     if obsolete[key] then
@@ -2781,7 +2750,7 @@ function apply_config()
   if openSub.conf.dirPath and not dir_path_err then
     config_saved = save_config()
     if config_saved then
-      vlc.msg.dbg("[VLSub] Configuration saved successfully")
+      dbg("Configuration saved successfully")
     else
       setError(lang["mess_err_conf_access"])
       return -- Exit if we can't save config
@@ -2822,7 +2791,7 @@ function apply_config()
     end
 
     -- Refresh the interface to show the enabled close button
-    vlc.msg.dbg("[VLSub] Authentication successful, refreshing config interface")
+    dbg("Authentication successful, refreshing config interface")
     if dlg then
       dlg:update()
     end
@@ -2840,7 +2809,7 @@ function apply_config()
       setMessage(error_tag("Login failed - please check your credentials.<br><small>Other configuration settings were saved successfully.</small>"))
     end
 
-    vlc.msg.dbg("[VLSub] Login failed but configuration was saved")
+    dbg("Login failed but configuration was saved")
   end
 end
 
@@ -2865,8 +2834,7 @@ function save_config()
 -- Dump local config into config file
   if openSub.conf.dirPath
   and openSub.conf.filePath then
-    vlc.msg.dbg(
-      "[VLSub] Saving config file:  "..
+    dbg("Saving config file:  "..
       openSub.conf.filePath)
 
     if file_touch(openSub.conf.filePath) then
@@ -2884,7 +2852,7 @@ function save_config()
     collectgarbage()
     return true
   else
-    vlc.msg.dbg("[VLSub] Unable fount a suitable path "..
+    dbg("Unable fount a suitable path "..
       "to save config, please set it manually")
     setError(lang["mess_err_conf_access"])
     return false
@@ -2963,9 +2931,7 @@ getFileInfo = function()
     file.guessit_data = nil; -- Clear GuessIt data when no input
     file.last_guessit_filename = nil; -- Clear cached filename
   else
-    if openSub.option.debugLogging then
-      vlc.msg.dbg("[VLSub] Video URI: "..item:uri())
-    end
+    dbg("Video URI: "..item:uri())
     local parsed_uri = vlc.net.url_parse(item:uri())
     file.uri = item:uri()
     file.protocol = parsed_uri["protocol"]
@@ -2986,9 +2952,7 @@ getFileInfo = function()
         path_for_host = "/" .. path_for_host
       end
       file.path = "//" .. uri_host .. path_for_host
-      if openSub.option.debugLogging then
-        vlc.msg.dbg("[VLSub] UNC/network path reconstructed: " .. file.path)
-      end
+      dbg("UNC/network path reconstructed: " .. file.path)
     end
 
     -- For windows
@@ -3047,9 +3011,7 @@ getFileInfo = function()
       file.name,
       "[%._]", " ")
 
-    if openSub.option.debugLogging then
-      vlc.msg.dbg("[VLSub] file info " .. json.encode(file, { indent = true }))
-    end
+    dbg("file info " .. json.encode(file, { indent = true }))
 
 
 -- Call GuessIt API when we have a valid filename (only if not already cached)
@@ -3068,9 +3030,7 @@ if file.completeName and file.completeName ~= "" then
   end
 
   if needs_guessit then
-    if openSub.option.debugLogging then
-      vlc.msg.dbg("[VLSub] Calling GuessIt for filename: " .. file.completeName)
-    end
+    dbg("Calling GuessIt for filename: " .. file.completeName)
     openSub.file.guessit_data = nil -- never keep the previous file's answer
     openSub.file.last_guessit_filename = file.completeName
     if openSub.callGuessIt(file.completeName) then
@@ -3148,12 +3108,10 @@ getMovieInfo = function()
       openSub.movie.episodeNumber = ""
     end
 
-    if openSub.option.debugLogging then
-      vlc.msg.dbg("[VLSub] Using GuessIt data - Title: " .. (openSub.movie.title or "none") ..
-                  ", Year: " .. (openSub.movie.year or "none") ..
-                  ", Season: " .. (openSub.movie.seasonNumber or "none") ..
-                  ", Episode: " .. (openSub.movie.episodeNumber or "none"))
-    end
+    dbg("Using GuessIt data - Title: " .. (openSub.movie.title or "none") ..
+                ", Year: " .. (openSub.movie.year or "none") ..
+                ", Season: " .. (openSub.movie.seasonNumber or "none") ..
+                ", Episode: " .. (openSub.movie.episodeNumber or "none"))
   else
     -- Fallback to original parsing logic if GuessIt data not available
     local showName, seasonNumber, episodeNumber = string.match(
@@ -3193,7 +3151,7 @@ getMovieInfo = function()
       openSub.movie.year = ""
     end
 
-    vlc.msg.dbg("[VLSub] Using fallback parsing - Title: " .. (openSub.movie.title or "none") ..
+    dbg("Using fallback parsing - Title: " .. (openSub.movie.title or "none") ..
                 ", Year: " .. (openSub.movie.year or "none") ..
                 ", Season: " .. (openSub.movie.seasonNumber or "none") ..
                 ", Episode: " .. (openSub.movie.episodeNumber or "none"))
@@ -3234,11 +3192,11 @@ end,
 
   -- Get data for hash calculation
   if openSub.file.is_archive then
-    vlc.msg.dbg("[VLSub] Read hash data from stream")
+    dbg("Read hash data from stream")
 
     local file = vlc.stream(openSub.file.uri)
     if not file then
-      vlc.msg.dbg("[VLSub] Cannot open stream for archive")
+      dbg("Cannot open stream for archive")
       setError("Cannot open archive stream for hashing")
       return false
     end
@@ -3249,7 +3207,7 @@ end,
 
     data_start = file:read(chunk_size)
     if not data_start then
-      vlc.msg.dbg("[VLSub] Cannot read start data from archive stream")
+      dbg("Cannot read start data from archive stream")
       setError("Cannot read archive data for hashing")
       return false
     end
@@ -3265,16 +3223,14 @@ end,
   elseif not file_exist(openSub.file.path)
   and openSub.file.stat then
     -- This case should not happen with our safety check, but keeping for completeness
-    vlc.msg.dbg("[VLSub] File doesn't exist but has stat - this shouldn't happen with safety checks")
+    dbg("File doesn't exist but has stat - this shouldn't happen with safety checks")
     setError("File not accessible for hashing")
     return false
   else
-    if openSub.option.debugLogging then
-      vlc.msg.dbg("[VLSub] Read hash data from local file")
-    end
+    dbg("Read hash data from local file")
     local file = io.open(openSub.file.path, "rb")
     if not file then
-      vlc.msg.dbg("[VLSub] Cannot open local file")
+      dbg("Cannot open local file")
       setError("Cannot open local file for hashing")
       return false
     end
@@ -3348,10 +3304,8 @@ end,
 
   openSub.file.bytesize = size
   openSub.file.hash = string.format("%08x%08x", hi,lo)
-  if openSub.option.debugLogging then
-    vlc.msg.dbg("[VLSub] Video hash: "..openSub.file.hash)
-    vlc.msg.dbg("[VLSub] Video bytesize: "..size)
-  end
+  dbg("Video hash: "..openSub.file.hash)
+  dbg("Video bytesize: "..size)
   collectgarbage()
   return true
 end,
@@ -3381,7 +3335,7 @@ function searchHash()
 
   -- Check if this is a suitable file for hashing BEFORE attempting hash calculation
   if not openSub.isLocalFileForHashing() then
-    vlc.msg.dbg("[VLSub] File not suitable for hash search, falling back to name search")
+    dbg("File not suitable for hash search, falling back to name search")
 
     -- Set up for name search fallback immediately
     openSub.lastSearchMethod = "hash_fallback" -- Track that this is a fallback
@@ -3398,7 +3352,7 @@ function searchHash()
 
     -- Only proceed with name search if we have a title
     if openSub.movie.title and openSub.movie.title ~= "" then
-      vlc.msg.dbg("[VLSub] Performing name search for streaming content with title: " .. openSub.movie.title)
+      dbg("Performing name search for streaming content with title: " .. openSub.movie.title)
 
       openSub.movie.sublanguageid = getSelectedLanguages()
 
@@ -3411,7 +3365,7 @@ function searchHash()
       openSub.checkSession()
       performNameSearchWithFallback()
     else
-      vlc.msg.dbg("[VLSub] Cannot perform search: no local file for hashing and no title for name search")
+      dbg("Cannot perform search: no local file for hashing and no title for name search")
       openSub.itemStore = {}
       setError("Hash search requires local files. Please enter a title for name search.")
     end
@@ -3425,7 +3379,7 @@ function searchHash()
 
   if not openSub.getMovieHash() then
     -- Hash calculation failed, try name search fallback if we have a title
-    vlc.msg.dbg("[VLSub] Hash calculation failed, attempting name search fallback")
+    dbg("Hash calculation failed, attempting name search fallback")
 
     openSub.lastSearchMethod = "hash_fallback"
     openSub.getMovieInfo()
@@ -3437,7 +3391,7 @@ function searchHash()
     end
 
     if openSub.movie.title and openSub.movie.title ~= "" then
-      vlc.msg.dbg("[VLSub] Performing name search fallback after hash failure")
+      dbg("Performing name search fallback after hash failure")
       openSub.checkSession()
       performNameSearchWithFallback()
     else
@@ -3454,32 +3408,32 @@ function searchHash()
   openSub.searchSubtitlesByHashNewAPI()
 
   -- Check if hash search returned results
-  vlc.msg.dbg("[VLSub] Hash search completed. itemStore type: " .. type(openSub.itemStore) .. ", value: " .. tostring(openSub.itemStore))
+  dbg("Hash search completed. itemStore type: " .. type(openSub.itemStore) .. ", value: " .. tostring(openSub.itemStore))
 
   local hasNoResults = false
 
   if not openSub.itemStore then
     hasNoResults = true
-    vlc.msg.dbg("[VLSub] itemStore is nil")
+    dbg("itemStore is nil")
   elseif type(openSub.itemStore) == "string" then
     if openSub.itemStore == "0" then
       hasNoResults = true
-      vlc.msg.dbg("[VLSub] itemStore is string '0'")
+      dbg("itemStore is string '0'")
     end
   elseif type(openSub.itemStore) == "number" then
     if openSub.itemStore == 0 then
       hasNoResults = true
-      vlc.msg.dbg("[VLSub] itemStore is number 0")
+      dbg("itemStore is number 0")
     end
   elseif type(openSub.itemStore) == "table" then
     if #openSub.itemStore == 0 then
       hasNoResults = true
-      vlc.msg.dbg("[VLSub] itemStore is empty table")
+      dbg("itemStore is empty table")
     end
   end
 
   if hasNoResults then
-    vlc.msg.dbg("[VLSub] Hash search returned 0 results, falling back to name search")
+    dbg("Hash search returned 0 results, falling back to name search")
 
     -- Set up for name search fallback
     openSub.lastSearchMethod = "hash_fallback"
@@ -3492,7 +3446,7 @@ function searchHash()
     end
 
     if openSub.movie.title and openSub.movie.title ~= "" then
-      vlc.msg.dbg("[VLSub] Performing fallback name search with title: " .. openSub.movie.title)
+      dbg("Performing fallback name search with title: " .. openSub.movie.title)
 
       openSub.itemStore = nil
       openSub.movie.sublanguageid = getSelectedLanguages()
@@ -3504,7 +3458,7 @@ function searchHash()
       openSub.checkSession()
       performNameSearchWithFallback()
     else
-      vlc.msg.dbg("[VLSub] Cannot perform name search fallback: no title available")
+      dbg("Cannot perform name search fallback: no title available")
     end
   end
 
@@ -3513,14 +3467,10 @@ end
 
 -- New function to perform name search
 function performNameSearchWithFallback()
-  if openSub.option.debugLogging then
-    vlc.msg.dbg("[VLSub] Starting name search")
-  end
+  dbg("Starting name search")
 
   -- Search with selected languages
-  if openSub.option.debugLogging then
-    vlc.msg.dbg("[VLSub] Name search with selected languages: " .. openSub.movie.sublanguageid)
-  end
+  dbg("Name search with selected languages: " .. openSub.movie.sublanguageid)
   openSub.searchSubtitlesNewAPI()
 
   -- Check if we got results
@@ -3577,7 +3527,7 @@ function searchIMBD_v2()
     local imdbId = extractIMDBId(imdbInput)
 
     if imdbId then
-      vlc.msg.dbg("[VLSub] IMDB ID provided: " .. imdbId)
+      dbg("IMDB ID provided: " .. imdbId)
       openSub.movie.imdbId = imdbId
 
       -- Get selected languages
@@ -3614,7 +3564,6 @@ function searchIMBD_v2()
   openSub.movie.imdbId = nil  -- Clear IMDB ID for name searches
 
   -- Debug: check available languages
-  debugLanguages()
 
   openSub.movie.sublanguageid = getSelectedLanguages()
 
@@ -3628,11 +3577,11 @@ end
 -- Simplified GuessIt function with persistent disk caching
 openSub.callGuessIt = function(filename)
   if not filename or filename == "" then
-    vlc.msg.dbg("[VLSub] GuessIt: No filename provided")
+    dbg("GuessIt: No filename provided")
     return false
   end
 
-  vlc.msg.dbg("[VLSub] GuessIt: Analyzing filename: " .. filename)
+  dbg("GuessIt: Analyzing filename: " .. filename)
 
   -- Check if we have a cached GuessIt result for this exact filename
   local cache_file = openSub.conf.dirPath .. slash .. "cache_guessit_" .. vlc.strings.encode_uri_component(filename) .. ".json"
@@ -3653,9 +3602,9 @@ openSub.callGuessIt = function(filename)
           if cache_age < config.cache_guessit_duration_seconds then
             cache_valid = true
             cached_data = cache_json.data
-            vlc.msg.dbg("[VLSub] Using cached GuessIt data (age: " .. math.floor(cache_age / 3600) .. " hours)")
+            dbg("Using cached GuessIt data (age: " .. math.floor(cache_age / 3600) .. " hours)")
           else
-            vlc.msg.dbg("[VLSub] GuessIt cache expired (age: " .. math.floor(cache_age / 3600) .. " hours)")
+            dbg("GuessIt cache expired (age: " .. math.floor(cache_age / 3600) .. " hours)")
           end
         end
       end
@@ -3686,13 +3635,13 @@ openSub.callGuessIt = function(filename)
   local res = client:get(guessit_url)
 
   if not res then
-    vlc.msg.dbg("[VLSub] GuessIt: No response from API")
+    dbg("GuessIt: No response from API")
     return false
   end
 
   if res.status ~= 200 then
     local status = res.status or "N/A"
-    vlc.msg.dbg("[VLSub] GuessIt: API request failed with status: " .. tostring(status))
+    dbg("GuessIt: API request failed with status: " .. tostring(status))
     return false
   end
 
@@ -3722,13 +3671,13 @@ openSub.callGuessIt = function(filename)
   if f then
     f:write(json.encode(cache_data))
     f:close()
-    vlc.msg.dbg("[VLSub] Saved GuessIt data to cache")
+    dbg("Saved GuessIt data to cache")
   else
-    vlc.msg.dbg("[VLSub] Failed to save GuessIt cache to disk")
+    dbg("Failed to save GuessIt cache to disk")
   end
 
   -- Simple debug output - just the raw JSON response
-  vlc.msg.dbg("[VLSub] GuessIt result: " .. json.encode(guessit_response, { indent = true }))
+  dbg("GuessIt result: " .. json.encode(guessit_response, { indent = true }))
 
   return true
 end
@@ -3740,7 +3689,7 @@ end
 function add_sub(subPath)
   if vlc.item or vlc.input.item() then
     subPath = decode_uri(subPath)
-    vlc.msg.dbg("[VLsub] Adding subtitle :" .. subPath)
+    dbg("Adding subtitle :" .. subPath)
     vlc.var.set(vlc.object.input(), 'sub-file', subPath)
 
     -- This is the key fix - use the same method as your working script
@@ -3749,7 +3698,7 @@ function add_sub(subPath)
     if success then
       -- Force enable subtitles like your working script does
       vlc.var.set(vlc.object.input(), "spu", true)
-      vlc.msg.dbg("[VLsub] Subtitle loaded and enabled successfully")
+      dbg("Subtitle loaded and enabled successfully")
       return true
     else
       vlc.msg.err("[VLsub] Failed to load subtitle")
@@ -3907,7 +3856,7 @@ function mkdir_p(path)
   if vlc.net and vlc.net.mkdir then
     local success = vlc.net.mkdir(path)
     if success then
-      vlc.msg.dbg("[VLSub] Created directory using VLC built-in: " .. path)
+      dbg("Created directory using VLC built-in: " .. path)
       return true
     end
   end
@@ -4033,7 +3982,7 @@ openSub.searchSubtitlesByIMDB = function(imdbId, is_retry)
   -- Add IMDB ID parameter (this is the primary search filter)
   if imdbId and imdbId ~= "" then
     params["imdb_id"] = imdbId
-    vlc.msg.dbg("[VLSub] Searching by IMDB ID: " .. imdbId)
+    dbg("Searching by IMDB ID: " .. imdbId)
   else
     vlc.msg.err("[VLSub] No IMDB ID provided")
     openSub.itemStore = "0"
@@ -4043,9 +3992,7 @@ openSub.searchSubtitlesByIMDB = function(imdbId, is_retry)
   -- Add language parameter (multiple languages, comma separated)
   if openSub.movie.sublanguageid and openSub.movie.sublanguageid ~= "all" then
     params["languages"] = openSub.movie.sublanguageid
-    if openSub.option.debugLogging then
-      vlc.msg.dbg("[VLSub] Searching in languages: " .. openSub.movie.sublanguageid)
-    end
+    dbg("Searching in languages: " .. openSub.movie.sublanguageid)
   end
 
   if openSub.option.sortBy and openSub.option.sortBy ~= "" then
@@ -4056,9 +4003,7 @@ openSub.searchSubtitlesByIMDB = function(imdbId, is_retry)
   -- Build URL with sorted parameters
   local url = build_sorted_url(base_url, params)
 
-  if openSub.option.debugLogging then
-    vlc.msg.dbg("[VLSub] API URL (sorted params, cleaned IDs): " .. url)
-  end
+  dbg("API URL (sorted params, cleaned IDs): " .. url)
 
   -- Make the API request with authentication
   local client = Curl.new()
@@ -4086,22 +4031,18 @@ openSub.searchSubtitlesByIMDB = function(imdbId, is_retry)
   end
 
   if res and res.status == 200 and res.body then
-    if openSub.option.debugLogging then
-      vlc.msg.dbg("[VLSub] API request successful, status: " .. res.status)
-    end
+    dbg("API request successful, status: " .. res.status)
     local ok, parsed_data = pcall(json.decode, res.body, 1, true)
     if ok and parsed_data and parsed_data.data then
       openSub.itemStore = openSub.convertNewAPIResponse(parsed_data.data)
-      if openSub.option.debugLogging then
-        vlc.msg.dbg("[VLSub] Found " .. #openSub.itemStore .. " subtitles by IMDB ID")
-      end
+      dbg("Found " .. #openSub.itemStore .. " subtitles by IMDB ID")
     else
       vlc.msg.err("[VLSub] Failed to parse API response: " .. (res.body or "no body"))
       openSub.itemStore = "0"
     end
   elseif res and res.status == 401 then
     -- Token expired or invalid, try to re-login
-    vlc.msg.dbg("[VLSub] Authentication failed, attempting re-login")
+    dbg("Authentication failed, attempting re-login")
     if not is_retry and openSub.refreshSession() then
       -- Retry the search once with the new token
       openSub.searchSubtitlesByIMDB(imdbId, true)
@@ -4139,7 +4080,7 @@ openSub.searchSubtitlesByIMDB = function(imdbId, is_retry)
     openSub.itemStore = "0"
   else
     vlc.msg.err("[VLSub] API request failed - no response")
-    vlc.msg.dbg("[VLSub] Response object: " .. tostring(res))
+    dbg("Response object: " .. tostring(res))
     openSub.itemStore = "0"
   end
 end
@@ -4251,21 +4192,21 @@ openSub.loginWithRestAPI = function()
 
   -- Check cached token first
   if openSub.session.token ~= "" and openSub.session.token_expires > os.time() then
-    vlc.msg.dbg("[VLSub] Using cached token")
+    dbg("Using cached token")
     return true
   end
 
   -- Check credentials
   if not openSub.option.os_username or not openSub.option.os_password or
      openSub.option.os_username == "" or openSub.option.os_password == "" then
-    vlc.msg.dbg("[VLSub] No credentials - using anonymous access")
+    dbg("No credentials - using anonymous access")
     openSub.session.token = ""
     openSub.session.user_info = nil
     openSub.session.token_expires = 0
     return true
   end
 
-  vlc.msg.dbg("[VLSub] Attempting login for: " .. openSub.option.os_username)
+  dbg("Attempting login for: " .. openSub.option.os_username)
 
   local login_data = {
     username = openSub.option.os_username,
@@ -4315,12 +4256,6 @@ openSub.loginWithRestAPI = function()
   end
 
   -- Mask token in logs for security
-  local masked_body = res.body
-  if openSub.option.debugLogging then
-    masked_body = string.gsub(res.body, '"token":"[^"]+"', '"token":"***MASKED***"')
-    vlc.msg.dbg("[VLSub] Login response body: " .. masked_body)
-  end
-
   -- Parse JSON response (body is now pre-cleaned by HTTP client)
   local ok, login_response = pcall(json.decode, res.body, 1, true)
   if not ok or not login_response then
@@ -4351,7 +4286,7 @@ openSub.loginWithRestAPI = function()
     openSub.session.base_url = login_response.base_url
   end
 
-  vlc.msg.dbg("[VLSub] Login successful")
+  dbg("Login successful")
   openSub.saveSessionCache()
 
   return true
@@ -4382,7 +4317,7 @@ openSub.saveSessionCache = function()
       cache_file:write(cache_content)
       cache_file:flush()
       cache_file:close()
-      vlc.msg.dbg("[VLSub] Session cached to: " .. cache_file_path)
+      dbg("Session cached to: " .. cache_file_path)
       return true
     end
   end
@@ -4415,25 +4350,25 @@ openSub.loadSessionCache = function()
 
   local ok, session_data = pcall(json.decode, cache_content, 1, true)
   if not ok or not session_data then
-    vlc.msg.dbg("[VLSub] Failed to parse session cache")
+    dbg("Failed to parse session cache")
     return false
   end
 
   -- Validate cache data
   if not session_data.token or not session_data.token_expires then
-    vlc.msg.dbg("[VLSub] Invalid session cache data")
+    dbg("Invalid session cache data")
     return false
   end
 
   -- Check if token is still valid
   if session_data.token_expires <= os.time() then
-    vlc.msg.dbg("[VLSub] Cached token expired")
+    dbg("Cached token expired")
     return false
   end
 
   -- Check if username matches (to handle account switching)
   if session_data.username ~= openSub.option.os_username then
-    vlc.msg.dbg("[VLSub] Cached session for different user")
+    dbg("Cached session for different user")
     return false
   end
 
@@ -4471,7 +4406,7 @@ openSub.saveAndLoadSubtitle = function(subtitle_content, item)
     return false
   end
 
-  vlc.msg.dbg("[VLSub] Processing subtitle content, size: " .. #subtitle_content .. " bytes")
+  dbg("Processing subtitle content, size: " .. #subtitle_content .. " bytes")
 
   -- Process subtitle content (remove tags if option is set)
   if openSub.option.removeTag then
@@ -4504,7 +4439,7 @@ openSub.saveAndLoadSubtitle = function(subtitle_content, item)
   local original_length = #subfileName
   subfileName = sanitize_filename(subfileName, 180)
   if original_length > 180 then
-    vlc.msg.dbg("[VLSub] Filename truncated from " .. original_length .. " to " .. #subfileName .. " characters")
+    dbg("Filename truncated from " .. original_length .. " to " .. #subfileName .. " characters")
   end
 
   if openSub.option.langExt then
@@ -4522,7 +4457,7 @@ openSub.saveAndLoadSubtitle = function(subtitle_content, item)
   if openSub.file.hasInput and openSub.file.dir and is_dir(openSub.file.dir) then
     target = openSub.file.dir..subfileName
     saveLocation = " (saved with video file)"
-    vlc.msg.dbg("[VLSub] Attempting to save with video file: " .. target)
+    dbg("Attempting to save with video file: " .. target)
 
   -- Second priority: Downloads folder when no video or video dir not accessible
   else
@@ -4531,13 +4466,13 @@ openSub.saveAndLoadSubtitle = function(subtitle_content, item)
       target = downloads_folder .. slash .. subfileName
       saveLocation = " (saved to Downloads folder)"
       saved_to_downloads = true
-      vlc.msg.dbg("[VLSub] Attempting to save to Downloads: " .. target)
+      dbg("Attempting to save to Downloads: " .. target)
 
     -- Third priority: VLSub directory
     elseif openSub.conf.dirPath then
       target = openSub.conf.dirPath..slash..subfileName
       saveLocation = " (saved to VLSub directory)"
-      vlc.msg.dbg("[VLSub] Attempting to save to VLSub directory: " .. target)
+      dbg("Attempting to save to VLSub directory: " .. target)
     else
       local errorMsg = "Cannot determine save location for subtitle file"
       vlc.msg.err("[VLSub] " .. errorMsg)
@@ -4548,7 +4483,7 @@ openSub.saveAndLoadSubtitle = function(subtitle_content, item)
 
   -- Test if we can write to the target location
   if not file_touch(target) then
-    vlc.msg.dbg("[VLSub] Cannot write to primary target, trying fallbacks...")
+    dbg("Cannot write to primary target, trying fallbacks...")
 
     -- Fallback 1: Downloads folder if not already tried
     if not saved_to_downloads then
@@ -4557,10 +4492,10 @@ openSub.saveAndLoadSubtitle = function(subtitle_content, item)
         target = downloads_folder .. slash .. subfileName
         saveLocation = " (saved to Downloads folder)"
         saved_to_downloads = true
-        vlc.msg.dbg("[VLSub] Fallback: trying Downloads folder: " .. target)
+        dbg("Fallback: trying Downloads folder: " .. target)
 
         if not file_touch(target) then
-          vlc.msg.dbg("[VLSub] Downloads folder also not writable")
+          dbg("Downloads folder also not writable")
         end
       end
     end
@@ -4570,7 +4505,7 @@ openSub.saveAndLoadSubtitle = function(subtitle_content, item)
       target = openSub.conf.dirPath..slash..subfileName
       saveLocation = " (saved to VLSub directory)"
       saved_to_downloads = false
-      vlc.msg.dbg("[VLSub] Final fallback: VLSub directory: " .. target)
+      dbg("Final fallback: VLSub directory: " .. target)
 
       if not file_touch(target) then
         local errorMsg = "Cannot write to any available location: " .. target
@@ -4588,7 +4523,7 @@ openSub.saveAndLoadSubtitle = function(subtitle_content, item)
     end
   end
 
-  vlc.msg.dbg("[VLSub] Final save target: " .. target)
+  dbg("Final save target: " .. target)
 
   -- Write subtitle content to file
   local subfile = io.open(target, "wb")
@@ -4603,13 +4538,13 @@ openSub.saveAndLoadSubtitle = function(subtitle_content, item)
   subfile:flush()
   subfile:close()
 
-  vlc.msg.dbg("[VLSub] Subtitle file saved successfully")
+  dbg("Subtitle file saved successfully")
 
   -- Try to load subtitles into VLC if video is playing
   local subtitle_loaded = false
   if openSub.file.hasInput and add_sub(target) then
     subtitle_loaded = true
-    vlc.msg.dbg("[VLSub] Subtitle loaded successfully into VLC")
+    dbg("Subtitle loaded successfully into VLC")
   end
 
   -- Build success message based on context
@@ -4678,7 +4613,7 @@ function download_subtitles_v2()
   setMessage(openSub.actionLabel..": "..progressBarContent(25))
 
   -- Always attempt automatic download (even without video loaded)
-  vlc.msg.dbg("[VLSub] Attempting automatic download. Video loaded: " .. tostring(openSub.file.hasInput))
+  dbg("Attempting automatic download. Video loaded: " .. tostring(openSub.file.hasInput))
 
   local success = openSub.downloadFromNewAPI(item)
 
@@ -4693,30 +4628,22 @@ function getSelectedLanguages()
 
   -- Debug: log dropdown values
   local sel1 = input_table["language"]:get_value()
-  if openSub.option.debugLogging then
-    vlc.msg.dbg("[VLSub] Primary language dropdown value: " .. tostring(sel1))
-  end
+  dbg("Primary language dropdown value: " .. tostring(sel1))
 
   -- Get primary language
   if sel1 > 0 and openSub.conf.languages[sel1] then
     local lang1 = openSub.conf.languages[sel1][1]
-    if openSub.option.debugLogging then
-      vlc.msg.dbg("[VLSub] Primary language selected: " .. lang1)
-    end
+    dbg("Primary language selected: " .. lang1)
     table.insert(languages, lang1)
   end
 
   -- Get secondary language
   if input_table["language2"] then
     local sel2 = input_table["language2"]:get_value()
-    if openSub.option.debugLogging then
-      vlc.msg.dbg("[VLSub] Secondary language dropdown value: " .. tostring(sel2))
-    end
+    dbg("Secondary language dropdown value: " .. tostring(sel2))
     if sel2 > 0 and openSub.conf.languages[sel2] then
       local lang2 = openSub.conf.languages[sel2][1]
-      if openSub.option.debugLogging then
-        vlc.msg.dbg("[VLSub] Secondary language selected: " .. lang2)
-      end
+      dbg("Secondary language selected: " .. lang2)
       -- Avoid duplicates
       local found = false
       for _, lang in ipairs(languages) do
@@ -4734,14 +4661,10 @@ function getSelectedLanguages()
   -- Get third language
   if input_table["language3"] then
     local sel3 = input_table["language3"]:get_value()
-    if openSub.option.debugLogging then
-      vlc.msg.dbg("[VLSub] Third language dropdown value: " .. tostring(sel3))
-    end
+    dbg("Third language dropdown value: " .. tostring(sel3))
     if sel3 > 0 and openSub.conf.languages[sel3] then
       local lang3 = openSub.conf.languages[sel3][1]
-      if openSub.option.debugLogging then
-        vlc.msg.dbg("[VLSub] Third language selected: " .. lang3)
-      end
+      dbg("Third language selected: " .. lang3)
       -- Avoid duplicates
       local found = false
       for _, lang in ipairs(languages) do
@@ -4766,9 +4689,7 @@ function getSelectedLanguages()
     result = table.concat(languages, ',')
   end
 
-  if openSub.option.debugLogging then
-    vlc.msg.dbg("[VLSub] Final language string: " .. result)
-  end
+  dbg("Final language string: " .. result)
   return result
 end
 
@@ -4798,14 +4719,6 @@ function applySubtitleSortingSelection()
 end
 
 -- Also add this debug function to check what languages are available
-function debugLanguages()
-  if openSub.option.debugLogging then
-    vlc.msg.dbg("[VLSub] Available languages:")
-    for i, lang in ipairs(openSub.conf.languages) do
-      vlc.msg.dbg("[VLSub] " .. i .. ": " .. lang[1] .. " = " .. lang[2])
-    end
-  end
-end
 
 
 -- Get user selected languages in order
@@ -4895,7 +4808,7 @@ function subtitle_list_click_handler()
 
   if time_diff < double_click_threshold and is_same_item and last_click_time > 0 then
     -- Double-click detected! Trigger download
-    vlc.msg.dbg("[VLSub] Double-click detected on item " .. selected_item .. ", triggering download")
+    dbg("Double-click detected on item " .. selected_item .. ", triggering download")
     download_subtitles_v2()
 
     -- Reset to prevent triple-click issues
@@ -4903,7 +4816,7 @@ function subtitle_list_click_handler()
     last_click_item = 0
   else
     -- Single click - just update tracking
-    vlc.msg.dbg("[VLSub] Single click on item " .. selected_item .. " (time: " .. current_time .. ")")
+    dbg("Single click on item " .. selected_item .. " (time: " .. current_time .. ")")
     last_click_time = current_time
     last_click_item = selected_item
   end
@@ -5001,7 +4914,7 @@ openSub.downloadFromNewAPI = function(item, is_retry)
         return false
     end
 
-    vlc.msg.dbg("[VLSub] Downloading subtitle file ID: " .. item.FileID)
+    dbg("Downloading subtitle file ID: " .. item.FileID)
     setMessage(openSub.actionLabel..": "..progressBarContent(50))
 
     -- Use the correct OpenSubtitles API endpoint with POST method
@@ -5013,8 +4926,8 @@ openSub.downloadFromNewAPI = function(item, is_retry)
         file_id = item.FileID
     })
 
-    vlc.msg.dbg("[VLSub] Making POST request to: " .. download_url)
-    vlc.msg.dbg("[VLSub] Request body: " .. request_body)
+    dbg("Making POST request to: " .. download_url)
+    dbg("Request body: " .. request_body)
 
     -- Make the API request with authentication using the fixed HTTP client
     local client = Curl.new()
@@ -5026,7 +4939,7 @@ openSub.downloadFromNewAPI = function(item, is_retry)
     local auth_header = openSub.getAuthHeader()
     if auth_header then
         client:add_header("Authorization", auth_header)
-        vlc.msg.dbg("[VLSub] Added Authorization header for download")
+        dbg("Added Authorization header for download")
     else
         local errorMsg = "Authentication required for download"
         vlc.msg.err("[VLSub] " .. errorMsg)
@@ -5127,7 +5040,7 @@ openSub.downloadFromNewAPI = function(item, is_retry)
         end
 
         if download_response.link then
-            vlc.msg.dbg("[VLSub] Got download link: " .. download_response.link)
+            dbg("Got download link: " .. download_response.link)
             setMessage(openSub.actionLabel..": "..progressBarContent(80))
 
             -- Download from the provided link using GET
@@ -5156,7 +5069,7 @@ openSub.downloadFromNewAPI = function(item, is_retry)
             subtitle_content = subtitle_res.body
         elseif download_response.content then
             subtitle_content = download_response.content
-            vlc.msg.dbg("[VLSub] Got direct subtitle content from API response")
+            dbg("Got direct subtitle content from API response")
         elseif download_response.error or download_response.message then
             -- e.g. 200 {"message":"Invalid file_id"}: an answer without a link
             -- is an explanation, never the subtitle itself
@@ -5166,10 +5079,10 @@ openSub.downloadFromNewAPI = function(item, is_retry)
             return false
         else
             subtitle_content = res.body
-            vlc.msg.dbg("[VLSub] Using entire response as subtitle content (fallback)")
+            dbg("Using entire response as subtitle content (fallback)")
         end
     else
-        vlc.msg.dbg("[VLSub] Response is not JSON, treating as direct subtitle content")
+        dbg("Response is not JSON, treating as direct subtitle content")
         subtitle_content = res.body
     end
 
@@ -5246,7 +5159,7 @@ function is_first_run()
   -- Check if any config file exists
   for _, config_path in ipairs(possible_config_paths) do
     if file_exist(config_path) then
-      vlc.msg.dbg("[VLSub] Found existing config: " .. config_path .. " - NOT first run")
+      dbg("Found existing config: " .. config_path .. " - NOT first run")
       return false
     end
   end
@@ -5272,7 +5185,7 @@ function is_first_run()
       for _, filename in ipairs(vlsub_files) do
         local filepath = dir_path .. current_slash .. filename
         if file_exist(filepath) then
-          vlc.msg.dbg("[VLSub] Found existing VLSub file: " .. filepath .. " - NOT first run")
+          dbg("Found existing VLSub file: " .. filepath .. " - NOT first run")
           return false
         end
       end
@@ -5282,12 +5195,12 @@ function is_first_run()
   -- Check VLC's sub-autodetect-path for vlsub_subtitles directory
   for path in vlc.config.get("sub-autodetect-path"):gmatch("[^,]+") do
     if path:match("vlsub_subtitles$") then
-      vlc.msg.dbg("[VLSub] Found vlsub_subtitles in VLC config - NOT first run")
+      dbg("Found vlsub_subtitles in VLC config - NOT first run")
       return false
     end
   end
 
-  vlc.msg.dbg("[VLSub] No VLSub files found anywhere - this IS first run")
+  dbg("No VLSub files found anywhere - this IS first run")
   return true
 end
 
@@ -5306,7 +5219,7 @@ openSub.checkLoginAndUserInfo = function()
   end
 
   -- Force fresh login (don't use cached token for verification)
-  vlc.msg.dbg("[VLSub] Performing fresh login for verification")
+  dbg("Performing fresh login for verification")
   local authenticated = openSub.loginWithRestAPI()
 
   if not authenticated then
@@ -5404,8 +5317,8 @@ openSub.checkLoginAndUserInfo = function()
   -- Update session with fresh user info
   openSub.session.user_info = user_data
 
-  vlc.msg.dbg("[VLSub] User info check successful for: " .. (user_data.username or "unknown"))
-  vlc.msg.dbg("[VLSub] Downloads: " .. downloads_count .. "/" .. allowed_downloads .. ", Remaining: " .. (user_data.remaining or "N/A"))
+  dbg("User info check successful for: " .. (user_data.username or "unknown"))
+  dbg("Downloads: " .. downloads_count .. "/" .. allowed_downloads .. ", Remaining: " .. (user_data.remaining or "N/A"))
 
   return true
 end
@@ -5416,40 +5329,36 @@ function openSub.isLocalFileForHashing()
 
   -- Check if we have valid file info
   if not file.hasInput or not file.protocol or not file.path then
-    vlc.msg.dbg("[VLSub] No valid file input for hashing")
+    dbg("No valid file input for hashing")
     return false
   end
 
   -- Only allow local file protocols
   if file.protocol ~= "file" then
-    vlc.msg.dbg("[VLSub] File protocol '" .. file.protocol .. "' not supported for hashing")
+    dbg("File protocol '" .. file.protocol .. "' not supported for hashing")
     return false
   end
 
   -- Check if file actually exists locally (for file:// protocol)
   if file.protocol == "file" then
     if file.is_archive then
-      vlc.msg.dbg("[VLSub] Archive files supported for hashing via stream")
+      dbg("Archive files supported for hashing via stream")
       return true
     end
 
     if not file.path or not file_exist(file.path) then
-      vlc.msg.dbg("[VLSub] File does not exist locally: " .. (file.path or "nil"))
+      dbg("File does not exist locally: " .. (file.path or "nil"))
       return false
     end
   end
 
   -- Additional check for minimum file size (very small files might not be valid)
   if file.stat and file.stat.size and file.stat.size < 65536 then
-    if openSub.option.debugLogging then
-      vlc.msg.dbg("[VLSub] File too small for reliable hashing: " .. file.stat.size .. " bytes")
-    end
+    dbg("File too small for reliable hashing: " .. file.stat.size .. " bytes")
     return false
   end
 
-  if openSub.option.debugLogging then
-    vlc.msg.dbg("[VLSub] File is suitable for hashing: " .. file.path)
-  end
+  dbg("File is suitable for hashing: " .. file.path)
   return true
 end
 
@@ -5476,7 +5385,7 @@ end
 function detect_user_locale()
   local detected_locales = {}
 
-  vlc.msg.dbg("[VLSub] Starting locale detection...")
+  dbg("Starting locale detection...")
 
   -- Method 1: Environment variables (Unix/Linux/macOS)
   local env_vars = {"LANG", "LANGUAGE", "LC_ALL", "LC_MESSAGES", "LC_CTYPE"}
@@ -5484,13 +5393,13 @@ function detect_user_locale()
   for _, var in ipairs(env_vars) do
     local value = os.getenv(var)
     if value and value ~= "" then
-      vlc.msg.dbg("[VLSub] Environment " .. var .. ": " .. value)
+      dbg("Environment " .. var .. ": " .. value)
       table.insert(detected_locales, {source = "env_" .. var, locale = value})
 
       -- Extract language code from locale (e.g., "en_US.UTF-8" -> "en")
       local lang_code = string.match(value, "^([a-z][a-z])")
       if lang_code then
-        vlc.msg.dbg("[VLSub] Extracted language code from " .. var .. ": " .. lang_code)
+        dbg("Extracted language code from " .. var .. ": " .. lang_code)
       end
     end
   end
@@ -5498,26 +5407,26 @@ function detect_user_locale()
   -- Method 2: VLC's own locale settings
   local vlc_lang = vlc.config.get("intf")
   if vlc_lang and vlc_lang ~= "" then
-    vlc.msg.dbg("[VLSub] VLC interface language: " .. vlc_lang)
+    dbg("VLC interface language: " .. vlc_lang)
     table.insert(detected_locales, {source = "vlc_intf", locale = vlc_lang})
   end
 
   -- Method 3: System locale via Lua's os.setlocale (works differently on different platforms)
   local sys_locale = os.setlocale(nil, "time")
   if sys_locale and sys_locale ~= "C" and sys_locale ~= "POSIX" then
-    vlc.msg.dbg("[VLSub] System locale (time): " .. sys_locale)
+    dbg("System locale (time): " .. sys_locale)
     table.insert(detected_locales, {source = "sys_time", locale = sys_locale})
   end
 
   local sys_locale_collate = os.setlocale(nil, "collate")
   if sys_locale_collate and sys_locale_collate ~= "C" and sys_locale_collate ~= "POSIX" then
-    vlc.msg.dbg("[VLSub] System locale (collate): " .. sys_locale_collate)
+    dbg("System locale (collate): " .. sys_locale_collate)
     table.insert(detected_locales, {source = "sys_collate", locale = sys_locale_collate})
   end
 
   local sys_locale_ctype = os.setlocale(nil, "ctype")
   if sys_locale_ctype and sys_locale_ctype ~= "C" and sys_locale_ctype ~= "POSIX" then
-    vlc.msg.dbg("[VLSub] System locale (ctype): " .. sys_locale_ctype)
+    dbg("System locale (ctype): " .. sys_locale_ctype)
     table.insert(detected_locales, {source = "sys_ctype", locale = sys_locale_ctype})
   end
 
@@ -5532,7 +5441,7 @@ function detect_user_locale()
 
   -- Method 5: Try to detect from user's subtitle language preferences if available
   if openSub.option.language and openSub.option.language ~= "" then
-    vlc.msg.dbg("[VLSub] User's preferred subtitle language: " .. openSub.option.language)
+    dbg("User's preferred subtitle language: " .. openSub.option.language)
     table.insert(detected_locales, {source = "user_pref", locale = openSub.option.language})
   end
 
@@ -5544,20 +5453,20 @@ function detect_user_locale()
   if #detected_locales == 0 then
     detect_ip_based_locale(detected_locales)
   else
-    vlc.msg.dbg("[VLSub] Locale known from the system, skipping IP geolocation")
+    dbg("Locale known from the system, skipping IP geolocation")
   end
 
   -- Analyze and prioritize the detected locales
   local best_guess = analyze_detected_locales(detected_locales)
 
-  vlc.msg.dbg("[VLSub] Locale detection summary:")
-  vlc.msg.dbg("[VLSub] Total detection methods tried: " .. #detected_locales)
+  dbg("Locale detection summary:")
+  dbg("Total detection methods tried: " .. #detected_locales)
   if best_guess then
-    vlc.msg.dbg("[VLSub] Best guess locale: " .. best_guess.locale .. " (from " .. best_guess.source .. ")")
-    vlc.msg.dbg("[VLSub] Extracted language: " .. (best_guess.language or "unknown"))
-    vlc.msg.dbg("[VLSub] Extracted country: " .. (best_guess.country or "unknown"))
+    dbg("Best guess locale: " .. best_guess.locale .. " (from " .. best_guess.source .. ")")
+    dbg("Extracted language: " .. (best_guess.language or "unknown"))
+    dbg("Extracted country: " .. (best_guess.country or "unknown"))
   else
-    vlc.msg.dbg("[VLSub] Could not determine user locale")
+    dbg("Could not determine user locale")
   end
 
   return best_guess
@@ -5568,7 +5477,7 @@ end
 
 -- 2. FIXED: detect_windows_locale function - remove all PowerShell/cmd commands
 function detect_windows_locale(detected_locales)
-  vlc.msg.dbg("[VLSub] Attempting Windows locale detection (safe methods only)...")
+  dbg("Attempting Windows locale detection (safe methods only)...")
 
   -- Only use safe environment variables and VLC's own settings
 
@@ -5583,7 +5492,7 @@ function detect_windows_locale(detected_locales)
   for _, var in ipairs(win_env_vars) do
     local value = os.getenv(var)
     if value and value ~= "" then
-      vlc.msg.dbg("[VLSub] Windows env " .. var .. ": " .. value)
+      dbg("Windows env " .. var .. ": " .. value)
       if var == "LANG" or var == "LANGUAGE" or var == "LC_ALL" or var == "LC_MESSAGES" then
         table.insert(detected_locales, {source = "win_env_" .. var, locale = value})
       end
@@ -5593,7 +5502,7 @@ function detect_windows_locale(detected_locales)
   -- Method 2: VLC's own language setting (safe, no external commands)
   local vlc_lang = vlc.config.get("intf")
   if vlc_lang and vlc_lang ~= "" then
-    vlc.msg.dbg("[VLSub] VLC Windows interface language: " .. vlc_lang)
+    dbg("VLC Windows interface language: " .. vlc_lang)
     table.insert(detected_locales, {source = "win_vlc_intf", locale = vlc_lang})
   end
 
@@ -5602,7 +5511,7 @@ function detect_windows_locale(detected_locales)
   if windir then
     local english_resources_path = windir .. "\\System32\\en-US"
     if is_dir(english_resources_path) then
-      vlc.msg.dbg("[VLSub] Found English resources directory")
+      dbg("Found English resources directory")
       table.insert(detected_locales, {source = "win_english_resources", locale = "en_US"})
     end
   end
@@ -5627,7 +5536,7 @@ function detect_windows_locale(detected_locales)
     for _, locale_info in ipairs(possible_locales) do
       local full_path = windir .. locale_info.path
       if is_dir(full_path) then
-        vlc.msg.dbg("[VLSub] Found locale directory: " .. locale_info.locale)
+        dbg("Found locale directory: " .. locale_info.locale)
         table.insert(detected_locales, {source = "win_locale_dir", locale = locale_info.locale})
         break -- Just take the first one found
       end
@@ -5638,7 +5547,7 @@ end
 
 -- macOS-specific locale detection using safe methods (no special permissions)
 function detect_macos_locale(detected_locales)
-  vlc.msg.dbg("[VLSub] Attempting macOS-specific locale detection (safe methods only)...")
+  dbg("Attempting macOS-specific locale detection (safe methods only)...")
 
   -- Method 1: Basic defaults read for public preferences (usually works without permissions)
   local safe_commands = {
@@ -5655,20 +5564,20 @@ function detect_macos_locale(detected_locales)
       handle:close()
 
       if result and result ~= "" then
-        vlc.msg.dbg("[VLSub] Safe macOS method " .. i .. " result: " .. result:sub(1, 100))
+        dbg("Safe macOS method " .. i .. " result: " .. result:sub(1, 100))
 
         if i == 1 then -- AppleLocale
           local locale = string.gsub(result, "%s+", "")
           locale = string.gsub(locale, "[\r\n]", "")
           if locale ~= "" and locale ~= "(null)" then
-            vlc.msg.dbg("[VLSub] Found safe AppleLocale: " .. locale)
+            dbg("Found safe AppleLocale: " .. locale)
             table.insert(detected_locales, {source = "macos_safe_locale", locale = locale})
           end
         elseif i == 2 then -- AppleLanguages (first few lines)
           -- Extract first language from array output
           local first_lang = string.match(result, '"([^"]+)"')
           if first_lang then
-            vlc.msg.dbg("[VLSub] Found safe AppleLanguage: " .. first_lang)
+            dbg("Found safe AppleLanguage: " .. first_lang)
             table.insert(detected_locales, {source = "macos_safe_language", locale = first_lang})
           end
         end
@@ -5681,7 +5590,7 @@ function detect_macos_locale(detected_locales)
   for _, var in ipairs(macos_env_vars) do
     local value = os.getenv(var)
     if value and value ~= "" and value ~= "C" then
-      vlc.msg.dbg("[VLSub] macOS env " .. var .. ": " .. value)
+      dbg("macOS env " .. var .. ": " .. value)
       table.insert(detected_locales, {source = "macos_env_" .. var, locale = value})
     end
   end
@@ -5694,7 +5603,7 @@ function detect_macos_locale(detected_locales)
 
     if tz_result and tz_result ~= "" then
       tz_result = string.gsub(tz_result, "[\r\n]", "")
-      vlc.msg.dbg("[VLSub] macOS timezone: " .. tz_result)
+      dbg("macOS timezone: " .. tz_result)
 
       -- Simple timezone to locale mapping (very basic)
       local tz_locale_map = {
@@ -5705,7 +5614,7 @@ function detect_macos_locale(detected_locales)
 
       local mapped_locale = tz_locale_map[tz_result]
       if mapped_locale then
-        vlc.msg.dbg("[VLSub] Mapped timezone " .. tz_result .. " to locale: " .. mapped_locale)
+        dbg("Mapped timezone " .. tz_result .. " to locale: " .. mapped_locale)
         table.insert(detected_locales, {source = "macos_timezone_hint", locale = mapped_locale})
       end
     end
@@ -5724,7 +5633,7 @@ function detect_macos_locale(detected_locales)
       handle:close()
 
       if result and result ~= "" then
-        vlc.msg.dbg("[VLSub] macOS region command " .. i .. " available")
+        dbg("macOS region command " .. i .. " available")
         if i == 1 then -- say command available
           table.insert(detected_locales, {source = "macos_say_available", locale = "en_US"})
         end
@@ -5780,7 +5689,7 @@ function analyze_detected_locales(detected_locales)
   for _, detection in ipairs(detected_locales) do
     local priority = source_priority[detection.source] or 0
 
-    vlc.msg.dbg("[VLSub] Analyzing: " .. detection.locale .. " (source: " .. detection.source .. ", priority: " .. priority .. ")")
+    dbg("Analyzing: " .. detection.locale .. " (source: " .. detection.source .. ", priority: " .. priority .. ")")
 
     -- Parse each detection to collect languages and countries
     local lang, country = parse_locale_string(detection.locale)
@@ -5816,14 +5725,14 @@ function analyze_detected_locales(detected_locales)
   end
 
   -- Log language analysis
-  vlc.msg.dbg("[VLSub] Language analysis:")
+  dbg("Language analysis:")
   for lang, info in pairs(languages_found) do
-    vlc.msg.dbg("[VLSub]   " .. lang .. ": priority=" .. info.priority .. ", count=" .. info.count .. ", source=" .. info.source)
+    dbg("  " .. lang .. ": priority=" .. info.priority .. ", count=" .. info.count .. ", source=" .. info.source)
   end
 
-  vlc.msg.dbg("[VLSub] Country analysis:")
+  dbg("Country analysis:")
   for country, info in pairs(countries_found) do
-    vlc.msg.dbg("[VLSub]   " .. country .. ": priority=" .. info.priority .. ", count=" .. info.count .. ", source=" .. info.source)
+    dbg("  " .. country .. ": priority=" .. info.priority .. ", count=" .. info.count .. ", source=" .. info.source)
   end
 
   if best_locale then
@@ -5863,13 +5772,13 @@ function analyze_detected_locales(detected_locales)
         if detected_country and (not most_likely_country or source_priority[detection.source] >= highest_country_priority) then
           most_likely_country = detected_country
           highest_country_priority = source_priority[detection.source] or 0
-          vlc.msg.dbg("[VLSub] Using IP-detected country: " .. detected_country)
+          dbg("Using IP-detected country: " .. detected_country)
         end
       end
     end
 
     if most_likely_country then
-      vlc.msg.dbg("[VLSub] Processing country-based languages for: " .. most_likely_country)
+      dbg("Processing country-based languages for: " .. most_likely_country)
 
       -- Enhanced country to languages mapping (native + commonly understood)
       local country_languages_map = {
@@ -6001,7 +5910,7 @@ function analyze_detected_locales(detected_locales)
 
       local country_languages = country_languages_map[most_likely_country]
       if country_languages then
-        vlc.msg.dbg("[VLSub] Found " .. #country_languages .. " languages for country " .. most_likely_country)
+        dbg("Found " .. #country_languages .. " languages for country " .. most_likely_country)
         for i, lang_code in ipairs(country_languages) do
           -- Skip if already added as primary
           local already_added = false
@@ -6013,7 +5922,7 @@ function analyze_detected_locales(detected_locales)
           end
 
           if not already_added then
-            vlc.msg.dbg("[VLSub] Adding country language " .. i .. ": " .. lang_code)
+            dbg("Adding country language " .. i .. ": " .. lang_code)
             table.insert(suggested_languages, {
               language = lang_code,
               priority = highest_country_priority,
@@ -6021,11 +5930,11 @@ function analyze_detected_locales(detected_locales)
               reason = i == 1 and "country_native_language" or "country_understood_language"
             })
           else
-            vlc.msg.dbg("[VLSub] Skipping duplicate language: " .. lang_code)
+            dbg("Skipping duplicate language: " .. lang_code)
           end
         end
       else
-        vlc.msg.dbg("[VLSub] No multilingual mapping found for country: " .. most_likely_country)
+        dbg("No multilingual mapping found for country: " .. most_likely_country)
       end
     end
 
@@ -6040,7 +5949,7 @@ function analyze_detected_locales(detected_locales)
 
     -- If English is not present and we have 1-2 languages detected, add English as fallback
     if not has_english and #suggested_languages >= 1 and #suggested_languages <= 2 then
-      vlc.msg.dbg("[VLSub] Adding English as fallback language (detected " .. #suggested_languages .. " non-English languages)")
+      dbg("Adding English as fallback language (detected " .. #suggested_languages .. " non-English languages)")
       table.insert(suggested_languages, {
         language = "en",
         priority = 1, -- Lower priority than detected languages
@@ -6051,7 +5960,7 @@ function analyze_detected_locales(detected_locales)
 
     -- ADDITIONAL: Always ensure English is available if no languages detected at all
     if #suggested_languages == 0 then
-      vlc.msg.dbg("[VLSub] No languages detected, defaulting to English")
+      dbg("No languages detected, defaulting to English")
       table.insert(suggested_languages, {
         language = "en",
         priority = 1,
@@ -6060,9 +5969,9 @@ function analyze_detected_locales(detected_locales)
       })
     end
 
-    vlc.msg.dbg("[VLSub] Final suggested languages count: " .. #suggested_languages)
+    dbg("Final suggested languages count: " .. #suggested_languages)
     for i, lang_suggestion in ipairs(suggested_languages) do
-      vlc.msg.dbg("[VLSub]   " .. i .. ": " .. lang_suggestion.language .. " (" .. lang_suggestion.reason .. ")")
+      dbg("  " .. i .. ": " .. lang_suggestion.language .. " (" .. lang_suggestion.reason .. ")")
     end
 
     return {
@@ -6084,7 +5993,7 @@ end
 
 -- Unix/Linux-specific locale detection
 function detect_unix_locale(detected_locales)
-  vlc.msg.dbg("[VLSub] Attempting Unix/Linux locale detection...")
+  dbg("Attempting Unix/Linux locale detection...")
 
   -- Check if we're on macOS for additional detection methods
   local is_macos = false
@@ -6094,9 +6003,9 @@ function detect_unix_locale(detected_locales)
     handle:close()
     if result and string.find(result, "Darwin") then
       is_macos = true
-      vlc.msg.dbg("[VLSub] Detected macOS system")
+      dbg("Detected macOS system")
     else
-      vlc.msg.dbg("[VLSub] Detected Unix/Linux system")
+      dbg("Detected Unix/Linux system")
     end
   end
 
@@ -6112,9 +6021,9 @@ function detect_unix_locale(detected_locales)
     handle:close()
 
     if result and result ~= "" then
-      vlc.msg.dbg("[VLSub] Locale command output:")
+      dbg("Locale command output:")
       for line in result:gmatch("[^\r\n]+") do
-        vlc.msg.dbg("[VLSub]   " .. line)
+        dbg("  " .. line)
 
         -- Extract locale values
         local var, value = string.match(line, "([^=]+)=(.+)")
@@ -6140,7 +6049,7 @@ function detect_unix_locale(detected_locales)
     -- These files are typically world-readable, no special permissions needed
     local file = io.open(file_path, "r")
     if file then
-      vlc.msg.dbg("[VLSub] Reading locale from: " .. file_path)
+      dbg("Reading locale from: " .. file_path)
       local content = file:read("*all")
       file:close()
 
@@ -6156,7 +6065,7 @@ function detect_unix_locale(detected_locales)
 
             if (string.match(var, "LANG") or string.match(var, "LC_")) and
                value ~= "C" and value ~= "POSIX" and value ~= "" then
-              vlc.msg.dbg("[VLSub] Found in " .. file_path .. ": " .. var .. "=" .. value)
+              dbg("Found in " .. file_path .. ": " .. var .. "=" .. value)
               table.insert(detected_locales, {source = "file_" .. string.gsub(file_path, ".*/", ""), locale = value})
             end
           end
@@ -6187,7 +6096,7 @@ function detect_unix_locale(detected_locales)
         result = string.gsub(result, "[\r\n]", " ")
         result = string.gsub(result, "^%s*(.-)%s*$", "%1")
 
-        vlc.msg.dbg("[VLSub] Linux safe command " .. i .. " result: " .. result:sub(1, 100))
+        dbg("Linux safe command " .. i .. " result: " .. result:sub(1, 100))
 
         if i <= 3 and result ~= "" then -- Environment variables
           table.insert(detected_locales, {source = "linux_printenv_" .. i, locale = result})
@@ -6195,13 +6104,13 @@ function detect_unix_locale(detected_locales)
           -- Parse first few available locales
           for locale in result:gmatch("([%w_%-%.]+)") do
             if string.match(locale, "^[a-z][a-z]_[A-Z][A-Z]") then
-              vlc.msg.dbg("[VLSub] Found available locale: " .. locale)
+              dbg("Found available locale: " .. locale)
               table.insert(detected_locales, {source = "linux_available_locale", locale = locale})
               break -- Just take the first good one
             end
           end
         elseif i == 5 and result ~= "" then -- Timezone
-          vlc.msg.dbg("[VLSub] Linux timezone: " .. result)
+          dbg("Linux timezone: " .. result)
           -- Map common timezones to likely locales
           local tz_locale_map = {
             ["America/New_York"] = "en_US",
@@ -6220,7 +6129,7 @@ function detect_unix_locale(detected_locales)
           }
           local mapped = tz_locale_map[result]
           if mapped then
-            vlc.msg.dbg("[VLSub] Mapped Linux timezone to: " .. mapped)
+            dbg("Mapped Linux timezone to: " .. mapped)
             table.insert(detected_locales, {source = "linux_timezone_hint", locale = mapped})
           end
         end
@@ -6238,7 +6147,7 @@ function detect_unix_locale(detected_locales)
   for _, var in ipairs(de_env_vars) do
     local value = os.getenv(var)
     if value then
-      vlc.msg.dbg("[VLSub] Desktop environment " .. var .. ": " .. value)
+      dbg("Desktop environment " .. var .. ": " .. value)
       -- This doesn't directly give us locale, but shows we're in a graphical environment
     end
   end
@@ -6255,7 +6164,7 @@ function detect_unix_locale(detected_locales)
     for _, file_path in ipairs(user_locale_files) do
       local file = io.open(file_path, "r")
       if file then
-        vlc.msg.dbg("[VLSub] Reading user locale from: " .. file_path)
+        dbg("Reading user locale from: " .. file_path)
         local content = file:read("*all")
         file:close()
 
@@ -6270,7 +6179,7 @@ function detect_unix_locale(detected_locales)
 
               if (string.match(var:lower(), "lang") or string.match(var:lower(), "locale")) and
                  value ~= "" and value ~= "C" then
-                vlc.msg.dbg("[VLSub] Found user locale: " .. var .. "=" .. value)
+                dbg("Found user locale: " .. var .. "=" .. value)
                 table.insert(detected_locales, {source = "linux_user_config", locale = value})
               end
             end
@@ -6320,7 +6229,7 @@ function parse_locale_string(locale_str)
     return language, string.lower(country)
   end
 
-  vlc.msg.dbg("[VLSub] Could not parse locale string: " .. locale_str)
+  dbg("Could not parse locale string: " .. locale_str)
   return nil, nil
 end
 
@@ -6466,24 +6375,18 @@ function show_appropriate_window()
   -- Check if user has valid authentication (already configured)
   local has_valid_auth = has_valid_authentication()
 
-  if openSub.option.debugLogging then
-    vlc.msg.dbg("[VLSub] Determining appropriate window:")
-    vlc.msg.dbg("[VLSub]   - has_valid_authentication(): " .. tostring(has_valid_auth))
-    vlc.msg.dbg("[VLSub]   - is_first_run result: " .. tostring(init_results.is_first_run))
-    vlc.msg.dbg("[VLSub]   - stored has_auth: " .. tostring(init_results.has_auth))
-  end
+  dbg("Determining appropriate window:")
+  dbg("  - has_valid_authentication(): " .. tostring(has_valid_auth))
+  dbg("  - is_first_run result: " .. tostring(init_results.is_first_run))
+  dbg("  - stored has_auth: " .. tostring(init_results.has_auth))
 
   -- Use the stored authentication check from initialization
   if init_results.has_auth or has_valid_auth then
-    if openSub.option.debugLogging then
-      vlc.msg.dbg("[VLSub] User has valid authentication - showing main window")
-    end
+    dbg("User has valid authentication - showing main window")
     is_authenticated = true
     show_main() -- This will now auto-search if conditions are met
   else
-    if openSub.option.debugLogging then
-      vlc.msg.dbg("[VLSub] No valid authentication - showing configuration window")
-    end
+    dbg("No valid authentication - showing configuration window")
     is_authenticated = false
     show_conf()
   end
@@ -6597,7 +6500,7 @@ function get_downloads_folder()
     end
   end
 
-  vlc.msg.dbg("[VLSub] Downloads folder detected: " .. (downloads_path or "not found"))
+  dbg("Downloads folder detected: " .. (downloads_path or "not found"))
   return downloads_path
 end
 
@@ -6680,7 +6583,7 @@ function checkInitializationStatus()
 
   -- Only auto-close if we have both: working core functionality AND network
   if allTestsPassed and not hasCriticalFailure and not networkTestsFailed then
-    vlc.msg.dbg("[VLSub] Full initialization successful - auto-closing debug window in 3 seconds")
+    dbg("Full initialization successful - auto-closing debug window in 3 seconds")
     append_debug_log("All tests passed - auto-closing in 3 seconds...")
 
     -- Update button to show countdown
@@ -6702,17 +6605,17 @@ function checkInitializationStatus()
     if debug_dlg then
       close_debug_window()
       show_appropriate_window()
-      vlc.msg.dbg("[VLSub] Debug window auto-closed")
+      dbg("Debug window auto-closed")
     end
   else
     -- Keep debug window open for user information
     if shouldStayOpen then
       if networkTestsFailed and allTestsPassed then
-        vlc.msg.dbg("[VLSub] Core functionality OK but offline - keeping debug window open")
+        dbg("Core functionality OK but offline - keeping debug window open")
         append_debug_log("Click 'Continue Offline' to proceed with limited functionality")
         update_debug_status("Click 'Continue Offline' to proceed")
       else
-        vlc.msg.dbg("[VLSub] Critical initialization failure - keeping debug window open")
+        dbg("Critical initialization failure - keeping debug window open")
         append_debug_log("Critical failures detected - click 'Continue Anyway' or 'Close VLSub'")
         update_debug_status("Critical errors - manual intervention needed")
       end
@@ -6779,9 +6682,9 @@ function build_sorted_url(base_url, params_table)
     for key, value in pairs(params_table) do
         -- Skip default values
         if key == "ai_translated" and value == "include" then
-            vlc.msg.dbg("[VLSub] Skipping default parameter: " .. key .. "=" .. tostring(value))
+            dbg("Skipping default parameter: " .. key .. "=" .. tostring(value))
         elseif key == "machine_translated" and value == "exclude" then
-            vlc.msg.dbg("[VLSub] Skipping default parameter: " .. key .. "=" .. tostring(value))
+            dbg("Skipping default parameter: " .. key .. "=" .. tostring(value))
         else
             filtered_params[key] = value
         end
@@ -6809,7 +6712,7 @@ function build_sorted_url(base_url, params_table)
                 if processed_value == "" then
                     processed_value = "0"
                 end
-                vlc.msg.dbg("[VLSub] Cleaned IMDB ID: " .. tostring(value) .. " -> " .. processed_value)
+                dbg("Cleaned IMDB ID: " .. tostring(value) .. " -> " .. processed_value)
             end
 
             -- Remove leading zeros from other ID parameters
@@ -6873,32 +6776,24 @@ openSub.searchSubtitlesNewAPI = function(is_retry)
   -- Add year parameter if available
   if openSub.movie.year and openSub.movie.year ~= "" then
     params["year"] = openSub.movie.year
-    if openSub.option.debugLogging then
-      vlc.msg.dbg("[VLSub] Including year in search: " .. openSub.movie.year)
-    end
+    dbg("Including year in search: " .. openSub.movie.year)
   end
 
   -- Add language parameter (multiple languages, comma separated)
   if openSub.movie.sublanguageid and openSub.movie.sublanguageid ~= "all" then
     params["languages"] = openSub.movie.sublanguageid
-    if openSub.option.debugLogging then
-      vlc.msg.dbg("[VLSub] Searching in languages: " .. openSub.movie.sublanguageid)
-    end
+    dbg("Searching in languages: " .. openSub.movie.sublanguageid)
   end
 
   -- Add season and episode if available
   if openSub.movie.seasonNumber and openSub.movie.seasonNumber ~= "" and tonumber(openSub.movie.seasonNumber) and tonumber(openSub.movie.seasonNumber) > 0 then
     params["season_number"] = openSub.movie.seasonNumber
-    if openSub.option.debugLogging then
-      vlc.msg.dbg("[VLSub] Including season: " .. openSub.movie.seasonNumber)
-    end
+    dbg("Including season: " .. openSub.movie.seasonNumber)
   end
 
   if openSub.movie.episodeNumber and openSub.movie.episodeNumber ~= "" and tonumber(openSub.movie.episodeNumber) and tonumber(openSub.movie.episodeNumber) > 0 then
     params["episode_number"] = openSub.movie.episodeNumber
-    if openSub.option.debugLogging then
-      vlc.msg.dbg("[VLSub] Including episode: " .. openSub.movie.episodeNumber)
-    end
+    dbg("Including episode: " .. openSub.movie.episodeNumber)
   end
 
   if openSub.option.sortBy and openSub.option.sortBy ~= "" then
@@ -6909,9 +6804,7 @@ openSub.searchSubtitlesNewAPI = function(is_retry)
   -- Build URL with sorted parameters
   local url = build_sorted_url(base_url, params)
 
-  if openSub.option.debugLogging then
-    vlc.msg.dbg("[VLSub] API URL (sorted params): " .. url)
-  end
+  dbg("API URL (sorted params): " .. url)
 
   -- Make the API request with authentication
   local client = Curl.new()
@@ -6929,15 +6822,11 @@ openSub.searchSubtitlesNewAPI = function(is_retry)
   local res = client:get(url)
 
   if res and res.status == 200 and res.body then
-    if openSub.option.debugLogging then
-      vlc.msg.dbg("[VLSub] API request successful, status: " .. res.status)
-    end
+    dbg("API request successful, status: " .. res.status)
     local ok, parsed_data = pcall(json.decode, res.body, 1, true)
     if ok and parsed_data and parsed_data.data then
       openSub.itemStore = openSub.convertNewAPIResponse(parsed_data.data)
-      if openSub.option.debugLogging then
-        vlc.msg.dbg("[VLSub] Found " .. #openSub.itemStore .. " subtitles")
-      end
+      dbg("Found " .. #openSub.itemStore .. " subtitles")
     else
       vlc.msg.err("[VLSub] Failed to parse API response: " .. (res.body or "no body"))
       openSub.itemStore = "0"
@@ -6948,7 +6837,7 @@ openSub.searchSubtitlesNewAPI = function(is_retry)
     openSub.itemStore = "0"
   elseif res and res.status == 401 then
     -- Token expired or invalid, try to re-login
-    vlc.msg.dbg("[VLSub] Authentication failed, attempting re-login")
+    dbg("Authentication failed, attempting re-login")
     if not is_retry and openSub.refreshSession() then
       -- Retry the search once with the new token
       openSub.searchSubtitlesNewAPI(true)
@@ -6992,9 +6881,7 @@ openSub.searchSubtitlesByHashNewAPI = function(is_retry)
     -- Add moviehash parameter (required for hash search)
     if openSub.file.hash and openSub.file.hash ~= "" then
         params["moviehash"] = openSub.file.hash
-        if openSub.option.debugLogging then
-          vlc.msg.dbg("[VLSub] Searching with hash: " .. openSub.file.hash)
-        end
+        dbg("Searching with hash: " .. openSub.file.hash)
     else
         vlc.msg.err("[VLSub] No movie hash available")
         openSub.itemStore = {} -- Set to empty table
@@ -7006,17 +6893,13 @@ openSub.searchSubtitlesByHashNewAPI = function(is_retry)
     -- Add moviebytesize parameter (recommended for better matching)
     if openSub.file.bytesize and openSub.file.bytesize > 0 then
         params["moviebytesize"] = tostring(openSub.file.bytesize)
-        if openSub.option.debugLogging then
-          vlc.msg.dbg("[VLSub] Using file size: " .. openSub.file.bytesize)
-        end
+        dbg("Using file size: " .. openSub.file.bytesize)
     end
 
     -- Add language parameter (multiple languages, comma separated)
     if openSub.movie.sublanguageid and openSub.movie.sublanguageid ~= "all" then
         params["languages"] = openSub.movie.sublanguageid
-        if openSub.option.debugLogging then
-          vlc.msg.dbg("[VLSub] Searching in languages: " .. openSub.movie.sublanguageid)
-        end
+        dbg("Searching in languages: " .. openSub.movie.sublanguageid)
     end
 
     if openSub.option.sortBy and openSub.option.sortBy ~= "" then
@@ -7027,9 +6910,7 @@ openSub.searchSubtitlesByHashNewAPI = function(is_retry)
     -- Build URL with sorted parameters
     local url = build_sorted_url(base_url, params)
 
-    if openSub.option.debugLogging then
-      vlc.msg.dbg("[VLSub] Hash search API URL (sorted params): " .. url)
-    end
+    dbg("Hash search API URL (sorted params): " .. url)
 
     -- Make the API request with authentication
     local client = Curl.new()
@@ -7060,21 +6941,17 @@ openSub.searchSubtitlesByHashNewAPI = function(is_retry)
     end
 
     if res and res.status == 200 and res.body then
-        if openSub.option.debugLogging then
-          vlc.msg.dbg("[VLSub] Hash search API request successful, status: " .. res.status)
-        end
+        dbg("Hash search API request successful, status: " .. res.status)
         local ok, parsed_data = pcall(json.decode, res.body, 1, true)
         if ok and parsed_data and parsed_data.data then
             openSub.itemStore = openSub.convertNewAPIResponse(parsed_data.data)
-            if openSub.option.debugLogging then
-              vlc.msg.dbg("[VLSub] Found " .. #openSub.itemStore .. " subtitles by hash")
-            end
+            dbg("Found " .. #openSub.itemStore .. " subtitles by hash")
 
             if #openSub.itemStore > 0 then
-                vlc.msg.dbg("[VLSub] Hash search successful - found synchronized subtitles")
+                dbg("Hash search successful - found synchronized subtitles")
                 setMessage(success_tag(lang["mess_complete"] .. ": " .. #openSub.itemStore .. " " .. lang["mess_res"]))
             else
-                vlc.msg.dbg("[VLSub] Hash search returned no results")
+                dbg("Hash search returned no results")
                 setMessage(error_tag(lang["mess_no_res"]))
             end
         else
@@ -7082,7 +6959,7 @@ openSub.searchSubtitlesByHashNewAPI = function(is_retry)
                 vlc.msg.err("[VLSub] JSON decode error: " .. tostring(parsed_data))
             end
             vlc.msg.err("[VLSub] Failed to parse hash search API response")
-            vlc.msg.dbg("[VLSub] Response body (first 500 chars): " .. string.sub(res.body or "", 1, 500))
+            dbg("Response body (first 500 chars): " .. string.sub(res.body or "", 1, 500))
             openSub.itemStore = {} -- Set to empty table
             setMessage(error_tag(lang["mess_no_res"]))
         end
@@ -7093,7 +6970,7 @@ openSub.searchSubtitlesByHashNewAPI = function(is_retry)
         setMessage(error_tag("API Error: URL parameters not sorted correctly"))
     elseif res and res.status == 401 then
         -- Token expired or invalid, try to re-login
-        vlc.msg.dbg("[VLSub] Authentication failed during hash search, attempting re-login")
+        dbg("Authentication failed during hash search, attempting re-login")
         if not is_retry and openSub.refreshSession() then
             -- Retry the search once with the new token
             openSub.searchSubtitlesByHashNewAPI(true)
@@ -7142,7 +7019,7 @@ openSub.searchSubtitlesByHashNewAPI = function(is_retry)
         end
     else
         vlc.msg.err("[VLSub] Hash search API request failed - no response")
-        vlc.msg.dbg("[VLSub] Response object: " .. tostring(res))
+        dbg("Response object: " .. tostring(res))
         openSub.itemStore = {} -- Set to empty table
         setMessage(error_tag(lang["mess_no_response"]))
     end
@@ -7170,7 +7047,7 @@ function VLCHttpClient:_build_url_params(url, data)
                 local decoded_key = url_decode(key)
                 local decoded_value = url_decode(value)
                 all_params[decoded_key] = decoded_value
-                vlc.msg.dbg("[VLSub] Decoded existing param: " .. decoded_key .. " = " .. decoded_value)
+                dbg("Decoded existing param: " .. decoded_key .. " = " .. decoded_value)
             end
         end
     end
@@ -7192,20 +7069,20 @@ function VLCHttpClient:_build_url_params(url, data)
         end
         if param_name then
             all_params[param_name] = value
-            vlc.msg.dbg("[VLSub] Added header param: " .. param_name .. " = " .. value)
+            dbg("Added header param: " .. param_name .. " = " .. value)
         end
     end
 
     -- Step 3: Add POST data if present
     if data then
         all_params["x-post-data"] = data
-        vlc.msg.dbg("[VLSub] Added POST data param")
+        dbg("Added POST data param")
     end
 
     -- Step 4: Build final URL with ALL parameters sorted alphabetically using custom encoder
     local final_url = build_sorted_url(base_url, all_params)
 
-    vlc.msg.dbg("[VLSub] Rebuilt URL with sorted params: " .. final_url)
+    dbg("Rebuilt URL with sorted params: " .. final_url)
 
     return final_url
 end
@@ -7270,9 +7147,7 @@ local function decode_chunked_body(body)
         return ""
     end
 
-    if openSub.option.debugLogging then
-      vlc.msg.dbg("[VLSub] Decoding chunked response, raw length: " .. string.len(body))
-    end
+    dbg("Decoding chunked response, raw length: " .. string.len(body))
 
     local decoded = ""
     local pos = 1
@@ -7297,21 +7172,15 @@ local function decode_chunked_body(body)
 
         if not chunk_size then
             -- Not a valid chunk size, might be the start of actual content
-            if openSub.option.debugLogging then
-              vlc.msg.dbg("[VLSub] Invalid chunk size, treating as regular content: " .. chunk_size_str)
-            end
+            dbg("Invalid chunk size, treating as regular content: " .. chunk_size_str)
             break
         end
 
-        if openSub.option.debugLogging then
-          vlc.msg.dbg("[VLSub] Chunk " .. chunk_count .. ": size=" .. chunk_size .. " (hex: " .. chunk_size_str .. ")")
-        end
+        dbg("Chunk " .. chunk_count .. ": size=" .. chunk_size .. " (hex: " .. chunk_size_str .. ")")
 
         if chunk_size == 0 then
             -- End of chunks
-            if openSub.option.debugLogging then
-              vlc.msg.dbg("[VLSub] End of chunks reached")
-            end
+            dbg("End of chunks reached")
             break
         end
 
@@ -7322,9 +7191,7 @@ local function decode_chunked_body(body)
         local chunk_data = string.sub(body, pos, pos + chunk_size - 1)
         decoded = decoded .. chunk_data
 
-        if openSub.option.debugLogging then
-          vlc.msg.dbg("[VLSub] Added chunk data: " .. string.len(chunk_data) .. " bytes")
-        end
+        dbg("Added chunk data: " .. string.len(chunk_data) .. " bytes")
 
         -- Move past the chunk data and trailing CRLF
         pos = pos + chunk_size
@@ -7336,9 +7203,7 @@ local function decode_chunked_body(body)
         chunk_count = chunk_count + 1
     end
 
-    if openSub.option.debugLogging then
-      vlc.msg.dbg("[VLSub] Chunked decoding complete: " .. string.len(decoded) .. " bytes")
-    end
+    dbg("Chunked decoding complete: " .. string.len(decoded) .. " bytes")
     return decoded
 end
 
@@ -7437,7 +7302,7 @@ function socket_exchange(host, port, request, timeout_seconds)
 end
 
 function VLCHttpClient:_make_request_stream(method, url, data)
-    vlc.msg.dbg("[VLSub] Using optimized vlc.stream for HTTPS request")
+    dbg("Using optimized vlc.stream for HTTPS request")
 
     -- Build final URL with minimal parameters to reduce URL length
     local final_url = self:_build_url_params(url, data)
@@ -7458,7 +7323,7 @@ function VLCHttpClient:_make_request_stream(method, url, data)
     while bytes_read < max_size do
         -- Aggressive timeout check
         if (os.clock() - start_time) > self.timeout then
-            vlc.msg.dbg("[VLSub] Stream timeout, breaking")
+            dbg("Stream timeout, breaking")
             break
         end
 
@@ -7472,12 +7337,12 @@ function VLCHttpClient:_make_request_stream(method, url, data)
 
         -- Early break if we detect end of JSON (skip for raw subtitle downloads)
         if not self.raw and string.find(chunk, "}$") and string.find(response_data, "^{") then
-            vlc.msg.dbg("[VLSub] Detected complete JSON, stopping read")
+            dbg("Detected complete JSON, stopping read")
             break
         end
     end
 
-    vlc.msg.dbg("[VLSub] Read " .. bytes_read .. " bytes in " ..
+    dbg("Read " .. bytes_read .. " bytes in " ..
                 string.format("%.2f", (os.clock() - start_time)) .. " seconds")
 
     if bytes_read > 0 then
@@ -7513,19 +7378,7 @@ function VLCHttpClient:_make_request_tcp(method, url, data)
         full_path = full_path .. "?" .. option
     end
 
-    vlc.msg.dbg("[VLSub] Using vlc.net.connect_tcp for " .. protocol .. " request to " .. host .. ":" .. port)
-
-    if openSub.option.debugLogging then
-      -- Debug: Show all client headers
-      vlc.msg.dbg("[VLSub] Client headers stored:")
-      for key, value in pairs(self.headers) do
-          local masked_value = value
-          if string.lower(key) == "api-key" or string.lower(key) == "authorization" then
-              masked_value = string.sub(value, 1, 8) .. "...***"
-          end
-          vlc.msg.dbg("[VLSub]   " .. key .. ": " .. masked_value)
-      end
-    end
+    dbg("Using vlc.net.connect_tcp for " .. protocol .. " request to " .. host .. ":" .. port)
 
     -- Build HTTP request
     local request_lines = {}
@@ -7558,25 +7411,6 @@ function VLCHttpClient:_make_request_tcp(method, url, data)
     -- Add POST data if present
     if data and (method == "POST" or method == "PUT") then
         request = request .. data
-    end
-
-    if openSub.option.debugLogging then
-      -- Headers only. The body can hold the account password (login) and is
-      -- never written to the log; secrets in headers are masked.
-      vlc.msg.dbg("[VLSub] ========== HTTP REQUEST ==========")
-      for _, header_line in ipairs(request_lines) do
-          if header_line ~= "" then
-              local lower_line = string.lower(header_line)
-              if string.find(lower_line, "^api%-key:") or string.find(lower_line, "^authorization:") then
-                  header_line = string.gsub(header_line, ":.*", ": ***")
-              end
-              vlc.msg.dbg("[VLSub] " .. header_line)
-          end
-      end
-      if data and (method == "POST" or method == "PUT") then
-          vlc.msg.dbg("[VLSub] (body: " .. string.len(data) .. " bytes, not logged)")
-      end
-      vlc.msg.dbg("[VLSub] ==================================")
     end
 
     local attempt = 0
@@ -7624,11 +7458,9 @@ function VLCHttpClient:_make_request_tcp(method, url, data)
                     decoded_body = clean_response_body(body, headers)
                 end
 
-                if openSub.option.debugLogging then
-                  -- Sizes only: bodies can contain the session token.
-                  vlc.msg.dbg("[VLSub] HTTP " .. status_code .. ", " .. string.len(body) ..
-                              " bytes on the wire, " .. string.len(decoded_body) .. " bytes decoded")
-                end
+                -- Sizes only: bodies can contain the session token.
+                dbg("HTTP " .. status_code .. ", " .. string.len(body) ..
+                            " bytes on the wire, " .. string.len(decoded_body) .. " bytes decoded")
 
                 return {
                     status = status_code,

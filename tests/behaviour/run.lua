@@ -38,9 +38,10 @@ local EXCEPTIONS = {
   {
     name = "vlsub_conf.json no longer stores interface strings",
     why = "only real settings are written; old files still load",
-    -- keys of the saved configuration that belong to the removed
-    -- interface-translation machinery
-    drop_config_keys = { translation = true, translations_avail = true, intLang = true },
+    -- interface-translation machinery (removed, was unreachable), and the
+    -- hidden debugLogging switch (VLC's own verbosity is the switch now)
+    drop_config_keys = { translation = true, translations_avail = true, intLang = true,
+                         debugLogging = true },
   },
 }
 local DROP_CONFIG_KEYS = EXCEPTIONS[2].drop_config_keys
