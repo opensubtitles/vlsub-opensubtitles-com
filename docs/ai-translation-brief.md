@@ -285,6 +285,32 @@ What this settles:
 
 Not measured yet (needs a logged-in account with credits): the download.
 
+### Several languages asked: only the first one is served (2026-11-19)
+
+Same film (`imdb_id=1254207`, has an English subtitle, none in cs/sk/de/fr):
+
+| `languages=` | rows returned |
+|---|---|
+| `en` | en |
+| `sk` | sk (on demand) |
+| `cs,sk` / `cs,de,sk` | cs (on demand) only |
+| `de,sk` | de (on demand) only |
+| `en,sk` | en only - no on-demand row for sk |
+| **`cs,en`** / `cs,en,sk` | **cs (on demand) only - the real English subtitle is missing** |
+
+The proxy looks at the first language of the list only (the list is always
+sorted alphabetically - canonical form). When that language has no subtitle,
+the answer is one on-demand row **and the existing subtitles of the other
+languages are gone**. `languages=cs,en&query=big+buck+bunny` returns 1 row
+instead of about 50.
+
+This also happens for the User-Agents `v1.3.2` and `v1.4.0`, i.e. for
+released VLSub: a user with several subtitle languages can get a single row
+that fails with "Invalid file_id" in place of real results. Reported to the
+API owner; to be fixed on the server (insert one on-demand row per missing
+language, in addition to - never instead of - the real rows; 2.x User-Agents
+only).
+
 ### No simulation
 
 A simulated on-demand server in the test suite was tried and removed on the
