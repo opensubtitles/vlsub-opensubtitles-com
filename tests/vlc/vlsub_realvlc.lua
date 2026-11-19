@@ -28,6 +28,8 @@ local ROOT = assert(os.getenv("VLSUB_ROOT"), "VLSUB_ROOT not set")
 local OUT = assert(os.getenv("VLSUB_OUT"), "VLSUB_OUT not set")
 local SANDBOX = assert(os.getenv("VLSUB_HOME"), "VLSUB_HOME not set")
 local USER, PASS = os.getenv("VLSUB_USER"), os.getenv("VLSUB_PASS")
+-- CI passes unset secrets as empty strings, which are true in Lua.
+if USER == "" or PASS == "" then USER, PASS = nil, nil end
 local QUERY = os.getenv("VLSUB_QUERY") or "the matrix"
 local VERBOSE = tonumber(os.getenv("VLSUB_VERBOSE") or "0") or 0
 

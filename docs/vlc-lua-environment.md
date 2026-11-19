@@ -12,9 +12,12 @@ using something that does not exist.
 
 ## Lua itself
 
-- Lua **5.1** in the official macOS build (VLC 3.0.24, measured: `unpack`
-  exists, `table.unpack` does not) and **5.2** in Debian/Ubuntu's VLC 3.0.16
-  (measured). Code must run on both. Use nothing newer: no `utf8`, integer division, bitwise operators,
+- Which Lua depends on who built VLC (all measured with `tests/vlc/run.sh`):
+  **5.1** in the official macOS build (VLC 3.0.24), **5.2** in Ubuntu 22.04's
+  VLC 3.0.16, **5.4** in Ubuntu 24.04's VLC 3.0.23. They differ in details the
+  extension must not depend on: 5.1 has `unpack` and `loadstring` but no
+  `table.unpack`; 5.4 has `table.unpack` but neither of the other two.
+  Code must run on all of them. Use nothing newer than 5.1: no `utf8`, integer division, bitwise operators,
   `string.pack`, `table.move`, `goto`.
 - Do not assign to a `for` loop variable (`for line in ... do line = ... end`).
   Lua 5.5 rejects it at compile time; copy it into a `local` first. CI runs

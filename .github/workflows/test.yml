@@ -15,8 +15,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Measured: the official macOS VLC 3.0.24 embeds Lua 5.1, Debian/Ubuntu's
-        # VLC 3.0.16 embeds 5.2. 5.4 is run as a stricter, newer interpreter.
+        # All three are embedded by real VLC builds (measured): 5.1 by the
+        # official macOS VLC 3.0.24, 5.2 by Ubuntu 22.04's 3.0.16, 5.4 by
+        # Ubuntu 24.04's 3.0.23.
         lua: ['5.1', '5.2', '5.4']
     steps:
       - uses: actions/checkout@v4
