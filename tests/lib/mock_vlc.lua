@@ -647,7 +647,9 @@ function M.new(opts)
       if ok == true or ok == 0 then return 0 end
       return -1, 17
     end,
-    open = io.open,
+    -- looked up at call time: capturing io.open here would chain every
+    -- sandbox to the previous one (the harness wraps io.open per launch)
+    open = function(...) return io.open(...) end,
     unlink = function(path) if os.remove(path) then return 0 end return -1, 2 end,
     readdir = function(path) return net.opendir(path) end,
   })

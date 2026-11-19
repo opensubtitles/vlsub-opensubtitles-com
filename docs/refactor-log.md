@@ -5,8 +5,21 @@ Progress against `docs/refactor-brief.md`. Line counts are `wc -l vlsubcom.lua`.
 | Stage | Lines after | Behaviour diff |
 |---|---|---|
 | start (v1.3.2) | 9,173 | - |
-| 0 behaviour diff tool | 9,173 | identical (90 sessions, 509 steps) |
+| 0 behaviour diff tool | 9,173 | identical (90 sessions) |
 | 1 dead code | 7,695 | identical |
+| 2 logging | 7,272 | identical |
+| 3 duplication | 7,017 | identical |
+| 4 long functions | 6,686 | identical (96 sessions) |
+| 5 data tables | 6,690 | identical |
+| 6 config file | 6,692 | identical apart from the agreed config content |
+| phase 2 step 1: strings table | 6,875 | identical |
+
+Final state: 6,875 lines (was 9,173, -25%). The last step adds lines on
+purpose: 262 inline texts became 242 entries of the strings table.
+
+Verified at the end on Lua 5.1, 5.2, 5.4 and 5.5: 205 tests (203 pass, 2
+known bugs), luacheck clean, behaviour diff identical for all 96 sessions
+(538 recorded steps); and `tests/vlc/run.sh` inside VLC 3.0.16.
 
 ## Stage 0 - behaviour diff tool
 
@@ -49,3 +62,107 @@ Tests removed with the code they tested: legacy socket client (3),
 
 Old config files containing `translation`, `translations_avail` or `intLang`
 still load; those keys are skipped.
+
+## Stage 2 - logging (7,695 -> 7,272 lines)
+
+- One helper, `dbg(message)`. The hidden `debugLogging` config key is gone:
+  VLC's verbosity (Tools > Messages, level 2) decides whether debug lines are
+  shown. 63 `if debugLogging` blocks unwrapped.
+- All 294 debug statements reviewed; 169 removed, 4 dumps of values deleted.
+  Kept: failures, and one line per decision that explains an outcome.
+- Removed lines that could expose data: header values copied into the URL of
+  https requests, the rebuilt URL containing them, the first 500 bytes of a
+  response body, the masked login response.
+- Unchanged: the request lines (`[VLSub] GET http://...`), every warning and
+  error.
+
+## Stage 3 - duplication (7,272 -> 7,017 lines)
+
+- Name, IMDb and hash search share `search_begin`, `search_get`,
+  `search_results`. Each keeps its own status handling, because the messages
+  and error-log lines differ between them and are frozen behaviour.
+- `has_results` / `has_no_results` replace six copies of the same check.
+- `getSelectedLanguages` is built on `getUserSelectedLanguages`.
+- `searchHash`: its three copies of the name-search fallback share
+  `prepare_name_fallback`.
+- `map_to_opensubtitles_language`: 105 entries mapped a code to itself; the
+  four real mappings remain.
+
+## Stage 4 - long functions (7,017 -> 6,686 lines)
+
+| Function | Before | Now |
+|---|---|---|
+| `downloadFromNewAPI` | 232 lines | flow + `download_failed`, `fetch_subtitle`, `quota_text`, a status table |
+| `activate` | 255 | sequence of steps; three reporters replace 25 first-run guards; `apply_detected_languages` |
+| `analyze_detected_locales` | 328 | two tables moved to file level, `tally` helper, decision logic alone |
+| `detect_unix_locale` | 189 | `shell_output`, `read_assignments`, timezone table at file level |
+
+Sessions added first, checked against the baseline: locale from `/etc/*`
+files, from files in the home directory, from installed locales / timezone /
+`printenv`, and three Windows-flavoured sessions.
+
+## Stage 5 - data tables
+
+Duplicate keys removed from the IP-country table and the macOS timezone
+table (in Lua the last entry wins, so nothing changes). The surprising
+surviving values are in `docs/refactor-open-questions.md`.
+
+## Stage 6 - config file
+
+The interface strings were part of the options table and so were written
+into `vlsub_conf.json` on every save (about 9 kB). They are a table of their
+own now; the file holds the settings only (about 300 bytes). Settings no code
+reads (`showMediaInformation`, `requestTimeoutMs`, `requestPollIntervalMs`,
+`requestMaxRetries`, `debugLogging`) are no longer written and disappear from
+an existing file on its next save.
+
+Files written by 1.3.2 load. One consequence: the interface strings stored in
+an old file are ignored. 1.3.2 let that saved copy override the built-in
+text, so reworded strings never reached people who upgraded.
+
+## Phase 2, step 1 - strings table
+
+262 inline string literals (status messages, labels, buttons, first-run
+progress lines, update and error dialogs, status-to-message tables) moved
+into the strings table as 242 `ui_*` keys, by script. 21 strings nothing
+referenced were removed. `tests/spec/08_strings_spec.lua` checks that every
+key used is defined, no key is duplicated, every value is a non-empty string
+and no text is written inline in message or label calls.
+
+Not yet suitable for translators as is: texts with a variable part are split
+into fragments (`"Login failed with status: " .. status`), which fixes the
+word order. Phase 2 step 2 should turn those into format strings.
+
+## Windows-only code touched (needs a check on a real Windows machine)
+
+The Windows branches were left structurally alone. What changed in them:
+
+- `detect_windows_locale`: debug lines removed; nothing else.
+- `mkdir_p` (Windows branch): one debug line removed.
+- `show_dkjson_error_dialog`, `show_update_dialog`: their texts now come from
+  the strings table (same text).
+- `get_downloads_folder`, `is_first_run`, `is_window_path`, `is_win_safe`,
+  path handling in `getFileInfo`: not touched.
+- `restrict_to_owner` does nothing on Windows (unchanged since 1.3.2).
+
+The three Windows-flavoured behaviour sessions run these branches on Unix
+with VLC reporting Windows directories; they are identical to v1.3.2. They
+cannot show how a real Windows file system or `cmd.exe` behaves.
+
+## Left for later (not done, to stay safe)
+
+- `apply_config`, `saveAndLoadSubtitle`, `getMovieHash`, `getFileInfo`,
+  `checkLoginAndUserInfo` are still long (120-160 lines each).
+- About 20 unused local variables reported by luacheck.
+- `lang[...]` (old keys) and `strings.x` (new keys) are two spellings for the
+  same table; unifying them needs care because several functions have a
+  local variable called `lang`.
+
+## Found in the test tooling along the way
+
+- The mock's `vlc.io.open` captured the harness's per-launch `io.open`
+  wrapper, chaining every sandbox to the previous one. Memory grew with each
+  session and the extension's own `collectgarbage()` calls made a full run
+  four times slower (110 s instead of 25 s). Fixed in `tests/lib/mock_vlc.lua`.
+- Lua 5.1/5.2 put the variable name in a different place in error messages
+  than 5.3+; the diff tool now normalises both forms.

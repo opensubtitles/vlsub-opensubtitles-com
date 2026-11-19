@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Internal clean-up of the script with no change in behaviour** (9,173 → 6,875 lines): dead code removed (old XML-RPC API, a second HTTP client, the unreachable interface-translation code), the three search paths share one request function, long functions split into steps, debug output cut to the useful lines. Verified with a new behaviour-diff test that runs 96 scripted sessions against both v1.3.2 and the current script and compares every request, window, message and file.
+- `vlsub_conf.json` now contains only settings (it used to include about 9 kB of interface text). Existing files keep working.
+- Debug output is controlled by VLC's own message verbosity; the hidden `debugLogging` setting is gone.
+- All interface text now lives in one table, as preparation for translations.
+
+
 ## [1.3.2] - 2026-11-19
 
 ### Fixed

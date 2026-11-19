@@ -4,7 +4,7 @@ Three layers, cheapest first.
 
 | Command | What runs | Needs |
 |---|---|---|
-| `tests/run.sh` | syntax check, `luacheck`, 203 behaviour tests | any Lua 5.1–5.5 |
+| `tests/run.sh` | syntax check, `luacheck`, 205 behaviour tests, behaviour diff against v1.3.2 | any Lua 5.1–5.5 |
 | `tests/vlc/run.sh` | the extension inside a real headless VLC, against the live API | VLC |
 | `tools/dev.sh run` | VLC's GUI with this checkout installed and a debug log | VLC |
 
@@ -65,6 +65,27 @@ seen by locale detection), `files` (pre-existing cache files).
 
 Methods starting with `_` (`_click`, `_choose_text`, `_select`, `_at`, …) are
 test helpers; everything else on a widget is VLC's real API.
+
+### Behaviour diff — `tests/behaviour/`
+
+Proves that a change did not alter behaviour. `baseline/vlsubcom.lua` is the
+frozen v1.3.2 script; `sessions.lua` holds scripted sessions (start, click,
+type, ...); `run.lua` runs every session against the baseline and against the
+working copy and compares everything observable after each step: requests,
+windows and widgets, the status message, files with permissions and content,
+what VLC was told, log lines above debug level, shell commands, Lua errors.
+
+```bash
+lua tests/behaviour/run.lua                # all sessions (about 25 s)
+lua tests/behaviour/run.lua download       # only sessions whose name contains "download"
+CANDIDATE=/path/other.lua lua tests/behaviour/run.lua
+```
+
+A difference is printed with the step, the section and the first differing
+line of both versions. Intended differences are declared in `EXCEPTIONS` at
+the top of `run.lua`, each with its reason; anything else fails. When a
+behaviour change is wanted (a bug fix, a feature), either add it there or
+move the baseline forward to the new release.
 
 ## 2. Inside real VLC — `tests/vlc/run.sh`
 

@@ -88,8 +88,14 @@ local function make_normaliser(env)
     text = text:gsub("%[%d%d:%d%d:%d%d%]", "[<CLOCK>]")
     -- Lua errors: where they happen and what the local was called may change
     -- in a refactor; that they happen, and why, may not.
-    text = text:gsub("[%w_%.%-]+%.lua:%d+:", "<SCRIPT>:<LINE>:")
-    text = text:gsub(" %((%a+) '[^']*'%)", "")
+    -- (guarded by a plain search: the first pattern is slow on long texts)
+    if text:find(".lua:", 1, true) then
+      text = text:gsub("[%w_%.%-]+%.lua:%d+:", "<SCRIPT>:<LINE>:")
+      -- Lua 5.3+: "attempt to index a number value (local 'x')"
+      text = text:gsub(" %((%a+) '[^']*'%)", "")
+      -- Lua 5.1/5.2: "attempt to index local 'x' (a number value)"
+      text = text:gsub("(attempt to %a+) %a+ '[^']*' %(", "%1 (")
+    end
     return text
   end
 end
@@ -269,12 +275,14 @@ local failed, ran, steps = 0, 0, 0
 for _, session in ipairs(sessions) do
   if not filter or session.name:lower():find(filter:lower(), 1, true) then
     ran = ran + 1
+    local started = H.real_clock()
     local old = record(session, BASELINE)
     local new = record(session, CANDIDATE)
+    local seconds = H.real_clock() - started
     steps = steps + #old
     local diffs = compare(old, new)
     if #diffs == 0 then
-      print(string.format("identical  %-62s %2d steps", session.name, #old))
+      print(string.format("identical  %-62s %2d steps %5.1fs", session.name, #old, seconds))
     else
       failed = failed + 1
       print("DIFFERENT  " .. session.name)
