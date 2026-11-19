@@ -218,6 +218,23 @@ describe("interface language: first run", function()
     for _, r in ipairs(locale_requests(env)) do ok(not r.path:find("sk.json")) end
   end)
 
+  it("the published index offers every language of locale/, and a first run uses it", function()
+    local index = json.decode(H.read_file(H.ROOT .. "/locale/index.json"))
+    ok(#index.languages >= 61, "languages listed")
+    for _, language in ipairs(index.languages) do
+      eq(language.status, "ready", language.code)
+      ok(H.read_file(H.ROOT .. "/locale/" .. language.code .. ".json"), language.code .. ".json exists")
+    end
+    for locale, code in pairs({ ["sk_SK.UTF-8"] = "sk", ["de_DE.UTF-8"] = "de", ["ja_JP.UTF-8"] = "ja" }) do
+      local server = api.new()
+      server:publish_real_index()
+      local env = first_run(locale, { server = server })
+      local translation = json.decode(H.read_file(H.ROOT .. "/locale/" .. code .. ".json"))
+      has(labels(env.ui()), translation.int_os_username)
+      eq(env.errors(), {})
+    end
+  end)
+
   it("stays English for a language without a translation", function()
     local env = first_run("ja_JP.UTF-8", { server = server_with("ready") })
     eq(env.saved_config().detectedLanguage, "ja")

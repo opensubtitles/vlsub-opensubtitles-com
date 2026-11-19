@@ -308,7 +308,7 @@ else
 end
 
 step("interface language: fetch Slovak from the repository, window rebuilt in Slovak", function()
-  -- Slovak is still marked "review"; reviewers see it with translationPreview
+  -- works whether the published index lists Slovak as "ready" or "review"
   openSub.option.translationPreview = true
   trigger_menu(2)
   -- the list of languages comes from the repository

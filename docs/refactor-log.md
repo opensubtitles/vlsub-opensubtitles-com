@@ -201,3 +201,26 @@ cannot show how a real Windows file system or `cmd.exe` behaves.
   four times slower (110 s instead of 25 s). Fixed in `tests/lib/mock_vlc.lua`.
 - Lua 5.1/5.2 put the variable name in a different place in error messages
   than 5.3+; the diff tool now normalises both forms.
+
+## Translations: site wording, no fragments, all languages offered (2026-11-19)
+
+Branch `feature/translations`. Decided by the user: ship without native
+review (corrections come as reports / pull requests), no sentence fragments.
+
+- **No fragments.** Every message is one string with `%s` placeholders
+  (277 -> 284 strings). English output byte-identical: behaviour diff
+  96/96 identical.
+- **Compared with the opensubtitles.org translation database**
+  (`subs_locale_target`, read-only query, 87 common interface terms in 61
+  languages). Each translation was revised to use the site's term where the
+  site entry is sound; entries that are misspelt, left in English, all-caps
+  or have the wrong meaning were not followed. Serbian is Cyrillic now, as
+  on the site.
+- **10 more languages**, so every web-translate language of the site is
+  covered: sl, at, az-az, tt, uz, bn, ne, te, ur, sw. 61 in total.
+- **All 61 are `ready`** in `locale/index.json`. The `review` status stays
+  as a mechanism (`tools/locale.lua new` starts there).
+- Tests: the fake server offers no translations unless a test publishes an
+  index, so tests of other features see English whatever locale they script.
+
+Translations reach users only once `locale/` is on `main`.

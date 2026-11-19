@@ -5,8 +5,8 @@
 --   lua tools/locale.lua new <code> "<Name>" ["<English name>"]
 --                                               start a translation: empty file + index entry
 --   lua tools/locale.lua missing <code>         keys not translated yet, with the English text
---   lua tools/locale.lua ready <code>           mark as reviewed: offered to users
---   lua tools/locale.lua review <code>          mark as not reviewed: hidden from users
+--   lua tools/locale.lua ready <code>           offer it to users
+--   lua tools/locale.lua review <code>          hold it back: hidden from users
 --   lua tools/locale.lua export                 regenerate locale/en.json from vlsubcom.lua
 --
 -- <code> is the OpenSubtitles language code: sk, de, pt-br, zh-cn, ...

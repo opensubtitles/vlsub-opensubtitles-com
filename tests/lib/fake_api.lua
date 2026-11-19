@@ -309,7 +309,11 @@ function M.new(opts)
 
   -- The repository's locale folder, as raw.githubusercontent.com serves it.
   -- s.locale is { ["index.json"] = <text>, ["sk.json"] = <text>, ... }; by
-  -- default the real files of this checkout.
+  -- default the real translation files of this checkout, with an index that
+  -- offers none of them: a test of anything else then sees the English
+  -- interface whatever locale it scripts. Translation tests publish their
+  -- own index (s.locale["index.json"] = ...), or the real one with
+  -- s:publish_real_index().
   s.locale = {}
   do
     local dir = here .. "/../../locale/"
@@ -322,6 +326,9 @@ function M.new(opts)
     end
     listing:close()
   end
+  s.real_index = s.locale["index.json"]
+  s.locale["index.json"] = '{"format":1,"languages":[]}'
+  function s:publish_real_index() self.locale["index.json"] = self.real_index end
   s:on("GET raw.githubusercontent.com/opensubtitles/vlsub-opensubtitles-com/main/locale/*", function(req, srv)
     local name = req.path:match("([^/]+)$")
     local content = srv.locale[name]

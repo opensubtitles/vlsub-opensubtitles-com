@@ -20,15 +20,19 @@ release.
 
 ## Status of a language
 
-- `review` - translated, but nobody who speaks the language has read it
-  through. **Not offered to users.** To look at one anyway, add
+- `ready` - offered in the language drop-down. Every language in this
+  directory is `ready`.
+- `review` - held back: not offered to users. To look at one anyway, add
   `"translationPreview": true` to `vlsub_conf.json`; it then appears in the
-  drop-down marked "(not reviewed)".
-- `ready` - a native speaker has read every string in context. Offered in the
-  language drop-down.
+  drop-down marked "(not reviewed)". `tools/locale.lua new` starts a language
+  in this state, so a half-finished file is never offered.
 
-A translation goes from `review` to `ready` by a pull request that changes
-the status and says who reviewed it.
+The translations were machine-generated, using the wording of the
+opensubtitles.org website (its translation database) for the common terms.
+They were not read through by native speakers before release. **If something
+reads wrong, please fix it**: edit `locale/<code>.json` and open a pull
+request, or open an issue quoting the string. A correction reaches every user
+within a week, without a new release of the extension.
 
 ## Rules for a translation (checked by `tests/run.sh`)
 
@@ -72,7 +76,7 @@ lua tools/locale.lua status              # all languages: coverage, problems, st
 lua tools/locale.lua new de "Deutsch" "German"   # start a language
 lua tools/locale.lua missing de          # what is left to translate, with the English text
 lua tools/locale.lua check de            # every rule above, with the exact string at fault
-lua tools/locale.lua ready de            # after a native speaker has read it: offer it to users
+lua tools/locale.lua ready de            # offer it to users (must have 0 problems)
 lua tools/locale.lua review de           # take it back out
 lua tools/locale.lua export              # after changing English strings in vlsubcom.lua
 ```
