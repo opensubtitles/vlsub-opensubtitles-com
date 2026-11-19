@@ -14,7 +14,7 @@ Progress against `docs/refactor-brief.md`. Line counts are `wc -l vlsubcom.lua`.
 | 6 config file | 6,692 | identical apart from the agreed config content |
 | phase 2 step 1: strings table | 6,875 | identical |
 
-Final state: 6,875 lines (was 9,173, -25%). The last step adds lines on
+State when the goal was reached: 6,875 lines (was 9,173, -25%). The last step adds lines on
 purpose: 262 inline texts became 242 entries of the strings table.
 
 Verified at the end on Lua 5.1, 5.2, 5.4 and 5.5: 205 tests (203 pass, 2
@@ -132,6 +132,41 @@ and no text is written inline in message or label calls.
 Not yet suitable for translators as is: texts with a variable part are split
 into fragments (`"Login failed with status: " .. status`), which fixes the
 word order. Phase 2 step 2 should turn those into format strings.
+
+## After the goal: leftovers and translation groundwork (6,875 -> 6,770 lines)
+
+Done while the refactor was waiting for a test on macOS; same rules, behaviour
+diff identical throughout.
+
+- `saveAndLoadSubtitle` split into `subtitle_file_name`, `choose_save_target`
+  and the saving itself; one `report_failure` helper for "log, show, return
+  false".
+- `checkLoginAndUserInfo`, `display_select` tidied; a few unused variables
+  removed.
+- **Correction to the strings step.** The scripted move had also taken eight
+  literals that are not text: the window ids `"main"` and `"config"` (used in
+  comparisons), HTML fragments, two install commands and a file path. Output
+  was unchanged, but translating `"main"` would have broken the help window's
+  back button. They are literals again and a test keeps identifiers, markup,
+  commands and paths out of the table.
+- **Sentences instead of fragments.** 25 messages that were glued together
+  around a value, or split only because the source line was long, are single
+  strings with `%s` now, filled in by `tr(key, ...)`. Tests check that every
+  `tr()` key exists and gets as many values as its pattern has placeholders.
+  Messages of the form "label: value" are still label + value.
+- **`locale/`** (data only, the script does not load it yet):
+  `en.json` generated from the script, `index.json`, `README.md` with the
+  rules for translators, and `sk.json` - Slovak, 270 of 271 strings, machine
+  translated and marked `review`.
+  `tests/spec/09_locale_spec.lua` validates every translation file (known
+  keys, placeholders, HTML tags, edge spaces) and runs the extension with the
+  translation put into the strings table: all windows, a search, a download
+  and a first run, without errors.
+- The original VLSub's 22 human translations were not imported: only 28 of
+  today's 271 strings still have the same English text.
+
+Still to do for phase 2: the language drop-down, fetching `locale/<code>.json`
+on demand, storing it, the per-key English fallback (steps 3-5 of the brief).
 
 ## Windows-only code touched (needs a check on a real Windows machine)
 

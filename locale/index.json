@@ -1,0 +1,12 @@
+{
+  "format": 1,
+  "languages": [
+    {
+      "code": "sk",
+      "name": "Slovenčina",
+      "english_name": "Slovak",
+      "status": "review",
+      "note": "Machine translation (2026-11-19), not yet read through by a native speaker."
+    }
+  ]
+}
