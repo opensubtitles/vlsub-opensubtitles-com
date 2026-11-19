@@ -5351,188 +5351,143 @@ function analyze_detected_locales(detected_locales)
 end
 
 
--- Unix/Linux-specific locale detection
-function detect_unix_locale(detected_locales)
+-- Everything a shell command prints, or nil when it cannot be run.
+local function shell_output(command)
+  local handle = io.popen(command)
+  if not handle then
+    return nil
+  end
+  local result = handle:read("*all")
+  handle:close()
+  return result
+end
 
-  -- Check if we're on macOS for additional detection methods
-  local is_macos = false
-  local handle = io.popen("uname -s 2>/dev/null")
-  if handle then
-    local result = handle:read("*all")
-    handle:close()
-    if result and string.find(result, "Darwin") then
-      is_macos = true
+-- The KEY=value lines of a shell-style configuration file as a list of
+-- { key, value } (comment lines skipped, quotes and surrounding blanks
+-- removed). Empty when the file cannot be read.
+local function read_assignments(path)
+  local assignments = {}
+  local file = io.open(path, "r")
+  if not file then
+    return assignments
+  end
+  local content = file:read("*all")
+  file:close()
+
+  for line in content:gmatch("[^\r\n]+") do
+    if not string.match(line, "^%s*#") and string.find(line, "=") then
+      local var, value = string.match(line, "([^=]+)=(.+)")
+      if var and value then
+        var = string.gsub(var, "^%s*(.-)%s*$", "%1")
+        value = string.gsub(value, '"', '')
+        value = string.gsub(value, "^%s*(.-)%s*$", "%1")
+        table.insert(assignments, { var, value })
+      end
     end
   end
+  return assignments
+end
 
-  -- macOS-specific locale detection
-  if is_macos then
+-- Timezones that hint at a locale when nothing better is known
+local LINUX_TIMEZONE_LOCALE = {
+  ["America/New_York"] = "en_US",
+  ["America/Los_Angeles"] = "en_US",
+  ["America/Chicago"] = "en_US",
+  ["America/Denver"] = "en_US",
+  ["Europe/London"] = "en_GB",
+  ["Europe/Berlin"] = "de_DE",
+  ["Europe/Paris"] = "fr_FR",
+  ["Europe/Rome"] = "it_IT",
+  ["Europe/Madrid"] = "es_ES",
+  ["Asia/Tokyo"] = "ja_JP",
+  ["Asia/Shanghai"] = "zh_CN",
+  ["Asia/Seoul"] = "ko_KR",
+  ["Australia/Sydney"] = "en_AU"
+}
+
+-- Locale hints on Linux, BSD and macOS. Only reads world-readable files and
+-- runs harmless commands; every finding is appended to detected_locales.
+function detect_unix_locale(detected_locales)
+  local function found(source, locale)
+    table.insert(detected_locales, { source = source, locale = locale })
+  end
+
+  local system = shell_output("uname -s 2>/dev/null")
+  if system and string.find(system, "Darwin") then
     detect_macos_locale(detected_locales)
   end
 
-  -- Method 1: Standard locale command (safe, no permissions needed)
-  local handle = io.popen("locale 2>/dev/null")
-  if handle then
-    local result = handle:read("*all")
-    handle:close()
-
-    if result and result ~= "" then
-      for line in result:gmatch("[^\r\n]+") do
-
-        -- Extract locale values
-        local var, value = string.match(line, "([^=]+)=(.+)")
-        if var and value then
-          value = string.gsub(value, '"', '') -- Remove quotes
-          if value ~= "C" and value ~= "POSIX" and value ~= "" then
-            table.insert(detected_locales, {source = "locale_cmd_" .. var, locale = value})
-          end
+  -- 1. The `locale` command
+  local locale_output = shell_output("locale 2>/dev/null")
+  if locale_output and locale_output ~= "" then
+    for line in locale_output:gmatch("[^\r\n]+") do
+      local var, value = string.match(line, "([^=]+)=(.+)")
+      if var and value then
+        value = string.gsub(value, '"', '')
+        if value ~= "C" and value ~= "POSIX" and value ~= "" then
+          found("locale_cmd_" .. var, value)
         end
       end
     end
   end
 
-  -- Method 2: Safe system files (readable by all users, no special permissions)
-  local safe_locale_files = {
-    "/etc/locale.conf",     -- systemd systems (Arch, Fedora, etc.)
-    "/etc/default/locale",  -- Debian/Ubuntu systems
-    "/etc/sysconfig/i18n",  -- Red Hat/CentOS systems
-    "/etc/environment"      -- Some distributions
-  }
-
-  for _, file_path in ipairs(safe_locale_files) do
-    -- These files are typically world-readable, no special permissions needed
-    local file = io.open(file_path, "r")
-    if file then
-      local content = file:read("*all")
-      file:close()
-
-      for line in content:gmatch("[^\r\n]+") do
-        -- Skip comments
-        if not string.match(line, "^%s*#") and string.find(line, "=") then
-          local var, value = string.match(line, "([^=]+)=(.+)")
-          if var and value then
-            -- Clean up variable name and value
-            var = string.gsub(var, "^%s*(.-)%s*$", "%1")
-            value = string.gsub(value, '"', '') -- Remove quotes
-            value = string.gsub(value, "^%s*(.-)%s*$", "%1") -- Trim whitespace
-
-            if (string.match(var, "LANG") or string.match(var, "LC_")) and
-               value ~= "C" and value ~= "POSIX" and value ~= "" then
-              dbg("Found in " .. file_path .. ": " .. var .. "=" .. value)
-              table.insert(detected_locales, {source = "file_" .. string.gsub(file_path, ".*/", ""), locale = value})
-            end
-          end
-        end
+  -- 2. System-wide settings: systemd, Debian/Ubuntu, Red Hat, others
+  for _, file_path in ipairs({ "/etc/locale.conf", "/etc/default/locale",
+                               "/etc/sysconfig/i18n", "/etc/environment" }) do
+    for _, assignment in ipairs(read_assignments(file_path)) do
+      local var, value = assignment[1], assignment[2]
+      if (string.match(var, "LANG") or string.match(var, "LC_")) and
+         value ~= "C" and value ~= "POSIX" and value ~= "" then
+        dbg("Found in " .. file_path .. ": " .. var .. "=" .. value)
+        found("file_" .. string.gsub(file_path, ".*/", ""), value)
       end
     end
   end
 
-  -- Method 3: Additional safe system commands (no permissions needed)
-  local safe_commands = {
-    -- Get current user's shell locale settings
+  -- 3. Environment as a login shell sees it, installed locales, timezone
+  local commands = {
     'printenv LANG 2>/dev/null',
     'printenv LC_ALL 2>/dev/null',
     'printenv LANGUAGE 2>/dev/null',
-    -- Check available locales (safe, read-only)
     'locale -a 2>/dev/null | head -5',
-    -- Get timezone info (can hint at locale)
     'timedatectl show --property=Timezone --value 2>/dev/null || cat /etc/timezone 2>/dev/null'
   }
+  for i, command in ipairs(commands) do
+    local result = shell_output(command)
+    if result and result ~= "" then
+      result = string.gsub(result, "[\r\n]", " ")
+      result = string.gsub(result, "^%s*(.-)%s*$", "%1")
 
-  for i, cmd in ipairs(safe_commands) do
-    local handle = io.popen(cmd)
-    if handle then
-      local result = handle:read("*all")
-      handle:close()
-
-      if result and result ~= "" then
-        result = string.gsub(result, "[\r\n]", " ")
-        result = string.gsub(result, "^%s*(.-)%s*$", "%1")
-
-
-        if i <= 3 and result ~= "" then -- Environment variables
-          table.insert(detected_locales, {source = "linux_printenv_" .. i, locale = result})
-        elseif i == 4 and result ~= "" then -- Available locales
-          -- Parse first few available locales
-          for locale in result:gmatch("([%w_%-%.]+)") do
-            if string.match(locale, "^[a-z][a-z]_[A-Z][A-Z]") then
-              dbg("Found available locale: " .. locale)
-              table.insert(detected_locales, {source = "linux_available_locale", locale = locale})
-              break -- Just take the first good one
-            end
-          end
-        elseif i == 5 and result ~= "" then -- Timezone
-          -- Map common timezones to likely locales
-          local tz_locale_map = {
-            ["America/New_York"] = "en_US",
-            ["America/Los_Angeles"] = "en_US",
-            ["America/Chicago"] = "en_US",
-            ["America/Denver"] = "en_US",
-            ["Europe/London"] = "en_GB",
-            ["Europe/Berlin"] = "de_DE",
-            ["Europe/Paris"] = "fr_FR",
-            ["Europe/Rome"] = "it_IT",
-            ["Europe/Madrid"] = "es_ES",
-            ["Asia/Tokyo"] = "ja_JP",
-            ["Asia/Shanghai"] = "zh_CN",
-            ["Asia/Seoul"] = "ko_KR",
-            ["Australia/Sydney"] = "en_AU"
-          }
-          local mapped = tz_locale_map[result]
-          if mapped then
-            dbg("Mapped Linux timezone to: " .. mapped)
-            table.insert(detected_locales, {source = "linux_timezone_hint", locale = mapped})
+      if result == "" then
+        -- nothing but line breaks
+      elseif i <= 3 then
+        found("linux_printenv_" .. i, result)
+      elseif i == 4 then
+        for locale in result:gmatch("([%w_%-%.]+)") do
+          if string.match(locale, "^[a-z][a-z]_[A-Z][A-Z]") then
+            dbg("Found available locale: " .. locale)
+            found("linux_available_locale", locale)
+            break -- the first usable one is enough
           end
         end
+      elseif LINUX_TIMEZONE_LOCALE[result] then
+        dbg("Mapped Linux timezone to: " .. LINUX_TIMEZONE_LOCALE[result])
+        found("linux_timezone_hint", LINUX_TIMEZONE_LOCALE[result])
       end
     end
   end
 
-  -- Method 4: Check for desktop environment language (safe)
-  local de_env_vars = {
-    "XDG_CURRENT_DESKTOP", -- Desktop environment
-    "DESKTOP_SESSION",     -- Desktop session
-    "GDMSESSION"          -- GDM session
-  }
-
-  for _, var in ipairs(de_env_vars) do
-    local value = os.getenv(var)
-    if value then
-      dbg("Desktop environment " .. var .. ": " .. value)
-    end
-  end
-
-  -- Method 5: Check user's home directory for .locale or similar files (safe)
+  -- 4. Per-user settings
   local home = os.getenv("HOME")
   if home then
-    local user_locale_files = {
-      home .. "/.locale",
-      home .. "/.config/locale.conf",
-      home .. "/.dmrc" -- Display manager config, sometimes has language
-    }
-
-    for _, file_path in ipairs(user_locale_files) do
-      local file = io.open(file_path, "r")
-      if file then
-        local content = file:read("*all")
-        file:close()
-
-        -- Look for language/locale settings
-        for line in content:gmatch("[^\r\n]+") do
-          if string.find(line, "=") and not string.match(line, "^%s*#") then
-            local var, value = string.match(line, "([^=]+)=(.+)")
-            if var and value then
-              var = string.gsub(var, "^%s*(.-)%s*$", "%1")
-              value = string.gsub(value, '"', '')
-              value = string.gsub(value, "^%s*(.-)%s*$", "%1")
-
-              if (string.match(var:lower(), "lang") or string.match(var:lower(), "locale")) and
-                 value ~= "" and value ~= "C" then
-                dbg("Found user locale: " .. var .. "=" .. value)
-                table.insert(detected_locales, {source = "linux_user_config", locale = value})
-              end
-            end
-          end
+    for _, file_path in ipairs({ home .. "/.locale", home .. "/.config/locale.conf",
+                                 home .. "/.dmrc" }) do
+      for _, assignment in ipairs(read_assignments(file_path)) do
+        local var, value = assignment[1], assignment[2]
+        if (string.match(var:lower(), "lang") or string.match(var:lower(), "locale")) and
+           value ~= "" and value ~= "C" then
+          dbg("Found user locale: " .. var .. "=" .. value)
+          found("linux_user_config", value)
         end
       end
     end

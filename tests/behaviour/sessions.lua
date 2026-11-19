@@ -86,6 +86,44 @@ session("first run: macOS", function(S)
   } }))
 end)
 
+session("first run: locale from system files", function(S)
+  for path, content in pairs({
+    ["/etc/default/locale"] = '# comment\nLANG="sk_SK.UTF-8"\nLC_TIME = de_DE.UTF-8\nFOO=bar\nLC_ALL=C\n',
+    ["/etc/locale.conf"] = "LANG=fr_FR.UTF-8\n",
+    ["/etc/sysconfig/i18n"] = 'LANG="pt_BR.UTF-8"\nSYSFONT="latarcyrheb-sun16"\n',
+    ["/etc/environment"] = "PATH=/usr/bin\nLANGUAGE=es_ES:en\n",
+  }) do
+    local o = machine(nil)
+    o.etc = { [path] = content }
+    S.launch(o)
+  end
+end)
+
+session("first run: locale from files in the home directory", function(S)
+  for name, content in pairs({
+    [".locale"] = "LANG=ja_JP.UTF-8\n",
+    [".config/locale.conf"] = '# mine\n  LANG = "it_IT.UTF-8"  \nlocale=C\n',
+    [".dmrc"] = "[Desktop]\nLanguage=pl_PL.utf8\nSession=gnome\n",
+  }) do
+    local o = machine(nil)
+    o.home_files = { [name] = content }
+    S.launch(o)
+  end
+end)
+
+session("first run: installed locales and timezone are the only hints", function(S)
+  for _, shell in ipairs({
+    { ["^locale %-a"] = "C\nC.UTF-8\nde_DE.utf8\nen_US.utf8\nPOSIX\n" },
+    { ["timedatectl"] = "Europe/Berlin\n" },
+    { ["timedatectl"] = "Asia/Tokyo\n" },
+    { ["timedatectl"] = "Antarctica/Troll\n" },
+    { ["printenv LANGUAGE"] = "nl_NL:en\n" },
+    { ["printenv LC_ALL"] = "sv_SE.UTF-8\n" },
+  }) do
+    S.launch(machine(nil, { shell = shell }))
+  end
+end)
+
 session("first run: completely offline", function(S)
   S.launch(machine("fr_FR.UTF-8", { offline = true }))
   S.step("open main window", function() trigger_menu(1) end)
@@ -113,6 +151,63 @@ session("first run: enter credentials and save", function(S)
   S.step("save", click(S, "\240\159\146\190"))
   S.step("open main window", function() trigger_menu(1) end)
   type_and_search(S, "big buck bunny")
+end)
+
+-- A Windows-flavoured run on a Unix test machine: VLC reports a Windows data
+-- directory, so the extension takes its Windows branches (backslash paths,
+-- USERPROFILE, cmd.exe command lines). File names with backslashes are legal
+-- on Unix, so the files really get written; shell commands are swallowed.
+local function windows(o)
+  o = o or {}
+  o.datadir = "C:\\Program Files\\VideoLAN\\VLC"
+  o.userdatadir = "C:\\Users\\tester\\AppData\\Roaming\\vlc"
+  o.env = o.env or {}
+  o.env.USERPROFILE = "C:\\Users\\tester"
+  o.host_locale = "C"
+  o.env = o.env or {}
+  o.env.LANG = false
+  o.env.LC_ALL = false
+  o.env.HOMEDRIVE = "C:"
+  o.env.HOMEPATH = "\\Users\\tester"
+  o.env.APPDATA = "C:\\Users\\tester\\AppData\\Roaming"
+  o.env.LOCALAPPDATA = "C:\\Users\\tester\\AppData\\Local"
+  o.execute = function() return true end
+  o.popen = function() return "" end
+  return o
+end
+
+session("windows flavour: first run", function(S)
+  local o = windows({ first_run = true })
+  o.env.LANG = "sk_SK"
+  S.launch(o)
+  S.step("open main window", function() trigger_menu(1) end)
+end)
+
+session("windows flavour: first run without any hint", function(S)
+  S.launch(windows({ first_run = true }))
+end)
+
+session("windows flavour: search, download, save settings", function(S)
+  S.launch(windows({ first_run = true }))
+  S.step("fill in account", function()
+    local c = config_widgets(S)
+    c.username:set_text("tester")
+    c.password:set_text("test-password")
+  end)
+  S.step("save", click(S, "\240\159\146\190"))
+  S.step("main", function() trigger_menu(1) end)
+  type_and_search(S, "big buck bunny")
+  S.step("select", select_row(S, 1))
+  S.step("download", click(S, "Download"))
+  S.step("play a windows path", function()
+    S.env.play("file:///C:/Users/tester/Videos/Big.Buck.Bunny.2008.mkv") input_changed()
+  end)
+  S.step("search by hash", click(S, "hash"))
+  S.step("download", click(S, "Download"))
+  S.step("unc path", function()
+    S.env.play("file://nas/share/Movies/Some.Movie.2019.mkv") input_changed()
+  end)
+  S.step("search by hash", click(S, "hash"))
 end)
 
 -- ---------------------------------------------------------- subsequent runs --

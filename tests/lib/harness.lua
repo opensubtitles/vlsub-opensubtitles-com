@@ -29,6 +29,7 @@ end
 H.real_getenv = os.getenv
 H.real_popen = io.popen
 H.real_open = io.open
+H.real_remove = os.remove
 H.real_execute = os.execute
 H.real_setlocale = os.setlocale
 do
@@ -187,7 +188,14 @@ function H.launch(o)
   local env = { home = H.tmpdir() }
   env.dir = env.home .. "/lua/extensions/userdata/vlsub.com"
   env.server = (o.server and o.server.handle) and o.server or fake_api.new(o.server)
-  env.vlc = mock.new({ dir = env.home, server = env.server, config = o.vlc_config })
+  env.vlc = mock.new({ dir = env.home, server = env.server, config = o.vlc_config,
+                       datadir = o.datadir, userdatadir = o.userdatadir })
+  -- files in the user's home directory that exist before the extension starts
+  for name, content in pairs(o.home_files or {}) do
+    local dir = name:match("^(.*)/[^/]*$")
+    if dir then H.real_execute('mkdir -p "' .. env.home .. "/" .. dir .. '"') end
+    H.write_file(env.home .. "/" .. name, content)
+  end
   if o.offline then env.server.offline = true end
 
   if not o.first_run then
@@ -214,6 +222,12 @@ function H.launch(o)
   env.executed = {}
   os.execute = function(cmd)
     if cmd then env.executed[#env.executed + 1] = cmd end
+    -- o.execute can stand in for the shell (returns non-nil when it handled
+    -- the command), e.g. for Windows command lines
+    if cmd and o.execute then
+      local handled = o.execute(cmd)
+      if handled ~= nil then return handled end
+    end
     return H.real_execute(cmd)
   end
   io.popen = function(cmd, mode)
@@ -237,9 +251,33 @@ function H.launch(o)
     if o.host_locale ~= nil and locale == nil then return o.host_locale end
     return H.real_setlocale(locale, category)
   end
+  -- A Windows path ("C:\\Users\\x\\file") is just an odd relative file name on
+  -- Unix and would land in the current directory. Map it into the sandbox
+  -- instead: <home>/drive_c/Users/x/file.
+  local function sandboxed(path)
+    if type(path) ~= "string" then return path end
+    local drive, rest = path:match("^(%a):[\\/](.*)$")
+    if not drive then return path end
+    return env.home .. "/drive_" .. drive:lower() .. "/" .. rest:gsub("\\", "/")
+  end
+  env.sandboxed = sandboxed
+  os.remove = function(path) return H.real_remove(sandboxed(path)) end
+
   io.open = function(path, mode)
+    if sandboxed(path) ~= path then
+      path = sandboxed(path)
+      if mode and mode:find("[wa]") then
+        H.real_execute('mkdir -p "' .. path:match("^(.*)/[^/]*$") .. '"')
+      end
+    end
     if o.host_locale ~= nil and type(path) == "string" and path:match("^/etc/") then
-      return nil, path .. ": No such file or directory", 2
+      local content = o.etc and o.etc[path]
+      if not content then
+        return nil, path .. ": No such file or directory", 2
+      end
+      -- a scripted system file
+      return { read = function() local c = content content = nil return c end,
+               close = function() return true end }
     end
     return H.real_open(path, mode)
   end
