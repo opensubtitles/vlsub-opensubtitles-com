@@ -4204,161 +4204,125 @@ openSub.refreshSession = function()
   return openSub.loginWithRestAPI() and openSub.session.token ~= ""
 end
 
--- Enhanced saveAndLoadSubtitle function with Downloads folder support
-openSub.saveAndLoadSubtitle = function(subtitle_content, item)
-  if not subtitle_content or subtitle_content == "" then
-    local errorMsg = strings.ui_empty_subtitle_content_received
-    vlc.msg.err("[VLSub] " .. errorMsg)
-    setMessage(error_tag(errorMsg))
-    return false
+-- Log an error, show it in the window, and report failure.
+local function report_failure(message)
+  vlc.msg.err("[VLSub] " .. message)
+  setMessage(error_tag(message))
+  return false
+end
+
+-- File name for a downloaded subtitle: the video's name (or, without one,
+-- the subtitle's own name, the searched title or the end of the stream URL),
+-- made safe for every file system, plus ".<language>" and ".<format>".
+local function subtitle_file_name(item)
+  local name = "subtitle"
+  if openSub.file.name and openSub.file.name ~= '' then
+    name = openSub.file.name
+  elseif item.SubFileName then
+    name = string.sub(item.SubFileName, 1, #item.SubFileName - 4)
+  elseif openSub.movie.title and openSub.movie.title ~= "" then
+    name = openSub.movie.title
+  else
+    local inputItem = openSub.getInputItem()
+    local uriName = inputItem and vlc.strings.encode_uri_component(inputItem:uri())
+    if uriName then
+      name = string.sub(uriName, -64, -1)
+    end
   end
 
+  -- Stream URLs can carry long tokens and characters Windows forbids
+  local original_length = #name
+  name = sanitize_filename(name, 180)
+  if original_length > 180 then
+    dbg("Filename truncated from " .. original_length .. " to " .. #name .. " characters")
+  end
 
-  -- Process subtitle content (remove tags if option is set)
+  if openSub.option.langExt then
+    name = name .. "." .. item.SubLanguageID
+  end
+  return name .. "." .. item.SubFormat
+end
+
+-- Where to save `file_name`: next to the video; without a video (or if that
+-- folder is read-only) in the Downloads folder; last the VLSub folder.
+-- Returns the path, the note for the success message and whether it is the
+-- Downloads folder - or false after reporting that nothing is writable.
+local function choose_save_target(file_name)
+  local target, note, in_downloads
+
+  if openSub.file.hasInput and openSub.file.dir and is_dir(openSub.file.dir) then
+    target, note, in_downloads = openSub.file.dir .. file_name, strings.ui_saved_with_video_file, false
+  else
+    local downloads_folder = get_downloads_folder()
+    if downloads_folder then
+      target, note, in_downloads = downloads_folder .. slash .. file_name, strings.ui_saved_to_downloads_folder, true
+    elseif openSub.conf.dirPath then
+      target, note, in_downloads = openSub.conf.dirPath .. slash .. file_name, strings.ui_saved_to_vlsub_directory, false
+    else
+      return report_failure(strings.ui_cannot_determine_save_location_for_subtitle_file)
+    end
+  end
+  if file_touch(target) then
+    return target, note, in_downloads
+  end
+
+  dbg("Cannot write to primary target, trying fallbacks...")
+  if not in_downloads then
+    local downloads_folder = get_downloads_folder()
+    if downloads_folder then
+      target, note, in_downloads = downloads_folder .. slash .. file_name, strings.ui_saved_to_downloads_folder, true
+      if file_touch(target) then
+        return target, note, in_downloads
+      end
+      dbg("Downloads folder also not writable")
+    end
+  end
+
+  if openSub.conf.dirPath then
+    target = openSub.conf.dirPath .. slash .. file_name
+    if file_touch(target) then
+      return target, strings.ui_saved_to_vlsub_directory, false
+    end
+    return report_failure(strings.ui_cannot_write_to_any_available_location .. target)
+  end
+  return report_failure(strings.ui_cannot_write_subtitle_file_to_any_location)
+end
+
+-- Save the subtitle text and, when a video is playing, load it into the
+-- player. Sets the success or error message. Returns true on success.
+openSub.saveAndLoadSubtitle = function(subtitle_content, item)
+  if not subtitle_content or subtitle_content == "" then
+    return report_failure(strings.ui_empty_subtitle_content_received)
+  end
+
   if openSub.option.removeTag then
     subtitle_content = remove_tag(subtitle_content)
   end
 
-  -- Determine subtitle filename
-  local subfileName = "subtitle"
-  if openSub.file.name and openSub.file.name ~= '' then
-    subfileName = openSub.file.name
-  elseif item.SubFileName then
-    subfileName = string.sub(item.SubFileName, 1, #item.SubFileName - 4)
-  else
-    -- Use search query as filename if no video loaded
-    if openSub.movie.title and openSub.movie.title ~= "" then
-      subfileName = openSub.movie.title
-    else
-      local inputItem = openSub.getInputItem()
-      if inputItem then
-        local uriName = vlc.strings.encode_uri_component(inputItem:uri())
-        if uriName then
-          subfileName = string.sub(uriName, -64, -1)
-        end
-      end
-    end
-  end
-
-  -- Sanitize filename for filesystem compatibility (Windows limits, forbidden chars, UTF-8)
-  -- This prevents errors when stream URLs contain long tokens or forbidden characters
-  local original_length = #subfileName
-  subfileName = sanitize_filename(subfileName, 180)
-  if original_length > 180 then
-    dbg("Filename truncated from " .. original_length .. " to " .. #subfileName .. " characters")
-  end
-
-  if openSub.option.langExt then
-    subfileName = subfileName.."."..item.SubLanguageID
-  end
-
-  subfileName = subfileName.."."..item.SubFormat
-
-  -- Determine target directory with Downloads folder fallback
-  local target
-  local saveLocation = ""
-  local saved_to_downloads = false
-
-  -- First priority: save with video file if available
-  if openSub.file.hasInput and openSub.file.dir and is_dir(openSub.file.dir) then
-    target = openSub.file.dir..subfileName
-    saveLocation = strings.ui_saved_with_video_file
-
-  else
-    local downloads_folder = get_downloads_folder()
-    if downloads_folder then
-      target = downloads_folder .. slash .. subfileName
-      saveLocation = strings.ui_saved_to_downloads_folder
-      saved_to_downloads = true
-
-    elseif openSub.conf.dirPath then
-      target = openSub.conf.dirPath..slash..subfileName
-      saveLocation = strings.ui_saved_to_vlsub_directory
-    else
-      local errorMsg = strings.ui_cannot_determine_save_location_for_subtitle_file
-      vlc.msg.err("[VLSub] " .. errorMsg)
-      setMessage(error_tag(errorMsg))
-      return false
-    end
-  end
-
-  -- Test if we can write to the target location
-  if not file_touch(target) then
-    dbg("Cannot write to primary target, trying fallbacks...")
-
-    -- Fallback 1: Downloads folder if not already tried
-    if not saved_to_downloads then
-      local downloads_folder = get_downloads_folder()
-      if downloads_folder then
-        target = downloads_folder .. slash .. subfileName
-        saveLocation = strings.ui_saved_to_downloads_folder
-        saved_to_downloads = true
-
-        if not file_touch(target) then
-          dbg("Downloads folder also not writable")
-        end
-      end
-    end
-
-    -- Fallback 2: VLSub directory if not already tried
-    if not file_touch(target) and openSub.conf.dirPath then
-      target = openSub.conf.dirPath..slash..subfileName
-      saveLocation = strings.ui_saved_to_vlsub_directory
-      saved_to_downloads = false
-
-      if not file_touch(target) then
-        local errorMsg = strings.ui_cannot_write_to_any_available_location .. target
-        vlc.msg.err("[VLSub] " .. errorMsg)
-        setMessage(error_tag(errorMsg))
-        return false
-      end
-    end
-
-    if not file_touch(target) then
-      local errorMsg = strings.ui_cannot_write_subtitle_file_to_any_location
-      vlc.msg.err("[VLSub] " .. errorMsg)
-      setMessage(error_tag(errorMsg))
-      return false
-    end
-  end
-
-  dbg("Final save target: " .. target)
-
-  -- Write subtitle content to file
-  local subfile = io.open(target, "wb")
-  if not subfile then
-    local errorMsg = strings.ui_cannot_open_file_for_writing .. target
-    vlc.msg.err("[VLSub] " .. errorMsg)
-    setMessage(error_tag(errorMsg))
+  local target, note, in_downloads = choose_save_target(subtitle_file_name(item))
+  if not target then
     return false
   end
+  dbg("Final save target: " .. target)
 
+  local subfile = io.open(target, "wb")
+  if not subfile then
+    return report_failure(strings.ui_cannot_open_file_for_writing .. target)
+  end
   subfile:write(subtitle_content)
   subfile:flush()
   subfile:close()
 
-
-  -- Try to load subtitles into VLC if video is playing
-  local subtitle_loaded = false
+  local message
   if openSub.file.hasInput and add_sub(target) then
-    subtitle_loaded = true
     dbg("Subtitle loaded successfully into VLC")
-  end
-
-  -- Build success message based on context
-  local successMsg
-  if subtitle_loaded then
-    successMsg = lang["mess_loaded"] .. saveLocation
+    message = lang["mess_loaded"] .. note
+  elseif in_downloads then
+    message = strings.ui_subtitles_saved_to_downloads
   else
-    if saved_to_downloads then
-      successMsg = strings.ui_subtitles_saved_to_downloads  -- Removed duplicate saveLocation
-    else
-      successMsg = strings.ui_subtitles_saved .. saveLocation
-    end
+    message = strings.ui_subtitles_saved .. note
   end
-
-  setMessage(success_tag(successMsg))
-
+  setMessage(success_tag(message))
   return true
 end
 
@@ -4603,13 +4567,6 @@ end
 
             --[[ Download ]]--
 
--- Log an error, show it in the window, and report failure.
-local function download_failed(message)
-  vlc.msg.err("[VLSub] " .. message)
-  setMessage(error_tag(message))
-  return false
-end
-
 local DOWNLOAD_STATUS_MESSAGE = {
   [403] = strings.ui_access_forbidden_403_insufficient_permissions,
   [404] = strings.ui_subtitle_not_found_404_file_may_have,
@@ -4645,11 +4602,11 @@ local function fetch_subtitle(link)
 
   local res = client:get(link)
   if not res then
-    return download_failed(strings.ui_failed_to_download_from_provided_link)
+    return report_failure(strings.ui_failed_to_download_from_provided_link)
   elseif res.status ~= 200 then
-    return download_failed(strings.ui_failed_to_download_subtitle_content_http .. res.status .. ")")
+    return report_failure(strings.ui_failed_to_download_subtitle_content_http .. res.status .. ")")
   elseif not res.body then
-    return download_failed(strings.ui_empty_subtitle_content_downloaded)
+    return report_failure(strings.ui_empty_subtitle_content_downloaded)
   end
   return res.body
 end
@@ -4658,10 +4615,10 @@ end
 -- load it into the player. Returns true on success.
 openSub.downloadFromNewAPI = function(item, is_retry)
   if not item.FileID then
-    return download_failed(strings.ui_no_file_id_available_for_download)
+    return report_failure(strings.ui_no_file_id_available_for_download)
   end
   if not openSub.checkSession() then
-    return download_failed(strings.ui_authentication_failed_please_check_your_opensubt)
+    return report_failure(strings.ui_authentication_failed_please_check_your_opensubt)
   end
 
   dbg("Downloading subtitle file ID: " .. item.FileID)
@@ -4669,7 +4626,7 @@ openSub.downloadFromNewAPI = function(item, is_retry)
 
   local auth_header = openSub.getAuthHeader()
   if not auth_header then
-    return download_failed(strings.ui_authentication_required_for_download)
+    return report_failure(strings.ui_authentication_required_for_download)
   end
 
   local client = Curl.new()
@@ -4684,7 +4641,7 @@ openSub.downloadFromNewAPI = function(item, is_retry)
   local res = client:post("http://api.opensubtitles.com/api/v1/download",
                           json.encode({ file_id = item.FileID }))
   if not res then
-    return download_failed(strings.ui_no_response_from_download_server)
+    return report_failure(strings.ui_no_response_from_download_server)
   end
 
   if res.status == 401 then
@@ -4692,9 +4649,9 @@ openSub.downloadFromNewAPI = function(item, is_retry)
     if not is_retry and openSub.refreshSession() then
       return openSub.downloadFromNewAPI(item, true)
     end
-    return download_failed(strings.ui_authentication_failed_401_please_check_your_cred)
+    return report_failure(strings.ui_authentication_failed_401_please_check_your_cred)
   elseif DOWNLOAD_STATUS_MESSAGE[res.status] then
-    return download_failed(DOWNLOAD_STATUS_MESSAGE[res.status])
+    return report_failure(DOWNLOAD_STATUS_MESSAGE[res.status])
   elseif res.status ~= 200 then
     local message = "Download failed with HTTP status: " .. res.status
     vlc.msg.err("[VLSub] " .. message)
@@ -4710,7 +4667,7 @@ openSub.downloadFromNewAPI = function(item, is_retry)
   end
 
   if not res.body or res.body == "" then
-    return download_failed(strings.ui_empty_response_from_download_server)
+    return report_failure(strings.ui_empty_response_from_download_server)
   end
 
   setMessage(openSub.actionLabel..": "..progressBarContent(75))
@@ -4737,7 +4694,7 @@ openSub.downloadFromNewAPI = function(item, is_retry)
     elseif answer.error or answer.message then
       -- e.g. 200 {"message":"Invalid file_id"}: an answer without a link
       -- is an explanation, never the subtitle itself
-      return download_failed(strings.ui_api_returned_error .. tostring(answer.error or answer.message))
+      return report_failure(strings.ui_api_returned_error .. tostring(answer.error or answer.message))
     else
       subtitle_content = res.body
       dbg("Using entire response as subtitle content (fallback)")

@@ -63,7 +63,7 @@ describe("interface strings", function()
     for line in (body .. "\n"):gmatch("(.-)\n") do
       line_number = line_number + 1
       local code = line:gsub("%-%-.*$", "")
-      if code:find("setMessage%(") or code:find("setError%(") or code:find("download_failed%(")
+      if code:find("setMessage%(") or code:find("setError%(") or code:find("report_failure%(")
          or code:find(":add_label%(") or code:find(":add_button%(") or code:find(":add_html%(") then
         for literal in code:gmatch('"([^"]*)"') do
           local text = literal:gsub("<[^>]*>", "")
