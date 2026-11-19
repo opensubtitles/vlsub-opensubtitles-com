@@ -490,258 +490,196 @@ function descriptor()
 end
 
 
--- Enhanced activation to ensure file info is ready for auto-search
-function activate()
+-- First run only: copy the languages suggested by locale detection into the
+-- three language settings (only the ones still empty) and save them.
+-- `log` and `progress` write to the first-run progress window.
+local function apply_detected_languages(detected_locale, log, progress)
+  if not detected_locale then
+    log("Could not detect user locale")
+    return
+  end
+  log("Locale detected: " .. detected_locale.locale .. " from " .. detected_locale.source)
 
-  -- Reset status tracking variables
+  local suggestions = detected_locale.suggested_languages
+  if not suggestions or #suggestions == 0 then
+    return
+  end
+
+  local lang_codes = {}
+  for _, suggestion in ipairs(suggestions) do
+    table.insert(lang_codes, suggestion.language)
+  end
+  log("Found " .. #suggestions .. " suggested languages: " .. table.concat(lang_codes, ", "))
+
+  local slots = {
+    { option = "language", label = "primary" },
+    { option = "language2", label = "secondary" },
+    { option = "language3", label = "third" },
+  }
+  for i, suggestion in ipairs(suggestions) do
+    local os_lang = map_to_opensubtitles_language(suggestion.language)
+    local found_language = false
+    for _, lang_pair in ipairs(openSub.conf.languages) do
+      if lang_pair[1] == os_lang or lang_pair[1] == suggestion.language then
+        found_language = true
+        local slot = slots[i]
+        if slot and (not openSub.option[slot.option] or openSub.option[slot.option] == "") then
+          openSub.option[slot.option] = lang_pair[1]
+          log("Set " .. slot.label .. " language: " .. lang_pair[1])
+        end
+        break
+      end
+    end
+    if not found_language then
+      log("Language not available: " .. os_lang)
+    end
+  end
+
+  progress("Saving auto-detected settings...")
+  if save_config() then
+    log("Auto-detected settings saved")
+  else
+    log("Failed to save auto-detected settings")
+  end
+end
+
+-- VLC calls this when the extension is opened from the menu.
+-- The first run shows a progress window, tests the network, detects the
+-- user's languages and checks for updates; later runs go straight to the
+-- main (or configuration) window.
+function activate()
   configurationPassed = false
   jsonModuleLoaded = false
   networkTestsFailed = false
   criticalFailure = false
 
-  -- Check if this is the first run BEFORE expensive operations
-  local is_first_run_detected = is_first_run()
+  local first_run = is_first_run()
 
-  -- Only show debug window and run full tests on first run
-  if is_first_run_detected then
+  -- Reports for the first-run progress window; silent on later runs
+  local function progress(message) if first_run then update_debug_progress(message) end end
+  local function status(message) if first_run then update_debug_status(message) end end
+  local function log(message) if first_run then append_debug_log(message) end end
+
+  if first_run then
     show_debug_window()
-    update_debug_progress("Initializing VLSub (First Run)...")
-    append_debug_log("VLSub first-time setup started")
-
-    -- Test network first (only on first run)
-    local has_network = test_network_connectivity()
-    if not has_network then
+    progress("Initializing VLSub (First Run)...")
+    log("VLSub first-time setup started")
+    if not test_network_connectivity() then
       networkTestsFailed = true
     end
-  else
-    networkTestsFailed = false
   end
 
-  -- JSON module check (always needed but fast)
-  if is_first_run_detected then
-    update_debug_progress("Loading JSON module...")
-  end
+  -- JSON module (shipped with VLC)
+  progress("Loading JSON module...")
   local json_ok, json_module = pcall(require, "dkjson")
   if not json_ok then
-    if is_first_run_detected then
-      update_debug_status("ERROR: Failed to load JSON module")
-      append_debug_log("CRITICAL: JSON module load failed: " .. tostring(json_module))
-    end
+    status("ERROR: Failed to load JSON module")
+    log("CRITICAL: JSON module load failed: " .. tostring(json_module))
     criticalFailure = true
     return false
   end
   json = json_module
   jsonModuleLoaded = true
-  if is_first_run_detected then
-    append_debug_log("JSON module loaded successfully")
-  end
+  log("JSON module loaded successfully")
 
-  -- Check dkjson version and compatibility
-  if is_first_run_detected then
-    update_debug_progress("Checking dkjson compatibility...")
-  end
+  progress("Checking dkjson compatibility...")
   if not check_dkjson_compatibility() then
     vlc.msg.err("[VLSub] Incompatible dkjson version detected")
-    if is_first_run_detected then
-      update_debug_status("ERROR: Incompatible dkjson version")
-      append_debug_log("CRITICAL: dkjson version too old - cannot parse floats")
-    end
+    status("ERROR: Incompatible dkjson version")
+    log("CRITICAL: dkjson version too old - cannot parse floats")
     show_dkjson_error_dialog()
     criticalFailure = true
     return false
   end
-  if is_first_run_detected then
-    append_debug_log("dkjson compatibility check passed (version: " .. tostring(json.version) .. ")")
-  end
+  log("dkjson compatibility check passed (version: " .. tostring(json.version) .. ")")
 
-  -- Config check (always needed)
-  if is_first_run_detected then
-    update_debug_progress("Checking configuration...")
-  end
+  -- Paths, saved settings
+  progress("Checking configuration...")
   if not check_config() then
-    if is_first_run_detected then
-      update_debug_status("ERROR: Unsupported VLC version")
-      append_debug_log("CRITICAL: VLC version not supported")
-    end
+    status("ERROR: Unsupported VLC version")
+    log("CRITICAL: VLC version not supported")
     criticalFailure = true
     return false
   end
   configurationPassed = true
-  if is_first_run_detected then
-    append_debug_log("Configuration check passed")
-  end
+  log("Configuration check passed")
 
-  -- No longer needed since we use VLC's built-in networking
-
-  -- Language initialization
-  if is_first_run_detected then
-    update_debug_progress("Loading subtitle languages...")
-  end
+  -- Subtitle languages: built-in list first, then cache or API
+  progress("Loading subtitle languages...")
   convert_sub_languages()
   openSub.conf.languages = sub_languages
-
-  -- Only fetch languages from API on first run or if needed
-  if is_first_run_detected then
-    if not networkTestsFailed then
-      update_debug_status("Initializing languages from API...")
-      pcall(function()
-        initialize_languages()
-        append_debug_log("Language list loaded from API")
-      end)
-    else
-      update_debug_status("Using offline language list...")
-      append_debug_log("Using built-in language list (offline mode)")
-    end
+  if first_run and networkTestsFailed then
+    status("Using offline language list...")
+    log("Using built-in language list (offline mode)")
   else
+    status("Initializing languages from API...")
     pcall(function()
-      initialize_languages() -- This will use cache if available
+      initialize_languages()
+      log("Language list loaded from API")
     end)
   end
 
-  -- Locale detection (only on first run)
-  if is_first_run_detected then
-    update_debug_progress("Detecting user locale...")
-    append_debug_log("First run detected")
-
-    append_debug_log("Starting locale detection...")
+  -- Preferred languages from the system locale
+  if first_run then
+    progress("Detecting user locale...")
+    log("First run detected")
+    log("Starting locale detection...")
 
     local saved_user_pref = openSub.option.language
     openSub.option.language = nil
-    append_debug_log("Temporarily cleared user preference for clean detection")
-
+    log("Temporarily cleared user preference for clean detection")
     local detected_locale = detect_user_locale()
-
     if saved_user_pref then
       openSub.option.language = saved_user_pref
     end
-
-    if detected_locale then
-      append_debug_log("Locale detected: " .. detected_locale.locale .. " from " .. detected_locale.source)
-
-      if detected_locale.suggested_languages and #detected_locale.suggested_languages > 0 then
-        local lang_codes = {}
-        for i, suggestion in ipairs(detected_locale.suggested_languages) do
-          table.insert(lang_codes, suggestion.language)
-        end
-        append_debug_log("Found " .. #detected_locale.suggested_languages .. " suggested languages: " .. table.concat(lang_codes, ", "))
-
-        for i, suggestion in ipairs(detected_locale.suggested_languages) do
-          local os_lang = map_to_opensubtitles_language(suggestion.language)
-
-          local found_language = false
-          for j, lang_pair in ipairs(openSub.conf.languages) do
-            if lang_pair[1] == os_lang or lang_pair[1] == suggestion.language then
-              found_language = true
-
-              if i == 1 and (not openSub.option.language or openSub.option.language == "") then
-                openSub.option.language = lang_pair[1]
-                append_debug_log("Set primary language: " .. lang_pair[1])
-              elseif i == 2 and (not openSub.option.language2 or openSub.option.language2 == "") then
-                openSub.option.language2 = lang_pair[1]
-                append_debug_log("Set secondary language: " .. lang_pair[1])
-              elseif i == 3 and (not openSub.option.language3 or openSub.option.language3 == "") then
-                openSub.option.language3 = lang_pair[1]
-                append_debug_log("Set third language: " .. lang_pair[1])
-              end
-              break
-            end
-          end
-
-          if not found_language then
-            append_debug_log("Language not available: " .. os_lang)
-          end
-        end
-
-        update_debug_progress("Saving auto-detected settings...")
-        local auto_save_success = save_config()
-        if auto_save_success then
-          append_debug_log("Auto-detected settings saved")
-        else
-          append_debug_log("Failed to save auto-detected settings")
-        end
-      end
-    else
-      append_debug_log("Could not detect user locale")
-    end
+    apply_detected_languages(detected_locale, log, progress)
   end
 
-  -- File info initialization (ALWAYS needed for auto-search)
-  if is_first_run_detected then
-    update_debug_progress("Getting file information...")
-  end
+  -- What is playing (needed for auto-search)
+  progress("Getting file information...")
   if vlc.input.item() then
     openSub.getFileInfo()
     openSub.getMovieInfo()
-    if is_first_run_detected then
-      append_debug_log("File info loaded for current media")
-    end
+    log("File info loaded for current media")
   else
-    if is_first_run_detected then
-      append_debug_log("No media loaded")
-    end
+    log("No media loaded")
   end
 
-  -- Authentication check (fast check for subsequent runs)
-  if is_first_run_detected then
-    update_debug_progress("Checking authentication...")
-  end
-
+  progress("Checking authentication...")
   local username = trim(openSub.option.os_username or "")
   local password = trim(openSub.option.os_password or "")
-  local has_credentials = (username ~= "" and password ~= "")
-  local has_valid_session = has_valid_authentication()
-
-  is_authenticated = has_credentials or has_valid_session
-
-  if is_first_run_detected then
-    if is_authenticated then
-      append_debug_log("Valid authentication found - credentials available")
-    else
-      append_debug_log("No valid authentication - missing credentials")
-    end
+  is_authenticated = (username ~= "" and password ~= "") or has_valid_authentication()
+  if is_authenticated then
+    log("Valid authentication found - credentials available")
+  else
+    log("No valid authentication - missing credentials")
   end
 
-  -- Store results
-  init_results.is_first_run = is_first_run_detected
+  init_results.is_first_run = first_run
   init_results.has_auth = is_authenticated
-
-
-  -- Mark initialization as complete
   initialization_complete = true
 
-  -- Handle completion
-  if is_first_run_detected then
-    -- First run - use debug window completion logic
-    update_debug_progress("Initialization complete!")
-    append_debug_log("Initialization complete - checking for auto-close...")
-
-    if init_results.has_auth then
-      is_authenticated = true
-      append_debug_log("Ready to show main window (authenticated)")
+  if first_run then
+    progress("Initialization complete!")
+    log("Initialization complete - checking for auto-close...")
+    if is_authenticated then
+      log("Ready to show main window (authenticated)")
     else
-      is_authenticated = false
-      append_debug_log("Ready to show configuration window (no auth)")
+      log("Ready to show configuration window (no auth)")
     end
-
     checkInitializationStatus()
-  else
-    -- Subsequent run - go directly to appropriate window with auto-search
-    show_appropriate_window()
-  end
 
-  -- Initialize auto-update checking (only on first run)
-  if is_first_run_detected then
-    update_debug_progress("Initializing auto-update system...")
-    append_debug_log("Setting up automatic update checking...")
+    progress("Initializing auto-update system...")
+    log("Setting up automatic update checking...")
     initialize_auto_update()
   else
+    show_appropriate_window()
     if should_check_for_updates() then
       pcall(function()
         check_for_updates(false)
       end)
     end
   end
-
 end
 
 
