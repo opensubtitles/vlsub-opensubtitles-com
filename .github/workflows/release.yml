@@ -48,14 +48,13 @@ jobs:
       run: |
         echo "Updating version strings in $SCRIPT_NAME..."
 
-        # Update app_version
+        # The version lives in ONE place: app_version. (Two more substitutions
+        # used to run here for names that no longer hold a literal; one of them,
+        # 'current_version = "..."', had started to match - and overwrite - the
+        # interface string ui_current_version. The test gate below caught it.)
         sed -i 's/local app_version = "[^"]*"/local app_version = "${{ steps.version.outputs.VERSION_NO_V }}"/' $SCRIPT_NAME
 
-        # Update auto_update current_version
-        sed -i 's/current_version = "[^"]*"/current_version = "${{ steps.version.outputs.VERSION_NO_V }}"/' $SCRIPT_NAME
 
-        # Update user_agent version
-        sed -i 's/user_agent = "VLSub-OpenSubtitles\.com\/[^"]*"/user_agent = "VLSub-OpenSubtitles.com\/${{ steps.version.outputs.VERSION_NO_V }}"/' $SCRIPT_NAME
 
         echo "Version updates completed."
 
@@ -91,8 +90,6 @@ jobs:
           # Re-apply version updates since we switched branches
           echo "Re-applying version updates on main branch..."
           sed -i 's/local app_version = "[^"]*"/local app_version = "${{ steps.version.outputs.VERSION_NO_V }}"/' $SCRIPT_NAME
-          sed -i 's/current_version = "[^"]*"/current_version = "${{ steps.version.outputs.VERSION_NO_V }}"/' $SCRIPT_NAME
-          sed -i 's/user_agent = "VLSub-OpenSubtitles\.com\/[^"]*"/user_agent = "VLSub-OpenSubtitles.com\/${{ steps.version.outputs.VERSION_NO_V }}"/' $SCRIPT_NAME
         fi
         
         git add $SCRIPT_NAME
