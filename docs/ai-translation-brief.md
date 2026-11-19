@@ -244,26 +244,12 @@ Dari and Tagalog have other codes on the engines: es-419 / es-ES, fa-AF,
 fil.) Which engine and which source language are used is the server's
 choice; VLSub does not filter by language - it shows what the server offers.
 
-### The simulation
+### No simulation
 
-The live API does not show on-demand entries yet, so `tests/lib/fake_api.lua`
-plays them (`server.ai.on_demand = { language = "cs", from = "pl" }`):
-the extra row in `/subtitles` with a 34-digit id written as a JSON number and
-the "will be created on demand" comment, a `/download` that spends credits and
-not quota, an empty answer without credits, "still translating" answers
-(`server.ai.waits`), `/ai/credits` and `/ai/credits/buy`. **It follows the
-Kodi addon's assumptions and the answers above, not recorded traffic**; it is
-to be corrected against the real server in stage 0.
-
-`lua tests/ondemand_demo.lua` runs the extension as it is today against it:
-
-- the row is listed like any AI-translated upload (`CS | ... 🤖 👤AI [0↓]`),
-  nothing says it does not exist yet or costs credits;
-- Download sends `"file_id":1.2464484099115e+33` instead of the 34 digits
-  (the id went through a Lua number), and the user gets
-  "API returned error: Invalid file_id". Nothing is paid, nothing is saved.
-
-So v1.4.0 fails safely on such an entry, but cannot use it.
+A simulated on-demand server in the test suite was tried and removed on the
+user's instruction (2026-11-19): tests are built from real examples only.
+Until one exists, nothing about the shape of an on-demand entry or of its
+download is assumed in code.
 
 ## Open questions
 

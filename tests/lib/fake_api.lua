@@ -129,20 +129,7 @@ function M.new(opts)
              user_id = 66, ext_installed = false, vip = false },
     downloads_used = 0,
     rate_limit = nil,         -- number: 429 after that many requests
-    -- AI on-demand translation, SIMULATED from what the Kodi addon expects of
-    -- the server and what its owner said (2026-11-19); to be replaced by
-    -- recorded answers once the live API shows it. Off unless a test sets
-    -- ai.on_demand = { language = "cs", from = "pl" }.
-    ai = {
-      credits = 120,          -- balance of the account
-      price = 45,             -- what one translation costs
-      on_demand = nil,        -- { language, from, id }: the row /subtitles adds
-      waits = 0,              -- answers "still translating" this many times first
-      spent = 0,              -- translations paid for (tests assert on it)
-    },
   }
-  -- 34 digits: more than a Lua number (a double) can hold
-  s.ai.ON_DEMAND_ID = "1246448409911500000000000000000000"
 
   function s:resolve(host)
     return not (self.offline or self.down[host])
@@ -227,43 +214,7 @@ function M.new(opts)
     return M.fixture("languages")
   end))
 
-  -- The row the server adds for a translation that does not exist yet. The
-  -- id is written as a JSON integer of 34 digits, as the real API does for
-  -- its other ids; the text is the one quoted in the Kodi addon's tests.
-  local LANGUAGE_NAME = { cs = "czech", sk = "slovak", pl = "polish", en = "english", de = "german" }
-  local function on_demand_row(srv)
-    local od = srv.ai.on_demand
-    local id = od.id or srv.ai.ON_DEMAND_ID
-    return '{"id":"' .. id .. '","type":"subtitle","attributes":{"subtitle_id":"' .. id .. '",'
-      .. '"language":"' .. od.language .. '","download_count":0,"new_download_count":0,'
-      .. '"hearing_impaired":false,"hd":false,"fps":0.0,"votes":0,"ratings":0.0,"from_trusted":false,'
-      .. '"foreign_parts_only":false,"upload_date":"2026-11-19T00:00:00Z","ai_translated":true,'
-      .. '"nb_cd":1,"machine_translated":false,"release":"Big.Buck.Bunny.2008",'
-      .. '"comments":"This subtitle file will be created on demand in '
-      .. (LANGUAGE_NAME[od.language] or od.language) .. ' language as AI translation from '
-      .. (LANGUAGE_NAME[od.from] or od.from) .. ' language.",'
-      .. '"uploader":{"uploader_id":null,"name":"AI","rank":""},'
-      .. '"feature_details":{"feature_id":548792,"feature_type":"Movie","year":2008,'
-      .. '"title":"Big Buck Bunny","movie_name":"2008 - Big Buck Bunny","imdb_id":1254207,"tmdb_id":10378},'
-      .. '"url":"https://www.opensubtitles.com/en/subtitles/big_buck_bunny","related_links":[],'
-      .. '"files":[{"file_id":' .. id .. ',"cd_number":1,"file_name":"Big.Buck.Bunny.2008.' .. od.language .. '"}]}}'
-  end
-  local function with_on_demand(raw, req, srv)
-    local od = srv.ai.on_demand
-    if not od then return raw end
-    local wanted = "," .. (req.query.languages or "") .. ","
-    if req.query.languages and not wanted:find("," .. od.language .. ",", 1, true) then return raw end
-    if req.query.ai_translated == "exclude" then return raw end
-    local _, _, body = mock.decode_response(raw)
-    local row = on_demand_row(srv)
-    local patched, n = body:gsub('"data":%[%]', function() return '"data":[' .. row .. ']' end, 1)
-    if n == 0 then
-      patched = body:gsub('(.*)%]', function(before) return before .. "," .. row .. "]" end, 1)
-    end
-    return M.response(200, patched, { ["X-AI-Proxy"] = "true" }, { chunked = 4000 })
-  end
-
-  local function subtitles(req)
+  s:on("GET " .. API .. "/subtitles", guard(function(req)
     local q = req.query
     if q.moviehash then
       if q.moviehash == "8e245d9679d31e12" then return M.fixture("search_hash") end
@@ -278,24 +229,6 @@ function M.new(opts)
       return M.fixture("search_name_multi")
     end
     return M.fixture("search_name_en")
-  end
-  s:on("GET " .. API .. "/subtitles", guard(function(req, srv)
-    return with_on_demand(subtitles(req), req, srv)
-  end))
-
-  s:on("GET " .. API .. "/ai/credits", guard(function(req, srv)
-    if not authorized(req, srv) then return M.response(401, { message = "Unauthorized", status = 401 }) end
-    return M.response(200, { data = { credits = srv.ai.credits } })
-  end))
-
-  s:on("GET " .. API .. "/ai/credits/buy", guard(function(req, srv)
-    if not authorized(req, srv) then return M.response(401, { message = "Unauthorized", status = 401 }) end
-    return M.response(200, { data = {
-      { name = "500 credits", value = "5 USD", discount_percent = 0,
-        checkout_url = "https://ai.opensubtitles.com/assets/buy_credits.php?tag=TESTTAG5" },
-      { name = "1100 credits", value = "10 USD", discount_percent = 10,
-        checkout_url = "https://ai.opensubtitles.com/assets/buy_credits.php?tag=TESTTAG10" },
-    } })
   end))
 
   s:on("GET " .. API .. "/utilities/guessit", guard(function(req)
@@ -339,38 +272,7 @@ function M.new(opts)
     if not authorized(req, srv) then
       return M.response(401, { message = "You must be logged in to download", status = 401 })
     end
-    -- An on-demand translation: recognised by the digits as they were SENT.
-    -- (A client that let the id pass through a number sends something else -
-    -- 1.2464484099115e+33, or other digits - and gets "Invalid file_id".)
-    local od = srv.ai.on_demand
-    if od then
-      local sent = (req.body or ""):match('"file_id"%s*:%s*"?([%d%.eE%+]+)"?')
-      srv.ai.last_id_sent = sent
-      if sent == (od.id or srv.ai.ON_DEMAND_ID) then
-        if srv.ai.credits < srv.ai.price then
-          return M.response(200, "") -- as the Kodi addon met it: empty answer, balance 0
-        end
-        if srv.ai.waits > 0 then
-          srv.ai.waits = srv.ai.waits - 1
-          return M.response(200, { message = "Translation in progress", wait_for_translation = 5 })
-        end
-        srv.ai.credits = srv.ai.credits - srv.ai.price
-        srv.ai.spent = srv.ai.spent + 1
-        -- paid with credits only: the daily download quota is not touched
-        return M.response(200, {
-          link = "https://www.opensubtitles.com/download/AI123/subfile/Big.Buck.Bunny.2008." .. od.language .. ".srt",
-          file_name = "Big.Buck.Bunny.2008." .. od.language .. ".srt",
-          requests = srv.downloads_used,
-          remaining = srv.user.allowed_downloads - srv.downloads_used,
-          message = "Your quota will be renewed in 23 hours and 59 minutes",
-          reset_time = "23 hours and 59 minutes",
-          reset_time_utc = "2026-11-20T05:00:00.000Z" }, nil, { chunked = 120 })
-      end
-    end
-    -- (the specification types file_id as int32: anything larger that is not
-    -- a known on-demand id is not a file)
-    if not body or not tonumber(body.file_id) or tonumber(body.file_id) <= 1
-       or tonumber(body.file_id) > 2147483647 then
+    if not body or not tonumber(body.file_id) or tonumber(body.file_id) <= 1 then
       return M.fixture("download_noauth") -- real API: 200 {"message":"Invalid file_id"}
     end
     if srv.downloads_used >= srv.user.allowed_downloads then
