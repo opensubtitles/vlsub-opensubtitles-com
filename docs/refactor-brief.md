@@ -148,18 +148,47 @@ Steps, each one safe on its own:
 1. **Move the hard-coded messages into the strings table.** English output
    stays byte-identical, so the behaviour diff must still report `identical`.
    This step is neutral and may be done as the last stage of the refactor.
-2. **Translation tables inside the script**, one per language, keyed like the
-   English table. A string missing in a language falls back to English, per
-   key, so an incomplete translation can never produce an empty label or a
-   crash.
-3. **Choosing the language**: an "Interface language" drop-down in the
-   configuration window with `Auto`, `English` and the shipped languages.
-4. **Tests**: every language table contains only known keys; placeholders and
-   HTML tags match the English string; every window builds in every language;
-   no label is nil or empty; switching language and back restores English
-   exactly; with English selected the behaviour diff is still `identical`.
+2. **Translations live in the repository, not in the script**: one file per
+   language, `locale/<code>.json`, a flat `{"key": "text"}` object. The script
+   ships English only and stays small; a translation can be added or corrected
+   without releasing a new version.
+3. **Download on demand.** When the user picks a language, the script fetches
+   `https://raw.githubusercontent.com/opensubtitles/vlsub-opensubtitles-com/main/locale/<code>.json`
+   with `vlc.stream` (HTTPS GET without headers is exactly what it can do;
+   measured in VLC 3.0.16: 260 ms, and a missing file comes back as a clean
+   `nil`) and stores it in `<userdata>/vlsub.com/locale/`. Later starts read
+   the stored copy; it is refreshed at most once a week, in the same place the
+   update check already runs.
+4. **Never trust the file, never block startup.**
+   - Only keys that exist in the English table are accepted, values must be
+     strings of sane length, and the HTML tags and placeholders must match the
+     English string; anything else is dropped and English is used for that key.
+   - A string missing in a language falls back to English, per key, so an
+     incomplete or broken translation can never give an empty label or a crash.
+   - No download at startup and none on first run: `vlc.stream` cannot be timed
+     out. The fetch happens only on the Save click that changed the language,
+     and on the weekly refresh. If it fails the interface stays as it was and a
+     message says so.
+5. **Choosing the language**: an "Interface language" drop-down in the
+   configuration window: `English` plus the languages listed in
+   `locale/index.json` (bundled list as fallback), and `Auto` (use the system
+   language if a translation exists). Existing installs stay on `English`
+   until the user changes it; new installs get `Auto`.
+6. **Content**: start from the human translations of the original VLSub
+   project (GPL, reuse approved) for the old keys. Newer strings are
+   machine-translated and listed per language in `locale/README.md` as
+   unreviewed; a language appears in `index.json` only after someone has read
+   it through. `locale/README.md` explains how to contribute a translation.
+7. **Tests**: every `locale/*.json` parses, contains only known keys, and has
+   matching tags and placeholders (run in CI, so a bad translation cannot be
+   merged); every window builds in every language with no nil or empty label;
+   a hostile file (unknown keys, non-strings, injected HTML, 1 MB of text) is
+   neutralised; download failure leaves the interface unchanged; switching
+   language and back restores English exactly; with English selected the
+   behaviour diff is still `identical`; `tests/vlc/run.sh` fetches one real
+   translation inside VLC.
 
-Decisions needed before phase 2 starts (see the conversation of 2026-11-19):
-which languages ship, what existing users get by default, and who reviews
-machine-translated strings.
-
+Decided 2026-11-19: translations are hosted in the repository and downloaded
+on demand; existing installs stay English, new installs use Auto; only
+reviewed languages are listed; reuse of the original VLSub translations is
+fine (GPL).
