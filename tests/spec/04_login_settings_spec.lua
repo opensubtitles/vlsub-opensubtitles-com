@@ -243,6 +243,41 @@ describe("configuration window", function()
     eq(env.server:last(SUBTITLES).query.languages, "sk")
   end)
 
+  it("the config file contains settings only", function()
+    local env = H.launch({ first_run = true, host_locale = "C", env = { LANG = "sk_SK.UTF-8" },
+                           popen = function() return "" end })
+    local c = config_window(env)
+    c.username:set_text("tester")
+    c.password:set_text("test-password")
+    c.save:_click()
+    local keys = {}
+    for k in pairs(env.saved_config()) do keys[#keys + 1] = k end
+    table.sort(keys)
+    eq(keys, { "downloadBehaviour", "langExt", "language", "language2", "language3",
+               "os_password", "os_username", "progressBarSize", "removeTag", "sortDirection" })
+    ok(#H.read_file(env.dir .. "/vlsub_conf.json") < 600, "file is small")
+  end)
+
+  it("a config file written by 1.3.2 loads, and its obsolete keys are dropped on the next save", function()
+    local env = H.launch({ config = {
+      language = "sk", language2 = "en", intLang = "eng", debugLogging = true,
+      showMediaInformation = true, requestTimeoutMs = 15000, requestPollIntervalMs = 250,
+      requestMaxRetries = 2, translations_avail = { eng = "English", slo = "Slovak" },
+      translation = { int_all = "EVERYTHING", int_research = "Find", mess_no_res = "Nothing" },
+    } })
+    eq(env.ui():_at(2, 4, "dropdown").values[1].text, "Slovak", "language setting honoured")
+    eq(env.ui():_at(2, 4, "dropdown").values[2].text, "All", "saved interface strings are ignored")
+    local c = config_window(env)
+    c.save:_click()
+    local saved = env.saved_config()
+    eq(saved.language, "sk")
+    eq(saved.language2, "en")
+    for _, key in ipairs({ "translation", "translations_avail", "intLang", "debugLogging",
+                           "showMediaInformation", "requestTimeoutMs", "requestMaxRetries" }) do
+      eq(saved[key], nil, key)
+    end
+  end)
+
   it("config file is valid JSON and keeps unrelated options", function()
     local env = H.launch({ config = { progressBarSize = 42 } })
     local c = config_window(env)

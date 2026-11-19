@@ -171,6 +171,8 @@ local subtitle_sort_direction_options = {
 }
 
 -- First, update the options structure to support 3 languages
+-- Settings. This table is what gets saved to vlsub_conf.json (plus
+-- os_username / os_password once entered), so only settings belong here.
 local options = {
   language = nil,
   language2 = nil,  -- Second language
@@ -180,142 +182,138 @@ local options = {
   downloadBehaviour = 'save',
   langExt = true,
   removeTag = false,
-  showMediaInformation = true,
-  progressBarSize = 80,
-  translation = {
-    int_all = 'All',
-    int_descr = 'Download subtitles from OpenSubtitles.com',
-    int_research = 'Search',
-    int_config = 'Config',
-    int_configuration = 'Configuration',
-    int_help = 'Help',
-    int_search_hash = 'Search by hash',
-    int_search_name = 'Search',
-    int_title = 'Title',
-    int_season = 'TV Season',
-    int_episode = 'TV Episode',
-    int_imdb = 'IMDB ID',
-    int_show_help = 'Help',
-    int_show_conf = 'Config',
-    int_dowload_sel = 'Download selected',
-    int_close = 'Close',
-    int_ok = 'Ok',
-    int_save = 'Save',
-    int_cancel = 'Cancel',
-    int_bool_true = 'Yes',
-    int_bool_false = 'No',
-    int_search_transl = 'Search translations',
-    int_searching_transl = 'Searching translations ...',
-    int_int_lang = 'Interface language',
-    int_default_lang = '1. Subtitles Language',           -- Updated
-    int_second_lang = '2. Subtitles Language',            -- Updated
-    int_third_lang = '3. Subtitles Language',             -- Updated
-    int_dowload_behav = 'What to do with subtitles',
-    int_dowload_save = 'Load and save',
-    int_dowload_load = 'Load only',
-    int_dowload_manual =  'Manual download',
-    int_display_code = 'Save language code in file name',
-    int_remove_tag = 'Remove tags',
-    int_use_curl = 'Use curl (<a href="https://github.com/opensubtitles/vlsub-opensubtitles-com/wiki/VLC-Extension-Development-FAQ:-Networking-and-Header-Limitations">info</a>)',
-    int_vlsub_work_dir = 'VLSub working directory',
-    int_os_username = 'OpenSubtitles.com Username',
-    int_os_password = 'OpenSubtitles.com Password',
-    int_help_mess =[[
-      Download subtitles from
-      <a href='http://www.opensubtitles.org/'>
-      opensubtitles.org
-      </a> and display them while watching a video.<br>
-      <br>
-      <b><u>Usage:</u></b><br>
-      <br>
-      Start your video. If you use Vlsub witout playing a video
-      you will get a link to download the subtitles in your browser
-      but the subtitles won't be saved and loaded automatically.<br>
-      <br>
-      Choose up to 3 languages for your subtitles and click on the
-      button corresponding to one of the two research methods
-      provided by VLSub:<br>
-      <br>
-      <b>Method 1: Search by hash</b><br>
-      It is recommended to try this method first, because it
-      performs a research based on the video file print, so you
-      can find subtitles synchronized with your video.<br>
-      <br>
-      <b>Method 2: Search</b><br>
-      If you have no luck with the first method, just check the
-      title is correct before clicking. If you search subtitles
-      for a series, you can also provide a season and episode
-      number.<br>
-      <br>
-      <b>Downloading Subtitles</b><br>
-      Select one subtitle in the list and click on 'Download'.<br>
-      It will be put in the same directory that your video, with
-      the same name (different extension)
-      so VLC will load them automatically the next time you'll
-      start the video.<br>
-      <br>
-      <b>/!\\ Beware :</b> Existing subtitles are overwritten
-      without asking confirmation, so put them elsewhere if
-      they're important.<br>
-      <br>
-      Find more VLC extensions at
-      <a href='http://addons.videolan.org'>addons.videolan.org</a>.
-      ]],
-    int_no_support_mess = [[
-      <strong>VLSub is not working with Vlc 2.1.x on
-      any platform</strong>
-      because the lua "net" module needed to interact
-      with opensubtitles has been
-      removed in this release for the extensions.
-      <br>
-      <strong>Works with Vlc 2.2 on mac and linux.</strong>
-      <br>
-      <strong>On windows you have to install an older version
-      of Vlc (2.0.8 for example)</strong>
-      to use Vlsub:
-      <br>
-      <a target="_blank" rel="nofollow"
-      href="http://download.videolan.org/pub/videolan/vlc/2.0.8/">
-      http://download.videolan.org/pub/videolan/vlc/2.0.8/</a><br>
+  progressBarSize = 80
+}
+
+-- Interface strings (English)
+local strings = {
+  int_all = 'All',
+  int_descr = 'Download subtitles from OpenSubtitles.com',
+  int_research = 'Search',
+  int_config = 'Config',
+  int_configuration = 'Configuration',
+  int_help = 'Help',
+  int_search_hash = 'Search by hash',
+  int_search_name = 'Search',
+  int_title = 'Title',
+  int_season = 'TV Season',
+  int_episode = 'TV Episode',
+  int_imdb = 'IMDB ID',
+  int_show_help = 'Help',
+  int_show_conf = 'Config',
+  int_dowload_sel = 'Download selected',
+  int_close = 'Close',
+  int_ok = 'Ok',
+  int_save = 'Save',
+  int_cancel = 'Cancel',
+  int_bool_true = 'Yes',
+  int_bool_false = 'No',
+  int_search_transl = 'Search translations',
+  int_searching_transl = 'Searching translations ...',
+  int_int_lang = 'Interface language',
+  int_default_lang = '1. Subtitles Language',           -- Updated
+  int_second_lang = '2. Subtitles Language',            -- Updated
+  int_third_lang = '3. Subtitles Language',             -- Updated
+  int_dowload_behav = 'What to do with subtitles',
+  int_dowload_save = 'Load and save',
+  int_dowload_load = 'Load only',
+  int_dowload_manual =  'Manual download',
+  int_display_code = 'Save language code in file name',
+  int_remove_tag = 'Remove tags',
+  int_use_curl = 'Use curl (<a href="https://github.com/opensubtitles/vlsub-opensubtitles-com/wiki/VLC-Extension-Development-FAQ:-Networking-and-Header-Limitations">info</a>)',
+  int_vlsub_work_dir = 'VLSub working directory',
+  int_os_username = 'OpenSubtitles.com Username',
+  int_os_password = 'OpenSubtitles.com Password',
+  int_help_mess =[[
+    Download subtitles from
+    <a href='http://www.opensubtitles.org/'>
+    opensubtitles.org
+    </a> and display them while watching a video.<br>
+    <br>
+    <b><u>Usage:</u></b><br>
+    <br>
+    Start your video. If you use Vlsub witout playing a video
+    you will get a link to download the subtitles in your browser
+    but the subtitles won't be saved and loaded automatically.<br>
+    <br>
+    Choose up to 3 languages for your subtitles and click on the
+    button corresponding to one of the two research methods
+    provided by VLSub:<br>
+    <br>
+    <b>Method 1: Search by hash</b><br>
+    It is recommended to try this method first, because it
+    performs a research based on the video file print, so you
+    can find subtitles synchronized with your video.<br>
+    <br>
+    <b>Method 2: Search</b><br>
+    If you have no luck with the first method, just check the
+    title is correct before clicking. If you search subtitles
+    for a series, you can also provide a season and episode
+    number.<br>
+    <br>
+    <b>Downloading Subtitles</b><br>
+    Select one subtitle in the list and click on 'Download'.<br>
+    It will be put in the same directory that your video, with
+    the same name (different extension)
+    so VLC will load them automatically the next time you'll
+    start the video.<br>
+    <br>
+    <b>/!\\ Beware :</b> Existing subtitles are overwritten
+    without asking confirmation, so put them elsewhere if
+    they're important.<br>
+    <br>
+    Find more VLC extensions at
+    <a href='http://addons.videolan.org'>addons.videolan.org</a>.
     ]],
+  int_no_support_mess = [[
+    <strong>VLSub is not working with Vlc 2.1.x on
+    any platform</strong>
+    because the lua "net" module needed to interact
+    with opensubtitles has been
+    removed in this release for the extensions.
+    <br>
+    <strong>Works with Vlc 2.2 on mac and linux.</strong>
+    <br>
+    <strong>On windows you have to install an older version
+    of Vlc (2.0.8 for example)</strong>
+    to use Vlsub:
+    <br>
+    <a target="_blank" rel="nofollow"
+    href="http://download.videolan.org/pub/videolan/vlc/2.0.8/">
+    http://download.videolan.org/pub/videolan/vlc/2.0.8/</a><br>
+  ]],
 
-    action_login = 'Logging in',
-    action_logout = 'Logging out',
-    action_noop = 'Checking session',
-    action_search = 'Searching subtitles',
-    action_hash = 'Calculating movie hash',
+  action_login = 'Logging in',
+  action_logout = 'Logging out',
+  action_noop = 'Checking session',
+  action_search = 'Searching subtitles',
+  action_hash = 'Calculating movie hash',
 
-    mess_success = 'Success',
-    mess_error = 'Error',
-    mess_no_response = 'Server not responding',
-    mess_unauthorized = 'Request unauthorized',
-    mess_expired = 'Session expired, retrying',
-    mess_overloaded = 'Server overloaded, please retry later',
-    mess_no_input = 'Please use this method during playing',
-    mess_not_local = 'This method works with local file only (for now)',
-    mess_not_found = 'File not found',
-    mess_not_found2 = 'File not found (illegal character?)',
-    mess_no_selection = 'No subtitles selected',
-    mess_save_fail = 'Unable to save subtitles',
-    mess_click_link = 'Click here to open the file',
-    mess_complete = 'Search complete',
-    mess_no_res = 'No result',
-    mess_res = 'result(s)',
-    mess_loaded = 'Subtitles loaded',
-    mess_not_load = 'Unable to load subtitles',
-    mess_downloading = 'Downloading subtitle',
-    mess_dowload_link = 'Download link',
-    mess_err_conf_access ='Can\'t find a suitable path to save'..
-      'config, please set it manually',
-    mess_err_wrong_path ='the path contains illegal character, '..
-      'please correct it',
-    mess_err_cant_download_interface_translation='could not download interface translation'
-  },
-
-  -- HTTP request settings
-  requestTimeoutMs = 15000,       -- 15 seconds
-  requestPollIntervalMs = 250,    -- 250ms
-  requestMaxRetries = 2           -- Retry failed requests twice
+  mess_success = 'Success',
+  mess_error = 'Error',
+  mess_no_response = 'Server not responding',
+  mess_unauthorized = 'Request unauthorized',
+  mess_expired = 'Session expired, retrying',
+  mess_overloaded = 'Server overloaded, please retry later',
+  mess_no_input = 'Please use this method during playing',
+  mess_not_local = 'This method works with local file only (for now)',
+  mess_not_found = 'File not found',
+  mess_not_found2 = 'File not found (illegal character?)',
+  mess_no_selection = 'No subtitles selected',
+  mess_save_fail = 'Unable to save subtitles',
+  mess_click_link = 'Click here to open the file',
+  mess_complete = 'Search complete',
+  mess_no_res = 'No result',
+  mess_res = 'result(s)',
+  mess_loaded = 'Subtitles loaded',
+  mess_not_load = 'Unable to load subtitles',
+  mess_downloading = 'Downloading subtitle',
+  mess_dowload_link = 'Download link',
+  mess_err_conf_access ='Can\'t find a suitable path to save'..
+    'config, please set it manually',
+  mess_err_wrong_path ='the path contains illegal character, '..
+    'please correct it',
+  mess_err_cant_download_interface_translation='could not download interface translation'
 }
 
 -- default subtitle languages
@@ -484,7 +482,7 @@ function descriptor()
     author = "OpenSubtitles",
     url = 'http://www.opensubtitles.com/',
     shortdesc = app_name;
-    description = options.translation.int_descr,
+    description = strings.int_descr,
     capabilities = {"menu", "input-listener" }
   }
 end
@@ -2408,7 +2406,7 @@ function check_config()
   end
 
   lang = nil
-  lang = options.translation -- just a short cut
+  lang = strings -- just a short cut
 
   if not vlc.net or not vlc.net.poll then
     dlg = vlc.dialog(
@@ -2438,8 +2436,12 @@ function load_config()
 
   -- Written by versions up to 1.3.2, which had an (unreachable) interface
   -- translation feature. Accepted in old files and ignored.
-  local obsolete = { translation = true, translations_avail = true, intLang = true,
-                     debugLogging = true }
+  local obsolete = {
+    translation = true, translations_avail = true, intLang = true, debugLogging = true,
+    -- settings no code reads any more
+    showMediaInformation = true, requestTimeoutMs = true, requestPollIntervalMs = true,
+    requestMaxRetries = true
+  }
 
   for key, value in pairs(option) do
     if obsolete[key] then

@@ -40,8 +40,12 @@ local EXCEPTIONS = {
     why = "only real settings are written; old files still load",
     -- interface-translation machinery (removed, was unreachable), and the
     -- hidden debugLogging switch (VLC's own verbosity is the switch now)
+    -- and settings no code reads (the last one since the first release, the
+    -- request* ones since the legacy socket client was removed)
     drop_config_keys = { translation = true, translations_avail = true, intLang = true,
-                         debugLogging = true },
+                         debugLogging = true, showMediaInformation = true,
+                         requestTimeoutMs = true, requestPollIntervalMs = true,
+                         requestMaxRetries = true },
   },
 }
 local DROP_CONFIG_KEYS = EXCEPTIONS[2].drop_config_keys
