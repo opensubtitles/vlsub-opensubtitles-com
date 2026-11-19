@@ -517,66 +517,6 @@ function descriptor()
 end
 
 
--- Test function
-local function test_headers()
-  vlc.msg.dbg("[VLSub] ========== HEADER DEBUG CHECK ==========")
-  vlc.msg.dbg("[VLSub] Testing if headers are sent to server...")
-
-  local test_url = "http://www.opensubtitles.org/addons/show_headers.php"
-  vlc.msg.dbg("[VLSub] Making request to: " .. test_url)
-
-  local client = Curl.new()
-  client:add_header("Api-Key", config.api_key)
-  client:add_header("User-Agent", openSub.conf.userAgentHTTP)
-  client:add_header("X-Test-Header", "VLSub-Test-Value")
-  client:set_timeout(10)
-  client:set_retries(1)
-
-  if openSub.session.token and openSub.session.token ~= "" then
-    client:add_header("Authorization", "Bearer " .. openSub.session.token)
-    vlc.msg.dbg("[VLSub] Added Authorization header")
-  else
-    vlc.msg.dbg("[VLSub] No token - testing without Authorization")
-  end
-
-  local res = client:get(test_url)
-
-  if not res then
-    vlc.msg.err("[VLSub] No response from server")
-    return false
-  end
-
-  vlc.msg.dbg("[VLSub] Response status: " .. (res.status or "no status"))
-
-  if not res.body or string.len(res.body) == 0 then
-    vlc.msg.err("[VLSub] Empty response body")
-    return false
-  end
-
-  vlc.msg.dbg("[VLSub] Response body:")
-  vlc.msg.dbg("[VLSub] " .. res.body)
-
-  local has_api_key = string.find(res.body, "Api%-Key") or string.find(res.body, "api%-key")
-  local has_user_agent = string.find(res.body, "User%-Agent") or string.find(res.body, "user%-agent")
-  local has_test_header = string.find(res.body, "X%-Test%-Header") or string.find(res.body, "x%-test%-header")
-  local has_auth = string.find(res.body, "Authorization") or string.find(res.body, "authorization")
-
-  vlc.msg.dbg("[VLSub] ========== HEADER CHECK RESULTS ==========")
-  vlc.msg.dbg("[VLSub] Api-Key: " .. (has_api_key and "YES" or "NO"))
-  vlc.msg.dbg("[VLSub] User-Agent: " .. (has_user_agent and "YES" or "NO"))
-  vlc.msg.dbg("[VLSub] X-Test-Header: " .. (has_test_header and "YES" or "NO"))
-  vlc.msg.dbg("[VLSub] Authorization: " .. (has_auth and "YES" or "NO"))
-  vlc.msg.dbg("[VLSub] ========================================")
-
-  if has_api_key then
-    vlc.msg.dbg("[VLSub] SUCCESS: Headers are sent!")
-    return true
-  else
-    vlc.msg.err("[VLSub] FAILURE: Headers NOT sent!")
-    return false
-  end
-end
-
 
 -- Enhanced activation to ensure file info is ready for auto-search
 function activate()
@@ -864,13 +804,6 @@ function activate()
   end
 end
 
--- Optional: Add a preference to disable auto-search
-function is_auto_search_enabled()
-  -- You could add this to options if you want to make it configurable
-  -- For now, always enabled for better UX
-  return true
-end
-
 
 
 
@@ -974,56 +907,6 @@ function compare_versions(version1, version2)
   end
 
   return 0
-end
-
--- Function to get installation instructions for the user's OS
-function get_install_instructions(download_url)
-  local instructions = {}
-
-  if openSub.conf.os == "win" then
-    -- Windows instructions
-    table.insert(instructions, "<b>Windows Installation:</b>")
-    table.insert(instructions, "")
-    table.insert(instructions, "<b>Option 1 - PowerShell (Recommended):</b>")
-    table.insert(instructions, "1. Press Win+R, type 'powershell' and press Enter")
-    table.insert(instructions, "2. Copy and paste this command:")
-    table.insert(instructions, "<code>iwr -useb https://raw.githubusercontent.com/opensubtitles/vlsub-opensubtitles-com/main/scripts/install.ps1 | iex</code>")
-    table.insert(instructions, "")
-    table.insert(instructions, "<b>Option 2 - Manual Download:</b>")
-    table.insert(instructions, "1. Download: <a href='" .. download_url .. "'>vlsubcom.lua</a>")
-    table.insert(instructions, "2. Copy to: <code>%APPDATA%\\vlc\\lua\\extensions\\</code>")
-    table.insert(instructions, "3. Restart VLC")
-
-  else
-    -- macOS/Linux instructions
-    local os_name = "Linux"
-    if string.find(string.lower(os.getenv("HOME") or ""), "users") then
-      os_name = "macOS"
-    end
-
-    table.insert(instructions, "<b>" .. os_name .. " Installation:</b>")
-    table.insert(instructions, "")
-    table.insert(instructions, "<b>Option 1 - Automatic (Recommended):</b>")
-    table.insert(instructions, "1. Open Terminal")
-    table.insert(instructions, "2. Copy and paste this command:")
-    table.insert(instructions, "<code>curl -sSL https://raw.githubusercontent.com/opensubtitles/vlsub-opensubtitles-com/main/scripts/install.sh | bash</code>")
-    table.insert(instructions, "")
-    table.insert(instructions, "<b>Option 2 - Manual Download:</b>")
-    table.insert(instructions, "1. Download: <a href='" .. download_url .. "'>vlsubcom.lua</a>")
-    if os_name == "macOS" then
-      table.insert(instructions, "2. Copy to: <code>~/Library/Application Support/org.videolan.vlc/lua/extensions/</code>")
-    else
-      table.insert(instructions, "2. Copy to: <code>~/.local/share/vlc/lua/extensions/</code>")
-    end
-    table.insert(instructions, "3. Restart VLC")
-  end
-
-  table.insert(instructions, "")
-  table.insert(instructions, "<b>After installation:</b>")
-  table.insert(instructions, "• Restart VLC Media Player")
-  table.insert(instructions, "• Access via View → VLSub OpenSubtitles.com")
-
-  return table.concat(instructions, "<br>")
 end
 
 -- Compact function to show update available dialog (single dialog, VLC-compatible, compact)
@@ -1468,14 +1351,6 @@ function check_for_updates(force_check)
   end
 end
 
--- Function to add "Check for Updates" button to config window
-function add_update_button_to_config()
-  -- Add this to your interface_config() function, in the button row
-  dlg:add_button("🔄 Check Updates", function()
-    check_for_updates(true) -- Force check
-  end, 1, 11, 1, 1)
-end
-
 -- Function to initialize auto-update checking (FIXED)
 function initialize_auto_update()
   vlc.msg.dbg("[VLSub] Initializing auto-update system...")
@@ -1605,16 +1480,6 @@ end
   end
 end
 
-
--- Helper function to force user to stay in config until authenticated
-function force_config_until_authenticated()
-  if not has_valid_authentication() then
-    vlc.msg.dbg("[VLSub] Authentication required - staying in config window")
-    setMessage(error_tag("Please enter valid OpenSubtitles.com credentials and click Save before proceeding."))
-    return true -- Stay in config
-  end
-  return false -- Can proceed
-end
 
 
 
@@ -2262,12 +2127,6 @@ function assoc_select_conf(select_id, option, conf, ind, default)
   }
   -- DON'T reorder - just display in original order
   display_select(select_id)
-end
-
-function set_default_option(select_id)
--- DON'T reorder languages - this was causing index issues
--- Just keep the original order from conf
-  -- This function now does nothing to avoid reordering
 end
 
 -- Missing display_select function that's called by assoc_select_conf
@@ -4411,24 +4270,9 @@ function network_redirect_message(status)
   return nil
 end
 
-function warning_tag(str)
-  return "<span style='color:#ffc107;font-weight:bold;'>"..
-    "Warning"..":</span> "..str..""
-end
-
-function info_tag(str)
-  return "<span style='color:#17a2b8;font-weight:bold;'>"..
-    "Info"..":</span> "..str..""
-end
-
 function loading_tag(str)
   return "<span style='color:#6c757d;font-weight:bold;'>"..
     "Loading"..":</span> "..str..""
-end
-
-function download_tag(str)
-  return "<span style='color:#007bff;font-weight:bold;'>"..
-    "Download"..":</span> "..str..""
 end
 
 
@@ -5065,22 +4909,6 @@ function dump_xml(data)
 end
 
             --[[ Misc utils]]--
-
-function make_uri(str)
-  str = str:gsub("\\", "/")
-  local windowdrive = string.match(str, "^(%a:).+$")
-  local encode_uri = vlc.strings.encode_uri_component
-  local encodedPath = ""
-  for w in string.gmatch(str, "/([^/]+)") do
-    encodedPath = encodedPath.."/"..encode_uri(w)
-  end
-
-  if windowdrive then
-    return "file:///"..windowdrive..encodedPath
-  else
-    return "file://"..encodedPath
-  end
-end
 
 function file_touch(name) -- test write ability
   if not name or trim(name) == ""
@@ -5757,47 +5585,6 @@ openSub.loadSessionCache = function()
   return true
 end
 
--- New logout function for REST API
-openSub.logoutRestAPI = function()
-  if openSub.session.token == "" then
-    return true -- Already logged out
-  end
-
-  openSub.actionLabel = lang["action_logout"]
-
-  local logout_url = "http://api.opensubtitles.com/api/v1/logout"
-
-  local client = Curl.new()
-  client:add_header("Api-Key", config.api_key)
-  client:add_header("Authorization", "Bearer " .. openSub.session.token)
-  -- client:add_header("User-Agent", openSub.conf.userAgentHTTP)
-  client:set_timeout(15)
-
-  local res = client:delete(logout_url)
-
-  -- Clear session regardless of logout success
-  openSub.session.token = ""
-  openSub.session.user_info = nil
-  openSub.session.token_expires = 0
-  openSub.session.loginTime = 0
-
-  -- Remove session cache file
-  if openSub.conf.dirPath then
-    local cache_file_path = openSub.conf.dirPath .. slash .. "session_cache.json"
-    if file_exist(cache_file_path) then
-      os.remove(cache_file_path)
-    end
-  end
-
-  if res and res.status == 200 then
-    vlc.msg.dbg("[VLSub] Successfully logged out from REST API")
-  else
-    vlc.msg.dbg("[VLSub] Logout request failed, but session cleared locally")
-  end
-
-  return true
-end
-
 
 
 -- The server rejected the current token (401). The cached session must be
@@ -6318,13 +6105,6 @@ function input_changed()
   collectgarbage()
 end
 
--- New trigger_action function (VLC calls this on list interactions)
-function trigger_action()
-  -- This function gets called when user interacts with dialog elements
-  -- including list selections on macOS
-  subtitle_list_click_handler()
-end
-
 -- Missing helper function: get_first_sel
 function get_first_sel(list)
   if not list then
@@ -6585,23 +6365,6 @@ function handle_temp_config_click()
     input_table['temp_config_button'] = nil
   end
   show_conf()
-end
-
--- Enhanced temporary config button with tooltip explanation
-function show_auth_error_with_config_button(errorMessage)
-  -- Show error message with helpful tooltip
-  local brandedError = "<span style='color:#ff6600;' title='Authentication is required to download subtitles from OpenSubtitles.com'><b>🔐 Authentication Error:</b></span> " .. errorMessage
-  setMessage(error_tag(brandedError))
-
-  -- Add temporary config button
-  if dlg and not input_table['temp_config_button'] then
-    input_table['temp_config_button'] = dlg:add_button(
-      "🔧 Setup Account",
-      handle_temp_config_click,
-      2, 10, 1, 1  -- Position in button row
-    )
-    dlg:update()
-  end
 end
 
 -- Simple fix: is_first_run() that doesn't rely on openSub.conf.filePath
@@ -7844,54 +7607,7 @@ end
 
 
 
--- Updated check_login_clicked function to use current form data
-function check_login_clicked()
-  vlc.msg.dbg("[VLSub] Check login button clicked")
 
-  -- Get current form values (don't save config yet, just use temp values)
-  local temp_username = trim(input_table['os_username']:get_text() or "")
-  local temp_password = trim(input_table['os_password']:get_text() or "")
-
-  -- Check if username or password is empty
-  if temp_username == "" or temp_password == "" then
-    setMessage(error_tag("Please enter both username and password before checking login"))
-    return
-  end
-
-  -- Temporarily store current config values
-  local saved_username = openSub.option.os_username
-  local saved_password = openSub.option.os_password
-
-  -- Set temporary values for login test
-  openSub.option.os_username = temp_username
-  openSub.option.os_password = temp_password
-
-  -- Clear any existing session to force fresh login
-  openSub.session.token = ""
-  openSub.session.token_expires = 0
-  openSub.session.user_info = nil
-
-  -- Attempt login and get user info
-  local success = openSub.checkLoginAndUserInfo()
-
-  -- Restore original config values (don't save the temporary ones)
-  openSub.option.os_username = saved_username
-  openSub.option.os_password = saved_password
-
-  if not success then
-    vlc.msg.dbg("[VLSub] Login check failed")
-    -- Error message should already be set by checkLoginAndUserInfo
-  else
-    vlc.msg.dbg("[VLSub] Login check successful")
-    -- Success message should already be set by checkLoginAndUserInfo
-  end
-end
-
-
-
-local function escape(str)
-    return str:gsub('"', '\\"')
-end
 
 
 -- Enhanced show_appropriate_window with auto-search capability
