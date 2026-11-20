@@ -125,7 +125,23 @@ case "${1:-help}" in
     # Translations come from the repository: on a branch, from that branch
     # (it must be pushed); the released extension reads them from main.
     BRANCH="$(git -C "$ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null || echo main)"
-    : "${VLSUB_LOCALE_URL:=https://raw.githubusercontent.com/opensubtitles/vlsub-opensubtitles-com/$BRANCH/locale/}"
+    BRANCH_URL="https://raw.githubusercontent.com/opensubtitles/vlsub-opensubtitles-com/$BRANCH/locale/"
+    # A VLSUB_LOCALE_URL left in the shell from an earlier session (an
+    # "export" for a branch that is gone) silently breaks every fetch: the
+    # language list stays empty and new texts stay English. Check it.
+    if [ -n "${VLSUB_LOCALE_URL:-}" ] && [ "$VLSUB_LOCALE_URL" != "$BRANCH_URL" ]; then
+      CODE="$(curl -s -o /dev/null -m 10 -w '%{http_code}' "${VLSUB_LOCALE_URL}index.json" 2>/dev/null || echo 000)"
+      if [ "$CODE" != "200" ]; then
+        echo "WARNING: VLSUB_LOCALE_URL is set in your shell to"
+        echo "           $VLSUB_LOCALE_URL"
+        echo "         which answers HTTP $CODE. Ignoring it and using this branch ($BRANCH)."
+        echo "         Remove it for good with:  unset VLSUB_LOCALE_URL"
+        VLSUB_LOCALE_URL="$BRANCH_URL"
+      else
+        echo "NOTE: VLSUB_LOCALE_URL from your shell is used (not this branch): unset VLSUB_LOCALE_URL to change that"
+      fi
+    fi
+    : "${VLSUB_LOCALE_URL:=$BRANCH_URL}"
     export VLSUB_LOCALE_URL
     echo "Translations from: $VLSUB_LOCALE_URL"
     VERBOSE_RUN=0; KEEP_LOCALE=0; FIRST_RUN=0
