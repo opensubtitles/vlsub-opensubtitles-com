@@ -183,6 +183,10 @@ local options = {
   downloadBehaviour = 'save',
   langExt = true,
   removeTag = false,
+  -- false: no AI subtitles at all - neither the paid translations made on
+  -- demand nor AI translations somebody uploaded. (A config file without
+  -- this key, from an older version, means true.)
+  aiTranslations = true,
   progressBarSize = 80
 }
 
@@ -520,7 +524,7 @@ local strings = {
   ui_ai_on_demand_from = "AI translation from %s (uses AI credits)",
   ui_ai_creating_translation = "Creating the AI translation - this can take a minute, VLC will not respond meanwhile...",
   ui_ai_still_translating = "The AI translation is being made: %s s (a whole film takes about 20 s; this window does not respond meanwhile)",
-  ui_ai_credits = "AI credits",
+  ui_ai_translations = "AI translations",
   ui_ai_show_credits = "🤖 Show balance / buy",
   ui_ai_credits_balance = "AI credits: %s",
   ui_ai_credits_login_first = "Log in to see your AI credits: enter username and password, then Save.",
@@ -2015,8 +2019,9 @@ function interface_config()
 
   -- Row 10: AI credits (asked for on click: no request just for opening
   -- this window)
-  dlg:add_label(strings.ui_ai_credits..":", 1, 10, 1, 1)
-  dlg:add_button(strings.ui_ai_show_credits, show_ai_credits, 2, 10, 1, 1)
+  dlg:add_label(strings.ui_ai_translations..":", 1, 10, 1, 1)
+  input_table['aiTranslations'] = dlg:add_dropdown(2, 10, 1, 1)
+  dlg:add_button(strings.ui_ai_show_credits, show_ai_credits, 3, 10, 1, 1)
 
   -- Row 11: Working directory
   if openSub.conf.dirPath then
@@ -2065,6 +2070,10 @@ function interface_config()
     show_main, 4, 13, 1, 1)
 
   -- Setup dropdown values for existing dropdowns
+  -- the current choice first (VLC selects whatever is added first)
+  local ai_on = openSub.option.aiTranslations ~= false
+  input_table['aiTranslations']:add_value(lang["int_bool_"..tostring(ai_on)], 1)
+  input_table['aiTranslations']:add_value(lang["int_bool_"..tostring(not ai_on)], 2)
   input_table['langExt']:add_value(
     lang["int_bool_"..tostring(openSub.option.langExt)], 1)
   input_table['langExt']:add_value(
@@ -3207,6 +3216,9 @@ function apply_config()
   -- Save boolean options (these should always be saved regardless of login status)
   if input_table["langExt"]:get_value() == 2 then
     openSub.option.langExt = not openSub.option.langExt
+  end
+  if input_table["aiTranslations"] and input_table["aiTranslations"]:get_value() == 2 then
+    openSub.option.aiTranslations = not (openSub.option.aiTranslations ~= false)
   end
 
   if input_table["removeTag"]:get_value() == 2 then
@@ -4422,8 +4434,11 @@ end
 openSub.convertNewAPIResponse = function(newData)
   local convertedData = {}
 
+  -- "AI translations: No": should the server send one anyway, it is not listed
+  local no_ai = openSub.option.aiTranslations == false
   for i, item in ipairs(newData) do
-    if item.type == "subtitle" and item.attributes then
+    if item.type == "subtitle" and item.attributes
+       and not (no_ai and item.attributes.ai_translated == true) then
       local attr = item.attributes
       local files = attr.files or {}
       local firstFile = files[1] or {}
@@ -6858,6 +6873,11 @@ local function search_get(params, protected)
   if openSub.option.sortBy and openSub.option.sortBy ~= "" then
     params["order_by"] = openSub.option.sortBy
     params["order_direction"] = (openSub.option.sortDirection == "asc") and "asc" or "desc"
+  end
+
+  if openSub.option.aiTranslations == false then
+    -- measured: this removes the on-demand entries and the AI uploads
+    params["ai_translated"] = "exclude"
   end
 
   local url = build_sorted_url(SUBTITLES_URL, params)

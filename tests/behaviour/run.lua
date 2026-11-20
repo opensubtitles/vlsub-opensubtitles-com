@@ -92,6 +92,7 @@ EXCEPTIONS[7] = {
 local DROP_CONFIG_KEYS = EXCEPTIONS[2].drop_config_keys
 DROP_CONFIG_KEYS.interfaceLanguage = true
 DROP_CONFIG_KEYS.detectedLanguage = true
+DROP_CONFIG_KEYS.aiTranslations = true -- exception 7
 
 local LOCALE_REQUEST = "raw.githubusercontent.com/opensubtitles/vlsub-opensubtitles-com/main/locale/"
 -- exception 7: requests about AI credits, and the balance in the Save message
@@ -198,7 +199,7 @@ local function snapshot(env, norm, cursor)
       for _, x in ipairs(d.widgets) do
         -- rows the baseline did not have: interface language (if it predates
         -- it) and AI credits
-        if x.kind == "label" and (x.text == "Interface language:" or x.text == "AI credits:") then
+        if x.kind == "label" and (x.text == "Interface language:" or x.text == "AI translations:") then
           skip[x.row] = true
         end
       end

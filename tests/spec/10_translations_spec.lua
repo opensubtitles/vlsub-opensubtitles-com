@@ -108,7 +108,7 @@ describe("interface language: after an update of the extension", function()
   local function stored(version)
     local old = {}
     for key, value in pairs(SLOVAK) do old[key] = value end
-    old.ui_ai_credits = nil -- a text the old version did not have
+    old.ui_ai_buy_credits = nil -- a text the old version did not have
     return {
       ["locale/index.json"] = json.encode({ format = 1, fetched = os.time(), languages = {
         { code = "sk", name = "Sloven\196\141ina", english_name = "Slovak", status = "ready" } } }),
@@ -123,8 +123,7 @@ describe("interface language: after an update of the extension", function()
       files["last_update_check.json"] = H.read_file(first.dir .. "/last_update_check.json")
       local env = H.launch({ server = server_with("ready"), config = { interfaceLanguage = "sk" }, files = files })
       ok(env.server:last(LOCALE .. "sk.json"), "translation fetched again (stored version " .. tostring(version) .. ")")
-      trigger_menu(2)
-      has(labels(env.ui()), SLOVAK.ui_ai_credits .. ":")
+      eq(H.find_local("strings").ui_ai_buy_credits, SLOVAK.ui_ai_buy_credits, "the new text is translated")
       local kept = json.decode(H.read_file(env.dir .. "/locale/sk.json"))
       ok(kept.version and kept.version ~= "1.4.0", "stored with the current version")
     end

@@ -163,6 +163,9 @@ it.
   shown after Save.
 - Credits are only ever spent by the **Download** button on such an entry -
   never by a search or by itself.
+- Do not want AI subtitles at all? Config > *AI translations* > **No**: the
+  on-demand entries and AI translations uploaded by others are left out of
+  every search.
 
 ## 📸 Screenshots
 

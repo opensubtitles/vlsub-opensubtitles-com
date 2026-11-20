@@ -554,6 +554,71 @@ H.describe("AI on-demand entry (recorded search answer)", function()
     eq(#env.server:seen(DOWNLOAD), 0)
   end)
 
+  -- Setting "AI translations: No" (decided by the owner: it hides ALL AI
+  -- subtitles, the paid on-demand ones and AI translations somebody
+  -- uploaded; the balance button stays).
+  local SUBTITLES = "GET api.opensubtitles.com/api/v1/subtitles"
+
+  it("AI translations are on by default; an old config file without the setting means on", function()
+    local env = H.launch()
+    env.server:reset()
+    local d = env.ui()
+    d:_at(2, 1, "text_input"):set_text("big buck bunny")
+    d:_button("Search$"):_click()
+    eq(env.server:last(SUBTITLES).query.ai_translated, nil, "the API default (include) is not sent")
+    trigger_menu(2)
+    eq(env.ui():_at(2, 10, "dropdown"):_texts(), { "Yes", "No" })
+  end)
+
+  it("turned off in the configuration window: saved, and every search asks the API to leave AI subtitles out", function()
+    local dir = H.tmpdir()
+    local env = H.launch({ config = { language = "cs" }, media = "file://" .. dir .. "/Big.Buck.Bunny.2008.mkv" })
+    trigger_menu(2)
+    env.ui():_at(2, 10, "dropdown"):_choose_text("^No$")
+    env.ui():_button("Save$"):_click()
+    eq(env.saved_config().aiTranslations, false)
+    has(env.message(), "AI credits: 2019") -- the balance stays visible
+    trigger_menu(2)
+    eq(env.ui():_at(2, 10, "dropdown"):_texts(), { "No", "Yes" })
+    ok(env.ui():_button("Show balance"), "balance button still there")
+
+    trigger_menu(1)
+    env.server:reset()
+    local d = env.ui()
+    d:_at(4, 3, "text_input"):set_text("1254207")
+    d:_button("Search$"):_click()
+    local req = env.server:last(SUBTITLES)
+    eq(req.query.ai_translated, "exclude")
+    eq(req.problems, {}, "still a canonical request")
+  end)
+
+  it("off: an AI entry the server sends anyway is not listed", function()
+    local env = H.launch({ config = { language = "cs", aiTranslations = false } })
+    local d = env.ui()
+    d:_at(4, 3, "text_input"):set_text("1254207") -- the fake server answers with the recorded on-demand row
+    d:_button("Search$"):_click()
+    for _, row in ipairs(env.results().values) do
+      ok(not row.text:find("AI translation", 1, true), row.text)
+    end
+    for _, item in ipairs(openSub.itemStore or {}) do
+      eq(item.OnDemand, false)
+      eq(item.AITranslated, false)
+    end
+  end)
+
+  it("switching it back on brings the on-demand entry back", function()
+    local env = H.launch({ config = { language = "cs", aiTranslations = false } })
+    trigger_menu(2)
+    env.ui():_at(2, 10, "dropdown"):_choose_text("^Yes$")
+    env.ui():_button("Save$"):_click()
+    eq(env.saved_config().aiTranslations, true)
+    trigger_menu(1)
+    local d = env.ui()
+    d:_at(4, 3, "text_input"):set_text("1254207")
+    d:_button("Search$"):_click()
+    has(env.results().values[1].text, "AI translation from English")
+  end)
+
   it("ordinary entries are not marked", function()
     local env = H.launch()
     local d = env.ui()

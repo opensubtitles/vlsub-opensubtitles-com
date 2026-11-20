@@ -10,7 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - **AI translation on demand.** When no subtitle exists in a language, the API offers an AI translation of an existing subtitle, made when it is downloaded and paid with the AI credits of the OpenSubtitles account. VLSub lists such an entry as "🤖 AI translation from <language> (uses AI credits)", shows the balance before and after, counts the seconds while the server translates (about 20 s for a whole film), and delivers a translation that exists already at once and for free. Without enough credits the server sends a preview; the message says so and links to the credit packages.
 - **AI credits in the configuration window**: the balance after Save, and a button that shows it together with the credit packages.
-- Help window: a section about AI translation.
+- **Setting "AI translations: Yes / No"** (configuration window). No leaves every AI subtitle out of the search results: the on-demand translations and AI translations uploaded by others. Default: Yes.
+- Help window: a section about AI translation; the whole window is shorter and in plainer words.
 
 ### Changed
 - Version 2.0.0: the API offers AI on-demand entries to this version only.
@@ -18,6 +19,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - While any request waits, VLC is told the extension is alive, so it no longer offers to kill it after 10 seconds.
 
 ### Fixed
+- **First run on an English system offered no interface languages** (the list was only fetched together with a translation). Also in 1.4.0.
+- **New texts stayed English after an update** until the weekly refresh: a translation stored by another version is fetched again at the next start.
+- **macOS: the first row of the configuration window was pushed out** by a three-line message.
 - **Subtitle file name when no video is open**: the name from the API lost its last four characters (assumed to be an extension, which most names do not have). Only a real subtitle extension and a trailing language tag are removed now.
 
 
