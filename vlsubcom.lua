@@ -522,7 +522,7 @@ local strings = {
   -- AI on-demand translation
   ui_ai_on_demand = "AI on demand (uses credits)",
   ui_ai_creating_translation = "Creating the AI translation - this can take a minute, VLC will not respond meanwhile...",
-  ui_ai_still_translating = "The AI translation is still being made, asking again (%s of %s)...",
+  ui_ai_still_translating = "The AI translation is being made (step %s) - VLC will not respond meanwhile...",
   ui_ai_credits = "AI credits",
   ui_ai_show_credits = "🤖 Show balance / buy",
   ui_ai_credits_balance = "AI credits: %s",
@@ -5261,45 +5261,37 @@ openSub.downloadFromNewAPI = function(item, is_retry)
     return answer
   end
 
-  -- An on-demand translation is not ready when it is asked for. Measured on
-  -- the live API: the POST is answered with a redirect (302) to the place
-  -- where the result will be; that is fetched with the same credentials. If
-  -- it has no link yet the translation is still being made: wait and ask
-  -- again, a few times, saying so each time.
-  local rounds = item.OnDemand and 4 or 1
-  local res
-  for round = 1, rounds do
-    res = traced("POST /download", client:post("http://api.opensubtitles.com/api/v1/download", request_body))
-    if not item.OnDemand or not res then
-      break
-    end
-    local location = res.headers and res.headers["location"]
-    if res.status >= 301 and res.status <= 308 and location then
-      -- the same host only (the token goes with it), over plain HTTP like
-      -- every other API request
-      local path = string.match(location, "^https?://api%.opensubtitles%.com(/.*)$")
-        or string.match(location, "^(/.*)$")
+  -- An on-demand translation that is not made yet (measured on the live
+  -- API): the POST is answered with 302 to
+  --   /api/v1/download/<id>?wait_for_translation=1
+  -- and that again with 302 to ...=2, ...=3 and so on while the translation
+  -- is being made; the last one answers 200 with the link. A translation
+  -- that exists already ("file was cached") answers the POST with 200 at
+  -- once. So: one POST, then the trail of redirects is followed - on the API
+  -- host only, over plain HTTP, with the same credentials - for at most
+  -- three minutes, the message line counting along.
+  local res = traced("POST /download", client:post("http://api.opensubtitles.com/api/v1/download", request_body))
+  if item.OnDemand and res then
+    local started, step = os.time(), 0
+    while res and res.status >= 301 and res.status <= 308 do
+      local location = res.headers and res.headers["location"]
+      local path = location and (string.match(location, "^https?://api%.opensubtitles%.com(/.*)$")
+        or string.match(location, "^(/.*)$"))
       if not path then
         break
       end
-      res = traced("GET " .. path, client:get("http://api.opensubtitles.com" .. path))
-      if not res then
-        break
-      end
-    end
-    if res.status ~= 200 or not res.body or res.body == "" then
-      break
-    end
-    local ok, answer = decode_object(res.body)
-    if not ok or answer.link or answer.content or round == rounds then
-      if ok and not (answer.link or answer.content) and not (answer.error or answer.message) then
+      if os.time() - started > 180 then
         return report_failure(strings.ui_ai_no_answer)
       end
-      break
+      step = step + 1
+      setMessage(loading_tag(tr("ui_ai_still_translating", tostring(step))))
+      -- a redirect that came back at once: do not hammer the server
+      local asked = os.time()
+      res = traced("GET " .. path, client:get("http://api.opensubtitles.com" .. path))
+      if res and res.status >= 301 and res.status <= 308 then
+        while os.time() - asked < 3 do end
+      end
     end
-    setMessage(loading_tag(tr("ui_ai_still_translating", tostring(round), tostring(rounds - 1))))
-    local waiting_since = os.time()
-    while os.time() - waiting_since < 5 do end
   end
   if not res then
     return report_failure(item.OnDemand and strings.ui_ai_no_answer or strings.ui_no_response_from_download_server)

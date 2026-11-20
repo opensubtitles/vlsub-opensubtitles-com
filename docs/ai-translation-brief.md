@@ -377,6 +377,26 @@ texts; help text; README / CHANGELOG.
   `www.opensubtitles.com/download/...` links - or be served by
   `api.opensubtitles.com` over plain HTTP. To be fixed on the server.
 
+### A translation that is not made yet (user's Mac, 2026-11-20)
+
+Slovak for the same film (id `431137311510700000000000000000000`), never
+translated before:
+
+```
+POST /api/v1/download                                   -> 302, empty body
+     Location: /api/v1/download/<id>?wait_for_translation=1
+GET  /api/v1/download/<id>?wait_for_translation=1       -> 302, empty body
+     Location: /api/v1/download/<id>?wait_for_translation=2
+...
+```
+
+The server answers a chain of redirects while it translates; the counter
+goes up by one each time. The extension follows the chain (API host only,
+plain HTTP, same credentials; one POST only; at most three minutes; at least
+3 s per step so a quick redirect is not hammered) until an answer that is
+not a redirect arrives. What the last answer of the chain looks like has not
+been seen yet; it is expected to be the 200 with `link` shown above.
+
 ## Open questions
 
 1. Blocked until done on the API side: the User-Agent

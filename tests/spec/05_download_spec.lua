@@ -351,6 +351,69 @@ H.describe("AI on-demand entry (recorded search answer)", function()
     ok(not env.message():find("<a ", 1, true), env.message())
   end)
 
+  -- Recorded in real VLC (2026-11-20): POST -> 302 Location
+  -- /api/v1/download/<id>?wait_for_translation=1 -> 302 ...=2 -> ... and, for
+  -- a translation that exists, 200 with this body.
+  local DONE = '{"link":"https:\\/\\/www.opensubtitles.com\\/download\\/AI\\/subfile\\/x.srt","file_name":"",'
+    .. '"requests":"1","remaining":"99999999","message":"This a on-demand translation by AI.OpenSubtitles.com",'
+    .. '"reset_time":"now","reset_time_utc":"2026-11-20T00:06:50.000Z"}'
+  local WAIT = "GET api.opensubtitles.com/api/v1/download/*"
+
+  local function translating(env, hops)
+    local seen = { post = 0, get = {} }
+    env.server:on(DOWNLOAD, function()
+      seen.post = seen.post + 1
+      return api.response(302, "", { Location = "/api/v1/download/" .. ID .. "?wait_for_translation=1" })
+    end)
+    env.server:on(WAIT, function(req)
+      local n = tonumber(req.query.wait_for_translation)
+      seen.get[#seen.get + 1] = { n = n, auth = req.headers["authorization"], scheme = req.scheme }
+      if n < hops then
+        return api.response(302, "", { Location = "/api/v1/download/" .. ID .. "?wait_for_translation=" .. (n + 1) })
+      end
+      return api.response(200, DONE)
+    end)
+    return seen
+  end
+
+  it("not made yet: the trail of wait_for_translation redirects is followed to the link", function()
+    local env = searched()
+    local seen = translating(env, 4)
+    env.results():_select(1)
+    env.ui():_button("Download"):_click()
+    eq(seen.post, 1, "one POST: the translation is ordered once")
+    eq(#seen.get, 4)
+    for i, hop in ipairs(seen.get) do
+      eq(hop.n, i)
+      eq(hop.scheme, "http")
+      ok(hop.auth and hop.auth:find("^Bearer "), "credentials on hop " .. i)
+    end
+    has(env.message(), "Success")
+    has(env.message(), "AI credits left: 2019")
+    lacks(env.message(), "99999999")
+    eq(env.errors(), {})
+  end)
+
+  it("a redirect to another host is not followed (the token stays with the API)", function()
+    local env = searched()
+    env.server:on(DOWNLOAD, function()
+      return api.response(302, "", { Location = "http://evil.example/steal" })
+    end)
+    env.results():_select(1)
+    env.ui():_button("Download"):_click()
+    eq(#env.server:seen("GET evil.example"), 0)
+    has(env.message(), "302")
+  end)
+
+  it("a translation that never finishes: gives up after three minutes with a clear message", function()
+    local env = searched()
+    local seen = translating(env, 100000)
+    env.results():_select(1)
+    env.ui():_button("Download"):_click()
+    eq(seen.post, 1)
+    has(env.message(), "did not arrive in time")
+  end)
+
   it("ordinary entries are not marked", function()
     local env = H.launch()
     local d = env.ui()
