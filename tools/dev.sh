@@ -3,9 +3,17 @@
 #
 #   tools/dev.sh link        use this checkout as the installed extension (symlink)
 #   tools/dev.sh install     copy vlsubcom.lua into VLC instead of linking
-#   tools/dev.sh run [-v] [file]  start VLC with a debug log, optionally playing a file;
+#   tools/dev.sh run [-v] [--keep-locale] [--first-run] [file]
+#                            start VLC with a debug log, optionally playing a file;
 #                            -v prints VLSub's log lines here as they happen and
-#                            traces every dialog widget (to find what VLC chokes on)
+#                            traces every dialog widget (to find what VLC chokes on).
+#                            Stored interface translations are dropped first, so the
+#                            current ones of this branch are fetched (--keep-locale: not).
+#                            --first-run: as on a fresh installation (see reset all)
+#   tools/dev.sh reset locale  forget the stored interface translations
+#   tools/dev.sh reset all     back to a fresh installation: settings, login, caches and
+#                            translations are moved to a backup folder (printed), VLSub
+#                            starts as on first use
 #   tools/dev.sh errors      show VLSub's Lua errors from the last run (exit 1 if any)
 #   tools/dev.sh requests    list the API requests made during the last run
 #   tools/dev.sh log         follow the VLSub lines of the log (Ctrl-C to stop)
@@ -35,6 +43,33 @@ case "$(uname -s)" in
 esac
 DEST="$EXT_DIR/vlsubcom.lua"
 BACKUP="$EXT_DIR/vlsubcom.lua.before-dev"
+
+# Every folder where VLSub keeps its settings (one per VLC installation).
+data_dirs() {
+  for base in "$HOME/Library/Application Support/org.videolan.vlc" "${XDG_DATA_HOME:-$HOME/.local/share}/vlc" "$HOME/.config/vlc" \
+              "$HOME/snap/vlc/current/.local/share/vlc" "$HOME/.var/app/org.videolan.VLC/data/vlc"; do
+    [ -d "$base" ] && find "$base" -type d -name "vlsub.com" 2>/dev/null
+  done
+  return 0
+}
+
+# Nothing is deleted: what is reset is moved to a backup folder.
+reset_data() { # $1 = locale | all
+  STAMP="$(date +%Y%m%d-%H%M%S)"
+  DIRS="$(data_dirs)"
+  if [ -z "$DIRS" ]; then
+    [ "$1" = "all" ] && echo "nothing to reset: VLSub has no settings yet (it is in its first-use state)"
+    return 0
+  fi
+  echo "$DIRS" | while IFS= read -r dir; do
+    if [ "$1" = "all" ]; then
+      mv "$dir" "$dir.backup-$STAMP" && echo "fresh installation: settings moved to $dir.backup-$STAMP"
+    elif [ -d "$dir/locale" ]; then
+      mkdir -p "$dir.locale-backups" && mv "$dir/locale" "$dir.locale-backups/locale-$STAMP" \
+        && echo "stored translations dropped (they are fetched again at start)"
+    fi
+  done
+}
 
 backup() {
   # Keep the first non-dev copy we find, once.
@@ -93,8 +128,21 @@ case "${1:-help}" in
     : "${VLSUB_LOCALE_URL:=https://raw.githubusercontent.com/opensubtitles/vlsub-opensubtitles-com/$BRANCH/locale/}"
     export VLSUB_LOCALE_URL
     echo "Translations from: $VLSUB_LOCALE_URL"
-    if [ "${1:-}" = "-v" ]; then
-      shift
+    VERBOSE_RUN=0; KEEP_LOCALE=0; FIRST_RUN=0
+    while :; do
+      case "${1:-}" in
+        -v) VERBOSE_RUN=1; shift ;;
+        --keep-locale) KEEP_LOCALE=1; shift ;;
+        --first-run) FIRST_RUN=1; shift ;;
+        *) break ;;
+      esac
+    done
+    if [ "$FIRST_RUN" = 1 ]; then
+      reset_data all
+    elif [ "$KEEP_LOCALE" = 0 ]; then
+      reset_data locale
+    fi
+    if [ "$VERBOSE_RUN" = 1 ]; then
       export VLSUB_TRACE_DIALOG=1
       export VLSUB_TRACE_HTTP=1   # shows the raw /download answer (it contains a temporary link)
       echo "Verbose: VLSub lines follow; VLC's own messages (stderr) are shown too."
@@ -167,6 +215,12 @@ case "${1:-help}" in
       fi
     fi
     ;;
+  reset)
+    case "${2:-}" in
+      locale|all) reset_data "$2" ;;
+      *) echo "usage: tools/dev.sh reset locale | all" >&2; exit 2 ;;
+    esac
+    ;;
   locale)
     BRANCH="$(git -C "$ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null || echo main)"
     URL="${VLSUB_LOCALE_URL:-https://raw.githubusercontent.com/opensubtitles/vlsub-opensubtitles-com/$BRANCH/locale/}"
@@ -214,6 +268,6 @@ case "${1:-help}" in
     exec "$ROOT/tests/vlc/run.sh" "$@"
     ;;
   *)
-    sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//'
+    sed -n '2,24p' "$0" | sed 's/^# \{0,1\}//'
     ;;
 esac

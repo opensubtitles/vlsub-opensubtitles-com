@@ -687,7 +687,7 @@ describe("interface language: VLC for macOS", function()
     trigger_menu(3)
     local all = {}
     for _, item in ipairs(visible_texts(env.ui())) do all[#all + 1] = (item.shown:gsub("<br>", " ")) end
-    has(table.concat(all, "\n"), SLOVAK.ui_name_search_uses_guessit_api_to_extract)
+    has(table.concat(all, "\n"), SLOVAK.ui_free_opensubtitles_com_account_required_for_down:gsub("<[^>]+>", ""))
   end)
 
   it("help window stays short enough for a laptop screen, in every language", function()

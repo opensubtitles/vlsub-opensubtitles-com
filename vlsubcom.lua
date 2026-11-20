@@ -308,10 +308,10 @@ local strings = {
   ui_help = "❓ Help",
   ui_check_updates = "🔄 Check Updates",
   ui_search_methods = "SEARCH METHODS:",
-  ui_hash_search_uses_video_file_fingerprint_for = "Hash Search: Uses video file fingerprint for exact matches",
-  ui_name_search_uses_guessit_api_to_extract = "Name Search: Uses GuessIt API to extract title/year/episode from filename",
-  ui_auto_fallback_from_hash_to_name_search = "Auto-fallback from hash to name search if no results found",
-  ui_language_detection = "LANGUAGE & DETECTION:",
+  ui_help_search_hash = "By file: finds the subtitles made for exactly this video file",
+  ui_help_search_name = "By name: uses the title, year and episode from the file name",
+  ui_help_search_fallback = "If the first finds nothing, the second is tried automatically",
+  ui_help_languages_title = "LANGUAGES:",
   ui_results_grouped_by_selected_languages_in_priorit = "Results grouped by selected languages in priority order",
   ui_choose_up_to_3_preferred_subtitle_languages = "Choose up to 3 preferred subtitle languages",
   ui_account_quotas = "ACCOUNT & QUOTAS:",
@@ -1036,14 +1036,18 @@ function activate()
     log(strings.ui_setting_up_automatic_update_checking)
     initialize_auto_update()
   else
-    show_appropriate_window()
-    local check_updates = should_check_for_updates()
     -- The list of translations (and the one in use) is kept fresh at most
     -- once a week, when the daily update check is online anyway. An install
-    -- that has no list at all (just upgraded) fetches it right away, or the
-    -- "Interface language" drop-down would have nothing to offer.
-    local stale, never_fetched = interface_language_is_stale()
-    if (check_updates and stale) or never_fetched then
+    -- that has no list at all, or a translation stored by another version
+    -- (just upgraded: new texts would stay English), fetches right away -
+    -- and before the first window is built, so that window is right too.
+    local stale, fetch_now = interface_language_is_stale()
+    if fetch_now then
+      pcall(refresh_interface_language)
+    end
+    show_appropriate_window()
+    local check_updates = should_check_for_updates()
+    if check_updates and stale and not fetch_now then
       pcall(refresh_interface_language)
     end
     if check_updates then
@@ -2101,10 +2105,10 @@ function interface_help()
   -- subject, nothing that the main window already says.
   local rows = {
     strings.ui_search_methods,
-    strings.ui_hash_search_uses_video_file_fingerprint_for,
-    strings.ui_name_search_uses_guessit_api_to_extract,
-    strings.ui_auto_fallback_from_hash_to_name_search,
-    strings.ui_language_detection,
+    strings.ui_help_search_hash,
+    strings.ui_help_search_name,
+    strings.ui_help_search_fallback,
+    strings.ui_help_languages_title,
     strings.ui_choose_up_to_3_preferred_subtitle_languages,
     strings.ui_results_grouped_by_selected_languages_in_priorit,
     strings.ui_account_quotas,
@@ -2930,6 +2934,10 @@ function refresh_interface_language()
     if translation then
       write_locale_file(code .. ".json", { fetched = os.time(), version = app_version, strings = translation })
     end
+    local count = 0
+    for _ in pairs(translation or {}) do count = count + 1 end
+    vlc.msg.info("[VLSub] Interface translation '" .. code .. "': "
+      .. (translation and (count .. " texts fetched") or "could not be fetched, the stored one stays"))
   end
   return load_interface_language()
 end
