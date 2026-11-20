@@ -312,17 +312,10 @@ local strings = {
   ui_name_search_uses_guessit_api_to_extract = "Name Search: Uses GuessIt API to extract title/year/episode from filename",
   ui_auto_fallback_from_hash_to_name_search = "Auto-fallback from hash to name search if no results found",
   ui_language_detection = "LANGUAGE & DETECTION:",
-  ui_auto_detects_locale_from_system_settings_ip = "Auto-detects locale from system settings, IP geolocation, timezone",
   ui_results_grouped_by_selected_languages_in_priorit = "Results grouped by selected languages in priority order",
   ui_choose_up_to_3_preferred_subtitle_languages = "Choose up to 3 preferred subtitle languages",
-  ui_technical_info = "TECHNICAL INFO:",
-  ui_guessit_api_extracts_movie_tv_metadata_from = "GuessIt API extracts movie/TV metadata from filenames",
-  ui_shows_quality_indicators_trusted_uploaders_downl = "Shows quality indicators: trusted uploaders, download counts, sync",
-  ui_windows_use_english_characters_in_file_paths = "Windows: Use English characters in file paths for best results",
   ui_account_quotas = "ACCOUNT & QUOTAS:",
   ui_free_opensubtitles_com_account_required_for_down = "<a href='https://www.opensubtitles.com'>Free OpenSubtitles.com account required for downloads</a>",
-  ui_extension_displays_your_rank_daily_quota_and = "Extension displays your rank, daily quota and current usage",
-  ui_select_subtitle_and_click_download_or_link = "Select subtitle and click Download or Link button",
   ui_support_opensubtitles_thank_you_very_much = "<a href='https://www.opensubtitles.com/en/support_us/'>Support OpenSubtitles</a> - thank you very much",
   ui_github_opensubtitles_vlsub_opensubtitles_com_sou = "<a href='https://github.com/opensubtitles/vlsub-opensubtitles-com'>GitHub: opensubtitles/vlsub-opensubtitles-com</a> - source, issues, releases",
   ui_continue = "⏳ Continue",
@@ -523,7 +516,6 @@ local strings = {
   ui_help_ai_title = "AI TRANSLATION:",
   ui_help_ai_what = "No subtitle in your language? An AI translation can be made on demand (marked with a robot)",
   ui_help_ai_credits = "It is paid with the AI credits of your account; without enough credits you get a short preview",
-  ui_help_ai_where = "Your balance and the credit packages: Config, row AI credits",
   ui_ai_on_demand = "AI translation on demand (uses AI credits)",
   ui_ai_on_demand_from = "AI translation from %s (uses AI credits)",
   ui_ai_creating_translation = "Creating the AI translation - this can take a minute, VLC will not respond meanwhile...",
@@ -2104,47 +2096,29 @@ function interface_help()
     return wrap and wrap_text(text, 64) or text
   end
 
-  -- Row 1: Search Methods
-  dlg:add_label(line(strings.ui_search_methods), 1, 1, 6, 1)
-  dlg:add_label(line(strings.ui_hash_search_uses_video_file_fingerprint_for), 1, 2, 6, 1)
-  dlg:add_label(line(strings.ui_name_search_uses_guessit_api_to_extract), 1, 3, 6, 1)
-  dlg:add_label(line(strings.ui_auto_fallback_from_hash_to_name_search), 1, 4, 6, 1)
+  -- Kept short on purpose: the window cannot scroll, and on a laptop screen
+  -- anything longer does not fit. One heading and one to three lines per
+  -- subject, nothing that the main window already says.
+  local rows = {
+    strings.ui_search_methods,
+    strings.ui_hash_search_uses_video_file_fingerprint_for,
+    strings.ui_name_search_uses_guessit_api_to_extract,
+    strings.ui_auto_fallback_from_hash_to_name_search,
+    strings.ui_language_detection,
+    strings.ui_choose_up_to_3_preferred_subtitle_languages,
+    strings.ui_results_grouped_by_selected_languages_in_priorit,
+    strings.ui_account_quotas,
+    strings.ui_free_opensubtitles_com_account_required_for_down,
+    strings.ui_help_ai_title,
+    strings.ui_help_ai_what,
+    strings.ui_help_ai_credits,
+    strings.ui_support_opensubtitles_thank_you_very_much,
+    strings.ui_github_opensubtitles_vlsub_opensubtitles_com_sou,
+  }
+  for row, text in ipairs(rows) do
+    dlg:add_label(line(text), 1, row, 6, 1)
+  end
 
-  -- Row 5: Language Features
-  dlg:add_label("", 1, 5, 6, 1) -- Spacer
-  dlg:add_label(line(strings.ui_language_detection), 1, 6, 6, 1)
-  dlg:add_label(line(strings.ui_auto_detects_locale_from_system_settings_ip), 1, 7, 6, 1)
-  dlg:add_label(line(strings.ui_results_grouped_by_selected_languages_in_priorit), 1, 8, 6, 1)
-  dlg:add_label(line(strings.ui_choose_up_to_3_preferred_subtitle_languages), 1, 9, 6, 1)
-
-  -- Row 10: Technical Details
-  dlg:add_label("", 1, 10, 6, 1) -- Spacer
-  dlg:add_label(line(strings.ui_technical_info), 1, 11, 6, 1)
-  dlg:add_label(line(strings.ui_guessit_api_extracts_movie_tv_metadata_from), 1, 12, 6, 1)
-  dlg:add_label(line(strings.ui_shows_quality_indicators_trusted_uploaders_downl), 1, 13, 6, 1)
-  dlg:add_label(line(strings.ui_windows_use_english_characters_in_file_paths), 1, 14, 6, 1)
-
-  -- Row 15: Account & Download
-  dlg:add_label("", 1, 15, 6, 1) -- Spacer
-  dlg:add_label(line(strings.ui_account_quotas), 1, 16, 6, 1)
-  dlg:add_label(line(strings.ui_free_opensubtitles_com_account_required_for_down), 1, 17, 6, 1)
-  dlg:add_label(line(strings.ui_extension_displays_your_rank_daily_quota_and), 1, 18, 6, 1)
-  dlg:add_label(line(strings.ui_select_subtitle_and_click_download_or_link), 1, 19, 6, 1)
-
-  -- Row 20: AI translation on demand
-  dlg:add_label("", 1, 20, 6, 1) -- Spacer
-  dlg:add_label(line(strings.ui_help_ai_title), 1, 21, 6, 1)
-  dlg:add_label(line(strings.ui_help_ai_what), 1, 22, 6, 1)
-  dlg:add_label(line(strings.ui_help_ai_credits), 1, 23, 6, 1)
-  dlg:add_label(line(strings.ui_help_ai_where), 1, 24, 6, 1)
-
-  -- Row 25: Links
-  dlg:add_label("", 1, 25, 6, 1) -- Spacer
-  dlg:add_label(line(strings.ui_support_opensubtitles_thank_you_very_much), 1, 26, 6, 1)
-  dlg:add_label(line(strings.ui_github_opensubtitles_vlsub_opensubtitles_com_sou), 1, 27, 6, 1)
-
-  -- Row 28: Close button with icon
-  dlg:add_label("", 1, 28, 6, 1) -- Spacer
   dlg:add_button(strings.ui_close,
     function()
       if previous_window == "config" then
@@ -2153,7 +2127,7 @@ function interface_help()
         show_main()
       end
     end,
-    3, 29, 2, 1)
+    3, #rows + 1, 2, 1)
 end
 
 

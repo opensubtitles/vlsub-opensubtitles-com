@@ -690,6 +690,26 @@ describe("interface language: VLC for macOS", function()
     has(table.concat(all, "\n"), SLOVAK.ui_name_search_uses_guessit_api_to_extract)
   end)
 
+  it("help window stays short enough for a laptop screen, in every language", function()
+    -- it cannot scroll: at 24 rows plus wrapping it was taller than the screen
+    local worst, worst_code = 0, nil
+    for _, language in ipairs(index.languages) do
+      local translation = json.decode(H.read_file(H.ROOT .. "/locale/" .. language.code .. ".json"))
+      local env = with_translation(language.code, translation, { macos = true })
+      trigger_menu(3)
+      local lines, labels_count = 0, 0
+      for _, item in ipairs(visible_texts(env.ui())) do
+        if item.kind == "label" then
+          labels_count = labels_count + 1
+          lines = lines + 1 + select(2, item.shown:gsub("<br>", ""))
+        end
+      end
+      ok(labels_count <= 14, language.code .. ": " .. labels_count .. " rows")
+      if lines > worst then worst, worst_code = lines, language.code end
+    end
+    ok(worst <= 26, "tallest help window: " .. worst .. " text lines (" .. tostring(worst_code) .. ")")
+  end)
+
   it("help window on Linux / Windows is not wrapped: Qt sizes the window to the text", function()
     local env = with_translation("sk", SLOVAK)
     trigger_menu(3)

@@ -84,8 +84,8 @@ EXCEPTIONS[6] = {
 EXCEPTIONS[7] = {
   name = "AI on-demand subtitles (2.0)",
   why = "new feature: an 'AI credits' row in the configuration window, the balance in "
-     .. "the message after Save (one request to /ai/credits), four lines about AI "
-     .. "translation in the help window; entries the API "
+     .. "the message after Save (one request to /ai/credits); the help window "
+     .. "rewritten (shorter, with an AI section); entries the API "
      .. "offers only to 2.x User-Agents are marked and paid with credits. Nothing else "
      .. "may change: the row is left out of the comparison.",
 }
@@ -203,20 +203,9 @@ local function snapshot(env, norm, cursor)
         end
       end
     end
-    if is_help then
-      -- the AI section of the help window: its four lines and the spacer
-      -- that follows them
-      local last
-      for _, x in ipairs(d.widgets) do
-        if x.kind == "label" and (x.text == "AI TRANSLATION:" or x.text:find("AI translation can be made", 1, true)
-           or x.text:find("AI credits of your account", 1, true) or x.text:find("row AI credits", 1, true)) then
-          skip[x.row] = true
-          if not last or x.row > last then last = x.row end
-        end
-      end
-      if last then skip[last + 1] = true end
-    end
-    if is_config or is_help then
+    -- The help window was rewritten for 2.0 (shortened to fit a laptop
+    -- screen, AI section added): only that it opens is compared.
+    if is_config then
       for _, x in ipairs(d.widgets) do
         if x.row and not skip[x.row] and not row_number[x.row] then
           row_number[x.row] = true
@@ -227,8 +216,8 @@ local function snapshot(env, norm, cursor)
       for position, row in ipairs(rows) do row_number[row] = position end
     end
     for _, x in ipairs(d.widgets) do
-      if not ((is_config or is_help) and skip[x.row]) then
-        local row = (is_config or is_help) and row_number[x.row] or x.row
+      if not (is_config and skip[x.row]) and not is_help then
+        local row = is_config and row_number[x.row] or x.row
         local col = (is_config and x.kind == "dropdown") and "*" or tostring(x.col) -- exception 6
         local text = norm(x.text or "")
         if is_config then text = text:gsub("<br>AI credits: %d+", "") end -- exception 7
