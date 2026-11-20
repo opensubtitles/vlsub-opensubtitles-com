@@ -36,6 +36,10 @@ local USER, PASS = os.getenv("VLSUB_USER"), os.getenv("VLSUB_PASS")
 if USER == "" or PASS == "" then USER, PASS = nil, nil end
 local QUERY = os.getenv("VLSUB_QUERY") or "the matrix"
 local AI = os.getenv("VLSUB_AI")
+-- which film and language the AI steps use (defaults: a short film whose
+-- Hungarian translation exists already, so the run is free)
+local AI_IMDB = os.getenv("VLSUB_AI_IMDB") or "1254207"
+local AI_LANGUAGE = os.getenv("VLSUB_AI_LANGUAGE") or "Hungarian"
 if AI ~= "credits" and AI ~= "nocredits" then AI = nil end
 local VERBOSE = tonumber(os.getenv("VLSUB_VERBOSE") or "0") or 0
 
@@ -337,10 +341,10 @@ if AI and USER and PASS then
     trigger_menu(1)
   end)
 
-  step("AI: search by IMDb id 1254207 in Hungarian offers an on-demand translation", function()
-    choose_languages("Hungarian")
+  step("AI: search by IMDb id " .. AI_IMDB .. " in " .. AI_LANGUAGE .. " offers an on-demand translation", function()
+    choose_languages(AI_LANGUAGE)
     ui():_at(2, 1, "text_input"):set_text("")
-    ui():_at(4, 3, "text_input"):set_text("1254207")
+    ui():_at(4, 3, "text_input"):set_text(AI_IMDB)
     ui():_button("Search$"):_click()
     local list = ui():_at(1, 9, "list")
     show_results(list)

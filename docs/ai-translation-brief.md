@@ -448,6 +448,34 @@ Hungarian, and its download (full text and "AI credits left", or the preview
 and its notice). Hungarian exists already, so the run costs nothing. Both
 passed on VLC 3.0.16 (Linux) on 2026-11-20: 16 steps each.
 
+### A whole film (live API, 2026-11-20)
+
+"Send Help" (2026, IMDb 8036976) into Ukrainian, from a Russian subtitle;
+account with credits. Measured with `curl`, as the extension asks:
+
+| step | answer | time |
+|---|---|---|
+| `POST /download` | 302 | 0.06 s |
+| `GET ...wait_for_translation=1` | 302 | 9.0 s (held by the server) |
+| `GET ...wait_for_translation=2` | 302 | 9.1 s |
+| `GET ...wait_for_translation=3` | 200, 98,348 bytes, 1296 cues | 0.04 s |
+
+**18 seconds in all, 22 credits** (416 -> 394). The server holds each
+waiting request for about 9 s, so VLC's window is frozen for the length of
+the translation; the message line changes between the steps.
+
+Then the same translation (now existing) through the extension in real VLC
+3.0.16: saved, 98,348 bytes, 1296 cues, credits unchanged at 394.
+(`VLSUB_AI_IMDB` / `VLSUB_AI_LANGUAGE` choose the film for the live steps.)
+
+Engine: the on-demand path has no engine parameter; the server chooses.
+Ukrainian and Russian are both DeepL2 languages; at 0.0009 per character a
+98 kB subtitle (about 55,000 characters of text) costs some 50 credits with
+DeepL2 if all bytes counted, 22 were charged.
+
+Seen on the way: for this film no on-demand entry is offered in Lithuanian
+or Latvian (no subtitle exists in either), but one is in Ukrainian.
+
 ## Open questions
 
 1. Blocked until done on the API side: the User-Agent
