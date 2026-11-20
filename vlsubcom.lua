@@ -2041,7 +2041,11 @@ function interface_config()
 
   -- Row 12: Status message
   input_table['message'] = nil
-  input_table['message'] = dlg:add_label('', 1, 12, 4, 1)
+  -- macOS sizes the window when it is built and does not grow it: a message
+  -- of three lines (account, AI credits, "saved") pushed the first row out
+  -- of the window at the top. Reserve the lines there.
+  local three_empty_lines = "&nbsp;<br>&nbsp;<br>&nbsp;"
+  input_table['message'] = dlg:add_label(on_macos() and three_empty_lines or '', 1, 12, 4, 1)
 
   -- Row 13: Action buttons
   dlg:add_button(
@@ -2950,17 +2954,28 @@ function refresh_interface_language()
   if code and is_offered(code) then
     local translation = fetch_locale_file(code .. ".json")
     if translation then
-      write_locale_file(code .. ".json", { fetched = os.time(), strings = translation })
+      write_locale_file(code .. ".json", { fetched = os.time(), version = app_version, strings = translation })
     end
   end
   return load_interface_language()
 end
 
 -- True when the stored list of languages is older than a week (or absent).
+-- Returns: older than a week; must be fetched right away. The second is
+-- true when there is no list at all, and when the translation in use was
+-- stored by another version of the extension: a new version brings new
+-- texts, which would stay English for up to a week otherwise (seen after the
+-- update to 2.0: the AI texts in English inside a Slovak window).
 function interface_language_is_stale()
   local index = read_locale_file("index.json")
   local fetched = index and tonumber(index.fetched) or 0
-  return (os.time() - fetched) > LOCALE_REFRESH_SECONDS, fetched == 0
+  local now = fetched == 0
+  local code = wanted_interface_language()
+  if code and not now then
+    local stored = read_locale_file(code .. ".json")
+    now = stored ~= nil and stored.version ~= app_version
+  end
+  return (os.time() - fetched) > LOCALE_REFRESH_SECONDS, now
 end
 
 function check_config()

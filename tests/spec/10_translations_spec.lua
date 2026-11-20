@@ -101,6 +101,48 @@ describe("interface language: defaults", function()
   end)
 end)
 
+describe("interface language: after an update of the extension", function()
+  -- Seen on a Mac after the update to 2.0: Slovak window, the new AI texts in
+  -- English. The stored translation was of the old version and would only be
+  -- refreshed a week later.
+  local function stored(version)
+    local old = {}
+    for key, value in pairs(SLOVAK) do old[key] = value end
+    old.ui_ai_credits = nil -- a text the old version did not have
+    return {
+      ["locale/index.json"] = json.encode({ format = 1, fetched = os.time(), languages = {
+        { code = "sk", name = "Sloven\196\141ina", english_name = "Slovak", status = "ready" } } }),
+      ["locale/sk.json"] = json.encode({ fetched = os.time(), version = version, strings = old }),
+    }
+  end
+
+  it("a translation stored by another version is fetched again at start, so new texts are translated", function()
+    for _, version in ipairs({ "1.4.0", false }) do
+      local files = stored(version or nil)
+      local first = H.launch({ server = server_with("ready") })
+      files["last_update_check.json"] = H.read_file(first.dir .. "/last_update_check.json")
+      local env = H.launch({ server = server_with("ready"), config = { interfaceLanguage = "sk" }, files = files })
+      ok(env.server:last(LOCALE .. "sk.json"), "translation fetched again (stored version " .. tostring(version) .. ")")
+      trigger_menu(2)
+      has(labels(env.ui()), SLOVAK.ui_ai_credits .. ":")
+      local kept = json.decode(H.read_file(env.dir .. "/locale/sk.json"))
+      ok(kept.version and kept.version ~= "1.4.0", "stored with the current version")
+    end
+  end)
+
+  it("a translation stored by this version is not fetched again", function()
+    local first = H.launch({ server = server_with("ready"), config = { interfaceLanguage = "sk" } })
+    local files = {
+      ["last_update_check.json"] = H.read_file(first.dir .. "/last_update_check.json"),
+      ["locale/index.json"] = H.read_file(first.dir .. "/locale/index.json"),
+      ["locale/sk.json"] = H.read_file(first.dir .. "/locale/sk.json"),
+    }
+    ok(files["locale/sk.json"], "stored by the first start")
+    local env = H.launch({ server = server_with("ready"), config = { interfaceLanguage = "sk" }, files = files })
+    eq(#locale_requests(env), 0)
+  end)
+end)
+
 describe("interface language: choosing one", function()
   local function switch_to_slovak(o)
     o = o or {}
@@ -584,6 +626,22 @@ describe("interface language: VLC for macOS", function()
     local label = d:add_label("a", 1, 1)
     d:add_button("go", function() label:set_text("b") d:hide() end, 1, 2):_click()
     eq(env.unsafe_closes(), { "x" })
+  end)
+
+  it("configuration window on macOS keeps room for a three-line message (the first row was pushed out)", function()
+    local env = H.launch({ macos = true })
+    trigger_menu(2)
+    local message
+    for _, w in ipairs(env.ui().widgets) do
+      if w.kind == "label" and w.row == 12 then message = w end
+    end
+    eq(select(2, message.text:gsub("<br>", "")), 2, "two line breaks = three lines reserved")
+    eq((message:_shown():gsub("[%s\194\160]", ""):gsub("&nbsp;", ""):gsub("<br>", "")), "", "and nothing to read in them")
+    local other = H.launch()
+    trigger_menu(2)
+    for _, w in ipairs(other.ui().widgets) do
+      if w.kind == "label" and w.row == 12 then eq(w.text, "", "Qt sizes the window itself") end
+    end
   end)
 
   it("the way back: 'English' is offered under that name in every interface language", function()
