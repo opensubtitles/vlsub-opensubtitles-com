@@ -59,6 +59,9 @@ faults.
 5. **The last cue is only a short link.** It stays on screen for five
    minutes and says nothing: not what happened, not why the film has no more
    subtitles, not what it costs, not what to do afterwards.
+7. The cause is "not enough credits", which is not the same as "no credits":
+   an account with 10 credits also gets the preview for a film that costs 20.
+   The text must give both numbers.
 6. Nothing says that this is a **preview** and that the rest of the film
    will have no subtitles.
 
@@ -81,14 +84,14 @@ This is only a preview
 of the AI translation.
 
 N+1
-(4 s)
+(5 s)
 The rest of this film is not translated:
-your account has no AI credits.
+your account does not have enough AI credits.
 
 N+2
-(4 s)
-The full translation of this subtitle
-costs about {price} AI credits.
+(5 s)
+The full translation costs about {price}
+AI credits. You have {balance}.
 
 N+3
 (5 s)
@@ -102,14 +105,14 @@ in your player - it will be complete.
 
 N+5
 (5 minutes)
-PREVIEW ONLY - no AI credits ({balance} left).
-Full translation: about {price} AI credits.
-Buy at {short_url} (ai.opensubtitles.com),
+PREVIEW ONLY - not enough AI credits.
+Needed: about {price}. You have: {balance}.
+Add credits at {short_url} (ai.opensubtitles.com),
 then download this subtitle again.
 ```
 
 `{price}` = credits the full translation would cost, `{balance}` = the
-user's balance, `{short_url}` = the short payment link (today
+user's balance (it may be more than 0), `{short_url}` = the short payment link (today
 `https://y1.to/..`).
 
 Notes for the implementation:
