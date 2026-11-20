@@ -3298,6 +3298,11 @@ function apply_config()
     -- Keep the successful message that was set by checkLoginAndUserInfo
     local current_message = input_table["message"]:get_text()
     if current_message and string.find(current_message, strings.mess_success, 1, true) then
+      -- the account line, completed with the AI credit balance
+      local credits = ai_credits()
+      if credits then
+        current_message = current_message .. "<br>" .. tr("ui_ai_credits_balance", tostring(credits))
+      end
       setMessage(current_message .. strings.ui_configuration_saved_you_can_now_close_this)
     else
       setMessage(success_tag(strings.ui_configuration_saved_and_login_successful_you_can))
@@ -5113,8 +5118,9 @@ local function fetch_subtitle(link)
 end
 
 -- AI credits of the logged-in account (GET /ai/credits), or nil when they
--- cannot be read. One short request.
-local function ai_credits()
+-- cannot be read. One short request. (Global: the configuration code above
+-- uses it.)
+function ai_credits()
   local auth_header = openSub.getAuthHeader()
   if not auth_header then
     return nil

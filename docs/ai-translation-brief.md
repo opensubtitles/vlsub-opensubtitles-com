@@ -351,6 +351,32 @@ Still missing: what the redirect target really answers (first while
 translating, then when done) as fixtures and tests; translations of the new
 texts; help text; README / CHANGELOG.
 
+### The download, measured in real VLC (user's Mac, 2026-11-19)
+
+`POST http://api.opensubtitles.com/api/v1/download` with
+`{"file_id":431137309911500000000000000000000}` (a JSON number), logged in,
+418 credits: **HTTP 200** at once,
+
+```json
+{"link":"https:\/\/ai.opensubtitles.com\/proxy\/download\/431137309911500000000000000000000",
+ "file_name":"","requests":"1","remaining":"99999999",
+ "message":"This a on-demand translation by AI.OpenSubtitles.com (file was cached)",
+ "reset_time":"now","reset_time_utc":"2026-11-19T23:55:54.000Z"}
+```
+
+(An earlier attempt the same evening got HTTP 302 with an empty body.)
+
+- The id is accepted as a JSON number.
+- `file_name` is empty; `requests` / `remaining` are strings and not the
+  daily quota (`"99999999"`): they must not be shown as quota.
+- **The link cannot be fetched.** `GET https://ai.opensubtitles.com/proxy/download/<id>`
+  answers **404** (HTML "Page not found"), with and without `Api-Key`;
+  over plain HTTP it answers 301 to https. VLC can fetch https only without
+  any header (`vlc.stream`), and plain HTTP is refused, so for VLSub this
+  link has to work **anonymously over https** - like the ordinary
+  `www.opensubtitles.com/download/...` links - or be served by
+  `api.opensubtitles.com` over plain HTTP. To be fixed on the server.
+
 ## Open questions
 
 1. Blocked until done on the API side: the User-Agent

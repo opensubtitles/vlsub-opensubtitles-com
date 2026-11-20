@@ -82,7 +82,8 @@ EXCEPTIONS[6] = {
 }
 EXCEPTIONS[7] = {
   name = "AI on-demand subtitles (2.0)",
-  why = "new feature: an 'AI credits' row in the configuration window; entries the API "
+  why = "new feature: an 'AI credits' row in the configuration window and the balance in "
+     .. "the message after Save (one request to /ai/credits); entries the API "
      .. "offers only to 2.x User-Agents are marked and paid with credits. Nothing else "
      .. "may change: the row is left out of the comparison.",
 }
@@ -91,6 +92,11 @@ DROP_CONFIG_KEYS.interfaceLanguage = true
 DROP_CONFIG_KEYS.detectedLanguage = true
 
 local LOCALE_REQUEST = "raw.githubusercontent.com/opensubtitles/vlsub-opensubtitles-com/main/locale/"
+-- exception 7: requests about AI credits, and the balance in the Save message
+local function is_ai_request(text)
+  return text:find("/api/v1/ai/", 1, true) ~= nil
+end
+
 local function is_locale_request(text)
   return text:find(LOCALE_REQUEST, 1, true) ~= nil
 end
@@ -163,7 +169,7 @@ local function snapshot(env, norm, cursor)
   snap.requests = {}
   for i = cursor.requests + 1, #env.server.requests do
     local r = env.server.requests[i]
-    if not is_locale_request(r.host .. r.path) then
+    if not is_locale_request(r.host .. r.path) and not is_ai_request(r.host .. r.path) then
     local headers = {}
     for _, h in ipairs(r.header_list) do headers[#headers + 1] = h[1] .. ": " .. h[2] end
     table.sort(headers) -- custom headers are emitted in table order, which is not behaviour
@@ -205,7 +211,9 @@ local function snapshot(env, norm, cursor)
       if not (is_config and skip[x.row]) then
         local row = is_config and row_number[x.row] or x.row
         local col = (is_config and x.kind == "dropdown") and "*" or tostring(x.col) -- exception 6
-        local line = string.format("%s @%s,%s %q", x.kind, col, tostring(row), norm(x.text or ""))
+        local text = norm(x.text or "")
+        if is_config then text = text:gsub("<br>AI credits: %d+", "") end -- exception 7
+        local line = string.format("%s @%s,%s %q", x.kind, col, tostring(row), text)
         if x.kind == "check_box" then line = line .. " checked=" .. tostring(x.checked) end
         w[#w + 1] = line
         for _, v in ipairs(x.values) do
@@ -257,7 +265,7 @@ local function snapshot(env, norm, cursor)
     for _, pattern in ipairs(EXCEPTIONS[5].log_lines) do
       if l.msg:find(pattern) then unreachable = true end
     end
-    if l.level ~= "dbg" and not is_locale_request(l.msg) and not unreachable then
+    if l.level ~= "dbg" and not is_locale_request(l.msg) and not is_ai_request(l.msg) and not unreachable then
       snap.log[#snap.log + 1] = l.level .. " " .. norm(l.msg)
     end
   end
