@@ -522,7 +522,7 @@ local strings = {
   -- AI on-demand translation
   ui_ai_on_demand = "AI on demand (uses credits)",
   ui_ai_creating_translation = "Creating the AI translation - this can take a minute, VLC will not respond meanwhile...",
-  ui_ai_still_translating = "The AI translation is being made (step %s) - VLC will not respond meanwhile...",
+  ui_ai_still_translating = "The AI translation is being made: %s s (a whole film takes about 20 s; this window does not respond meanwhile)",
   ui_ai_credits = "AI credits",
   ui_ai_show_credits = "🤖 Show balance / buy",
   ui_ai_credits_balance = "AI credits: %s",
@@ -4720,12 +4720,50 @@ end
 -- File name for a downloaded subtitle: the video's name (or, without one,
 -- the subtitle's own name, the searched title or the end of the stream URL),
 -- made safe for every file system, plus ".<language>" and ".<format>".
+-- The name the API gives a subtitle file, without what is added again when
+-- it is saved: a subtitle extension, and a language tag at the very end
+-- ("Movie.2020.eng", "Episode 5 - Breakage-eng", "film.en.srt"). Most names
+-- from the API have no extension at all, so nothing may be cut blindly
+-- ("...h264-poke" lost its "poke" when four characters always were).
+local SUBTITLE_EXTENSIONS = { ".srt", ".sub", ".ass", ".ssa", ".vtt", ".smi", ".txt" }
+-- (a literal table: nothing may run when the file is loaded)
+local LANGUAGE_TAGS = {
+  en = true, eng = true, fr = true, fre = true, fra = true, de = true, ger = true, deu = true,
+  es = true, spa = true, it = true, ita = true, pt = true, por = true, pob = true, ru = true,
+  rus = true, pl = true, pol = true, cs = true, cze = true, ces = true, sk = true, slo = true,
+  slk = true, hu = true, hun = true, nl = true, dut = true, nld = true, el = true, gre = true,
+  ell = true, tr = true, tur = true, ar = true, ara = true, he = true, heb = true, zh = true,
+  chi = true, zho = true, ja = true, jpn = true, ko = true, kor = true, sv = true, swe = true,
+  da = true, dan = true, fi = true, fin = true, no = true, nor = true, ro = true, rum = true,
+  ron = true, bg = true, bul = true, hr = true, hrv = true, sr = true, srp = true, uk = true,
+  ukr = true, vi = true, vie = true, th = true, tha = true, ["id"] = true, ind = true,
+}
+
+local function api_file_base_name(file_name, drop_language_tag)
+  local name = file_name
+  local lower = string.lower(name)
+  for _, extension in ipairs(SUBTITLE_EXTENSIONS) do
+    if #name > #extension and string.sub(lower, -#extension) == extension then
+      name = string.sub(name, 1, #name - #extension)
+      break
+    end
+  end
+  if drop_language_tag then
+    local tag = string.match(name, "[%.%-_](%a%a%a?)$")
+    if tag and LANGUAGE_TAGS[string.lower(tag)] and #name > #tag + 1 then
+      name = string.sub(name, 1, #name - #tag - 1)
+    end
+  end
+  return name
+end
+
 local function subtitle_file_name(item)
   local name = "subtitle"
   if openSub.file.name and openSub.file.name ~= '' then
     name = openSub.file.name
   elseif item.SubFileName then
-    name = string.sub(item.SubFileName, 1, #item.SubFileName - 4)
+    -- the language code is added below when the option is on
+    name = api_file_base_name(item.SubFileName, openSub.option.langExt)
   elseif openSub.movie.title and openSub.movie.title ~= "" then
     name = openSub.movie.title
   else
@@ -5239,6 +5277,13 @@ openSub.downloadFromNewAPI = function(item, is_retry)
     client:set_retries(0)
     -- the last answer can be the subtitle text itself: byte for byte
     client:set_raw(true)
+    -- The server keeps each waiting request open for seconds (measured: 9 s
+    -- twice for a whole film). Nothing can run beside it in VLC's Lua, but
+    -- the message can count, so the window is seen to be working.
+    local ordered_at = os.time()
+    client:set_on_wait(function()
+      setMessage(loading_tag(tr("ui_ai_still_translating", tostring(os.time() - ordered_at))))
+    end)
     -- the id goes back digit for digit, as a JSON number (as the Kodi addon
     -- sends it)
     if type(item.FileID) == "string" and string.match(item.FileID, "^%d+$") then
@@ -5281,7 +5326,7 @@ openSub.downloadFromNewAPI = function(item, is_retry)
   -- saying where to get credits (measured with an account at 0).
   local is_preview = false
   local function follow_waiting(answer)
-    local started, step = os.time(), 0
+    local started = os.time()
     while answer and answer.status >= 301 and answer.status <= 308 do
       local location = answer.headers and answer.headers["location"]
       local path = location and (string.match(location, "^https?://api%.opensubtitles%.com(/.*)$")
@@ -5295,8 +5340,6 @@ openSub.downloadFromNewAPI = function(item, is_retry)
       if string.find(path, "/download/preview-", 1, true) then
         is_preview = true
       end
-      step = step + 1
-      setMessage(loading_tag(tr("ui_ai_still_translating", tostring(step))))
       -- a redirect that came back at once: do not hammer the server
       local asked = os.time()
       answer = traced("GET " .. path, client:get("http://api.opensubtitles.com" .. path))
@@ -6660,6 +6703,12 @@ function VLCHttpClient:set_deadline(seconds)
     return self
 end
 
+-- fn(seconds) is called about once a second while an answer is awaited
+function VLCHttpClient:set_on_wait(fn)
+    self.on_wait = fn
+    return self
+end
+
 function VLCHttpClient:set_retries(count)
     self.retries = tonumber(count) or 2
     return self
@@ -7255,7 +7304,9 @@ end
 --     socket is always writable), which turns it into a non-blocking check so
 --     the deadline below can be enforced. Polling a dead descriptor, or
 --     polling for POLLIN alone on a silent server, freezes VLC's interface.
-function socket_exchange(host, port, request, timeout_seconds)
+-- `on_wait(seconds)` is called about once a second while the answer is
+-- awaited, so a long request can show that it is alive.
+function socket_exchange(host, port, request, timeout_seconds, on_wait)
     local fd = vlc.net.connect_tcp(host, port)
     if not fd or fd < 0 then
         return nil, "connect"
@@ -7268,7 +7319,9 @@ function socket_exchange(host, port, request, timeout_seconds)
     end
 
     local events = vlc.net.POLLIN + vlc.net.POLLOUT
-    local deadline = os.time() + (timeout_seconds or 15)
+    local started = os.time()
+    local deadline = started + (timeout_seconds or 15)
+    local last_tick = started
     local parts = {}
     local failure = nil
 
@@ -7292,6 +7345,16 @@ function socket_exchange(host, port, request, timeout_seconds)
         elseif os.time() > deadline then
             failure = "timeout"
             break
+        elseif os.time() ~= last_tick then
+            last_tick = os.time()
+            -- VLC offers to kill an extension that has been busy for 10 s
+            -- ("Extension not responding"); tell it this one is alive
+            if vlc.keep_alive then
+                pcall(vlc.keep_alive)
+            end
+            if on_wait then
+                on_wait(last_tick - started)
+            end
         end
     end
 
@@ -7429,7 +7492,7 @@ function VLCHttpClient:_make_request_tcp(method, url, data)
     while attempt <= self.retries do
         attempt = attempt + 1
 
-        local response_data, failure = socket_exchange(host, port, request, self.deadline or math.min(self.timeout, 15))
+        local response_data, failure = socket_exchange(host, port, request, self.deadline or math.min(self.timeout, 15), self.on_wait)
 
         if not response_data then
             vlc.msg.err("[VLSub] Request to " .. host .. ":" .. port .. " failed: " .. failure .. " (attempt " .. attempt .. ")")

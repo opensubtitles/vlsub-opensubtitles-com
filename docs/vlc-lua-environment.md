@@ -164,3 +164,17 @@ extension creates dialogs through `new_dialog()`, which encodes label / HTML
 text on the way in and returns the original text from `get_text()`. The test
 mock renders labels the macOS way (`widget:_shown()`, launch option
 `macos = true`), and a test opens every window in every language with it.
+
+## A long request: what can and cannot be done
+
+Nothing runs beside a callback: VLC's Lua has no timer, no thread and no
+"call me later", so a request that takes 20 s keeps the extension's window
+unresponsive for 20 s (the player itself keeps playing). What helps:
+
+- `vlc.keep_alive()` tells VLC the extension is alive. Without it VLC offers
+  to kill an extension that has been busy for 10 s ("Extension not
+  responding"). `socket_exchange` calls it about once a second while it
+  waits.
+- The window is repainted on `dlg:update()` even in the middle of a
+  callback, so a message can count the seconds
+  (`client:set_on_wait(fn)`).

@@ -9,6 +9,53 @@ local function save(env, name, item, content)
   return openSub.saveAndLoadSubtitle(content or "content", item or { SubFormat = "srt", SubLanguageID = "en" })
 end
 
+describe("subtitle file names without a video (named after the API's file name)", function()
+  -- file_name values as the API sends them (from the recorded searches and
+  -- the live on-demand answers): most have no extension.
+  local function named(file_name, language, with_code)
+    H.launch()
+    openSub.file.name = ""
+    openSub.option.langExt = with_code ~= false
+    return H.find_local("subtitle_file_name")({ SubFileName = file_name, SubLanguageID = language or "en", SubFormat = "srt" })
+  end
+
+  -- (spaces become underscores: the name is made safe for every file system)
+  it("nothing is cut from a name that has no extension", function()
+    eq(named("send.help.2026.1080p.web.h264-poke", "uk"), "send.help.2026.1080p.web.h264-poke.uk.srt")
+    eq(named("S02E05 Breakage"), "S02E05_Breakage.en.srt")
+    eq(named("Breaking Bad Season 2 Episode 05 - Breakage"), "Breaking_Bad_Season_2_Episode_05_-_Breakage.en.srt")
+    eq(named("The.Matrix.1989"), "The.Matrix.1989.en.srt")
+  end)
+
+  it("a subtitle extension is removed, whatever its case", function()
+    eq(named("Movie.2020.srt"), "Movie.2020.en.srt")
+    eq(named("Movie.2020.SRT"), "Movie.2020.en.srt")
+    eq(named("Movie.2020.ass"), "Movie.2020.en.srt")
+  end)
+
+  it("a language tag at the end is replaced by the code of the subtitle", function()
+    eq(named("big_buck_bunny.eng", "hu"), "big_buck_bunny.hu.srt")
+    eq(named("Episode 5 - Breakage-eng"), "Episode_5_-_Breakage.en.srt")
+    eq(named("The.Matrix.1999.Tubi.CC.en"), "The.Matrix.1999.Tubi.CC.en.srt")
+    eq(named("film.fre.srt", "fr"), "film.fr.srt")
+  end)
+
+  it("other short endings are part of the name", function()
+    eq(named("Breaking Bad S02E05.DVDRip.cc.en.SNY"), "Breaking_Bad_S02E05.DVDRip.cc.en.SNY.en.srt")
+    eq(named("Movie.2020.WEB"), "Movie.2020.WEB.en.srt")
+    eq(named("Movie.2020-YIFY"), "Movie.2020-YIFY.en.srt")
+  end)
+
+  it("with 'language code in file name' off the name is left as it is", function()
+    eq(named("big_buck_bunny.eng", "hu", false), "big_buck_bunny.eng.srt")
+  end)
+
+  it("a name that is only an extension or a tag is not emptied", function()
+    eq(named(".srt"), ".srt.en.srt")
+    eq(named("en"), "en.en.srt")
+  end)
+end)
+
 describe("subtitle file names", function()
   local function saved_name(name, o)
     local dir = H.tmpdir()

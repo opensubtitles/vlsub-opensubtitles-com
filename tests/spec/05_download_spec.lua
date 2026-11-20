@@ -472,6 +472,31 @@ H.describe("AI on-demand entry (recorded search answer)", function()
     eq(#H.ls(env.media_dir), 0)
   end)
 
+  it("while the server keeps the request open the message counts the seconds and VLC is told the extension is alive", function()
+    local env = searched()
+    local seen = translating(env, 3)
+    env.server.holds_for = 9 -- measured: each waiting request is held 9 s
+    local shown = {}
+    local label
+    for _, w in ipairs(env.ui().widgets) do if w.kind == "label" and w.row == 10 then label = w end end
+    local set = label.set_text
+    rawset(label, "set_text", function(self, text) shown[#shown + 1] = text return set(self, text) end)
+    env.results():_select(1)
+    env.ui():_button("Download"):_click()
+    env.server.holds_for = nil
+    local counted = {}
+    for _, text in ipairs(shown) do
+      local n = text:match("being made: (%d+) s")
+      if n then counted[#counted + 1] = tonumber(n) end
+    end
+    ok(#counted >= 15, "the counter was shown " .. #counted .. " times")
+    for i = 2, #counted do ok(counted[i] >= counted[i - 1], "the counter never goes back") end
+    ok(counted[#counted] >= 20, "it reached " .. tostring(counted[#counted]) .. " s")
+    ok(env.vlc._keep_alives >= 15, "vlc.keep_alive() called " .. env.vlc._keep_alives .. " times")
+    eq(seen.post, 1)
+    has(env.message(), "Success")
+  end)
+
   it("a redirect to another host is not followed (the token stays with the API)", function()
     local env = searched()
     env.server:on(DOWNLOAD, function()

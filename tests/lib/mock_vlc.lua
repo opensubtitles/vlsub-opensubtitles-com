@@ -549,8 +549,14 @@ function M.new(opts)
       if split_request(c.inbuf) then
         local raw, keep_open = server:handle(M.parse_request(c.inbuf, c.host, c.port))
         c.inbuf = ""
-        c.out = c.out .. (raw or "")
-        c.eof = not keep_open
+        if server.holds_for and server.holds_for > 0 then
+          -- the server keeps the request open that long before it answers
+          -- (the AI translation does: 9 s per waiting request)
+          c.held, c.held_eof, c.ready_at = raw or "", not keep_open, os.time() + server.holds_for
+        else
+          c.out = c.out .. (raw or "")
+          c.eof = not keep_open
+        end
       end
       return #data
     end,
@@ -573,6 +579,9 @@ function M.new(opts)
       local ready = 0
       for fd, events in pairs(fds) do
         local c = conns[fd]
+        if c and c.held and os.time() >= c.ready_at then
+          c.out, c.eof, c.held = c.out .. c.held, c.held_eof, nil
+        end
         local revents = 0
         if c and c.open then
           if (#c.out > 0 or c.eof) and events % 2 == 1 then revents = POLL.POLLIN end
@@ -705,7 +714,8 @@ function M.new(opts)
   })
   ns("errno", { ENOENT = 2, EEXIST = 17, EACCES = 13, EINVAL = 22 })
   rawset(vlc, "deactivate", function() vlc._deactivated = true end)
-  rawset(vlc, "keep_alive", function() end)
+  vlc._keep_alives = 0
+  rawset(vlc, "keep_alive", function() vlc._keep_alives = vlc._keep_alives + 1 end)
 
   -- vlc.misc is deliberately absent, see the top of this file.
   return vlc
