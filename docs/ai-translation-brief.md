@@ -476,6 +476,24 @@ DeepL2 if all bytes counted, 22 were charged.
 Seen on the way: for this film no on-demand entry is offered in Lithuanian
 or Latvian (no subtitle exists in either), but one is in Ukrainian.
 
+### Films to test with (on-demand row offered, checked 2026-11-20)
+
+Set one subtitle language only, search by IMDb id.
+
+| IMDb id | Film | Language | From | State |
+|---|---|---|---|---|
+| 2866360 | Coherence (2013) | Slovak | Czech | whole film, about 20 credits |
+| 2084989 | Upstream Color (2013) | Slovak | Czech | whole film |
+| 2084989 | Upstream Color (2013) | Ukrainian | Russian | whole film |
+| 390384 | Primer (2004) | Ukrainian | Russian | whole film |
+| 8036976 | Send Help (2026) | Ukrainian | Russian | translated 2026-11-20: free now |
+| 1254207 | Big Buck Bunny (2008) | sk cs hu uk pl de | English | 2 cues; hu, cs translated: free |
+| 756683 | The Man from Earth (2007) | Ukrainian | Russian | source looks like another title - avoid |
+
+Films with subtitles in every usual language (Send Help, The Matrix) offer
+nothing on demand. What an account without credits gets, and what is wrong
+with it, is in `docs/ai-preview-notice.md`.
+
 ## Open questions
 
 1. Blocked until done on the API side: the User-Agent
