@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **AI translation on demand.** When no subtitle exists in a language, the API offers an AI translation of an existing subtitle, made when it is downloaded and paid with the AI credits of the OpenSubtitles account. VLSub lists such an entry as "🤖 AI translation from <language> (uses AI credits)", shows the balance before and after, counts the seconds while the server translates (about 20 s for a whole film), and delivers a translation that exists already at once and for free. Without enough credits the server sends a preview; the message says so and links to the credit packages.
+- **AI credits in the configuration window**: the balance after Save, and a button that shows it together with the credit packages.
+- Help window: a section about AI translation.
+
+### Changed
+- Version 2.0.0: the API offers AI on-demand entries to this version only.
+- **Credits are spent by the Download button only.** A download the extension starts by itself (two media-change events in a row on a selected entry) skips AI on-demand entries.
+- While any request waits, VLC is told the extension is alive, so it no longer offers to kill it after 10 seconds.
+
+### Fixed
+- **Subtitle file name when no video is open**: the name from the API lost its last four characters (assumed to be an extension, which most names do not have). Only a real subtitle extension and a trailing language tag are removed now.
+
 
 ## [1.4.0] - 2026-11-19
 

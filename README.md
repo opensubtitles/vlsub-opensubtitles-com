@@ -145,6 +145,25 @@ yay -S vlsub-opensubtitles-com-git
 - 🤖 **AI translated**
 - ⚙️ **Machine translated**
 
+### 🤖 AI Translation on Demand (2.0)
+
+When no subtitle exists in your language, OpenSubtitles.com can make one for
+you: an AI translation of an existing subtitle, made the moment you download
+it.
+
+- Such an entry is listed as `SK | 🤖 AI translation from Czech (uses AI credits) | <release>`.
+- It is paid with the **AI credits** of your OpenSubtitles account, not with
+  your daily download quota. A whole film costs roughly 20 credits and takes
+  about 20 seconds; the VLSub window shows a seconds counter and does not
+  respond until it is done (the video keeps playing).
+- A translation that was made before is delivered at once and costs nothing.
+- Without enough credits you get a short **preview** and the message says
+  so, with links to the credit packages.
+- Your balance: Config > *AI credits* > "Show balance / buy"; it is also
+  shown after Save.
+- Credits are only ever spent by the **Download** button on such an entry -
+  never by a search or by itself.
+
 ## 📸 Screenshots
 
 | Main Interface | Configuration | Search Results |

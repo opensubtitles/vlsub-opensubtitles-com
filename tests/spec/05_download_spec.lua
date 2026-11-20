@@ -271,7 +271,7 @@ H.describe("AI on-demand entry (recorded search answer)", function()
     local env = searched()
     local rows = env.results().values
     eq(#rows, 1)
-    has(rows[1].text, "AI on demand (uses credits)")
+    eq(rows[1].text, "CS | \240\159\164\150 AI translation from English (uses AI credits) | big_buck_bunny")
     has(rows[1].text, "CS")
   end)
 
@@ -560,7 +560,7 @@ H.describe("AI on-demand entry (recorded search answer)", function()
     d:_at(2, 1, "text_input"):set_text("big buck bunny")
     d:_button("Search$"):_click()
     for _, row in ipairs(env.results().values) do
-      ok(not row.text:find("on demand", 1, true), row.text)
+      ok(not row.text:find("AI translation", 1, true), row.text)
     end
     for _, item in ipairs(openSub.itemStore) do eq(item.OnDemand, false) end
   end)

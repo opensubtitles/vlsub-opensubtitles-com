@@ -1,5 +1,5 @@
 -- Behaviour diff: proves that the working copy of vlsubcom.lua behaves like
--- the frozen baseline (tests/behaviour/baseline/vlsubcom.lua = v1.3.2).
+-- the frozen baseline (tests/behaviour/baseline/vlsubcom.lua = v1.4.0).
 --
 --   lua tests/behaviour/run.lua                 all sessions
 --   lua tests/behaviour/run.lua download        sessions whose name contains "download"
@@ -28,8 +28,9 @@ local BASELINE = here .. "/baseline/vlsubcom.lua"
 local CANDIDATE = os.getenv("CANDIDATE") or (here .. "/../../vlsubcom.lua")
 
 -- --------------------------------------------------------------- exceptions --
--- Agreed differences from v1.3.2. Each one is applied to BOTH recordings, so
--- it can only hide the difference it names.
+-- Agreed differences from the baseline (tests/behaviour/baseline/vlsubcom.lua,
+-- v1.4.0 since the AI work started; v1.3.2 before). Each one is applied to
+-- BOTH recordings, so it can only hide the difference it names.
 local EXCEPTIONS = {
   {
     name = "debug log content",
@@ -82,8 +83,9 @@ EXCEPTIONS[6] = {
 }
 EXCEPTIONS[7] = {
   name = "AI on-demand subtitles (2.0)",
-  why = "new feature: an 'AI credits' row in the configuration window and the balance in "
-     .. "the message after Save (one request to /ai/credits); entries the API "
+  why = "new feature: an 'AI credits' row in the configuration window, the balance in "
+     .. "the message after Save (one request to /ai/credits), four lines about AI "
+     .. "translation in the help window; entries the API "
      .. "offers only to 2.x User-Agents are marked and paid with credits. Nothing else "
      .. "may change: the row is left out of the comparison.",
 }
@@ -190,14 +192,31 @@ local function snapshot(env, norm, cursor)
     -- Exception 3: the configuration window has one more row. Leave that row
     -- out and number the remaining rows consecutively, in both recordings.
     local is_config = d.title:find("Configuration", 1, true) ~= nil
+    local is_help = d.title:find(": Help", 1, true) ~= nil
     local skip, rows, row_number = {}, {}, {}
     if is_config then
       for _, x in ipairs(d.widgets) do
-        -- exception 3 (interface language) and 7 (AI credits): rows v1.3.2 did not have
+        -- rows the baseline did not have: interface language (if it predates
+        -- it) and AI credits
         if x.kind == "label" and (x.text == "Interface language:" or x.text == "AI credits:") then
           skip[x.row] = true
         end
       end
+    end
+    if is_help then
+      -- the AI section of the help window: its four lines and the spacer
+      -- that follows them
+      local last
+      for _, x in ipairs(d.widgets) do
+        if x.kind == "label" and (x.text == "AI TRANSLATION:" or x.text:find("AI translation can be made", 1, true)
+           or x.text:find("AI credits of your account", 1, true) or x.text:find("row AI credits", 1, true)) then
+          skip[x.row] = true
+          if not last or x.row > last then last = x.row end
+        end
+      end
+      if last then skip[last + 1] = true end
+    end
+    if is_config or is_help then
       for _, x in ipairs(d.widgets) do
         if x.row and not skip[x.row] and not row_number[x.row] then
           row_number[x.row] = true
@@ -208,8 +227,8 @@ local function snapshot(env, norm, cursor)
       for position, row in ipairs(rows) do row_number[row] = position end
     end
     for _, x in ipairs(d.widgets) do
-      if not (is_config and skip[x.row]) then
-        local row = is_config and row_number[x.row] or x.row
+      if not ((is_config or is_help) and skip[x.row]) then
+        local row = (is_config or is_help) and row_number[x.row] or x.row
         local col = (is_config and x.kind == "dropdown") and "*" or tostring(x.col) -- exception 6
         local text = norm(x.text or "")
         if is_config then text = text:gsub("<br>AI credits: %d+", "") end -- exception 7
@@ -333,7 +352,7 @@ local function first_difference(a, b)
   for line in (b .. "\n"):gmatch("(.-)\n") do lb[#lb + 1] = line end
   for i = 1, math.max(#la, #lb) do
     if la[i] ~= lb[i] then
-      return "      line " .. i .. "\n        v1.3.2 : " .. tostring(la[i]) ..
+      return "      line " .. i .. "\n        baseline: " .. tostring(la[i]) ..
              "\n        current: " .. tostring(lb[i])
     end
   end
@@ -402,7 +421,9 @@ end
 H.cleanup()
 print(string.format("\n%d sessions, %d steps compared on %s: %d identical, %d different",
   ran, steps, _VERSION, ran - failed, failed))
-print("agreed exceptions: " .. EXCEPTIONS[1].name .. "; " .. EXCEPTIONS[2].name .. "; " .. EXCEPTIONS[3].name
-  .. "; " .. EXCEPTIONS[4].name .. "; " .. EXCEPTIONS[5].name
-  .. "; " .. EXCEPTIONS[6].name .. "; " .. EXCEPTIONS[7].name)
+-- Exceptions 2 to 6 were differences from v1.3.2. The baseline is v1.4.0 now,
+-- which has them all, so their rules no longer hide anything; they stay for
+-- comparing against an older script (CANDIDATE / baseline swapped by hand).
+print("baseline: v" .. tostring((H.read_file(BASELINE) or ""):match('local app_version = "([^"]+)"'))
+  .. "   agreed exceptions: " .. EXCEPTIONS[1].name .. "; " .. EXCEPTIONS[7].name)
 os.exit(failed == 0 and 0 or 1)

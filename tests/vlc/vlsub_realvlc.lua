@@ -349,9 +349,9 @@ if AI and USER and PASS then
     local list = ui():_at(1, 9, "list")
     show_results(list)
     for _, v in ipairs(list.values) do
-      if v.text:find("AI on demand", 1, true) then on_demand = v.id end
+      if v.text:find("AI translation", 1, true) then on_demand = v.id end
     end
-    check(on_demand, "no row marked 'AI on demand'")
+    check(on_demand, "no row marked as an AI translation on demand")
     ui():_at(4, 3, "text_input"):set_text("")
   end)
 

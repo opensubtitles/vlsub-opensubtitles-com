@@ -520,7 +520,12 @@ local strings = {
   ui_none = "None",
 
   -- AI on-demand translation
-  ui_ai_on_demand = "AI on demand (uses credits)",
+  ui_help_ai_title = "AI TRANSLATION:",
+  ui_help_ai_what = "No subtitle in your language? An AI translation can be made on demand (marked with a robot)",
+  ui_help_ai_credits = "It is paid with the AI credits of your account; without enough credits you get a short preview",
+  ui_help_ai_where = "Your balance and the credit packages: Config, row AI credits",
+  ui_ai_on_demand = "AI translation on demand (uses AI credits)",
+  ui_ai_on_demand_from = "AI translation from %s (uses AI credits)",
   ui_ai_creating_translation = "Creating the AI translation - this can take a minute, VLC will not respond meanwhile...",
   ui_ai_still_translating = "The AI translation is being made: %s s (a whole film takes about 20 s; this window does not respond meanwhile)",
   ui_ai_credits = "AI credits",
@@ -2122,13 +2127,20 @@ function interface_help()
   dlg:add_label(line(strings.ui_extension_displays_your_rank_daily_quota_and), 1, 18, 6, 1)
   dlg:add_label(line(strings.ui_select_subtitle_and_click_download_or_link), 1, 19, 6, 1)
 
-  -- Row 20: Links
+  -- Row 20: AI translation on demand
   dlg:add_label("", 1, 20, 6, 1) -- Spacer
-  dlg:add_label(line(strings.ui_support_opensubtitles_thank_you_very_much), 1, 21, 6, 1)
-  dlg:add_label(line(strings.ui_github_opensubtitles_vlsub_opensubtitles_com_sou), 1, 22, 6, 1)
+  dlg:add_label(line(strings.ui_help_ai_title), 1, 21, 6, 1)
+  dlg:add_label(line(strings.ui_help_ai_what), 1, 22, 6, 1)
+  dlg:add_label(line(strings.ui_help_ai_credits), 1, 23, 6, 1)
+  dlg:add_label(line(strings.ui_help_ai_where), 1, 24, 6, 1)
 
-  -- Row 23: Close button with icon
-  dlg:add_label("", 1, 23, 6, 1) -- Spacer
+  -- Row 25: Links
+  dlg:add_label("", 1, 25, 6, 1) -- Spacer
+  dlg:add_label(line(strings.ui_support_opensubtitles_thank_you_very_much), 1, 26, 6, 1)
+  dlg:add_label(line(strings.ui_github_opensubtitles_vlsub_opensubtitles_com_sou), 1, 27, 6, 1)
+
+  -- Row 28: Close button with icon
+  dlg:add_label("", 1, 28, 6, 1) -- Spacer
   dlg:add_button(strings.ui_close,
     function()
       if previous_window == "config" then
@@ -2137,7 +2149,7 @@ function interface_help()
         show_main()
       end
     end,
-    3, 24, 2, 1)
+    3, 29, 2, 1)
 end
 
 
@@ -2564,6 +2576,16 @@ function buildSubtitleDisplayText(item, langCode)
   -- Add language code at the beginning with spaces (e.g., "EN | ")
   displayText = string.upper(langCode) .. " | "
 
+  -- An AI translation that does not exist yet: what matters comes first (the
+  -- list cuts long rows off on the right) - that it is made by AI, from
+  -- which language, and that it costs credits. Uploader, download count and
+  -- date describe the source subtitle and would only mislead.
+  if item.OnDemand then
+    local label = item.OnDemandFrom and tr("ui_ai_on_demand_from", item.OnDemandFrom)
+      or strings.ui_ai_on_demand
+    return displayText .. "🤖 " .. label .. " | " .. (item.MovieReleaseName or item.SubFileName or "???")
+  end
+
   -- Add filename/release name
   displayText = displayText .. (item.SubFileName or "???")
 
@@ -2592,9 +2614,7 @@ function buildSubtitleDisplayText(item, langCode)
   end
 
   -- Translation indicators (lower priority)
-  if item.OnDemand then
-    table.insert(qualityIndicators, "🤖 " .. strings.ui_ai_on_demand)
-  elseif item.AITranslated then
+  if item.AITranslated then
     table.insert(qualityIndicators, "🤖") -- Robot for AI translated
   elseif item.MachineTranslated then
     table.insert(qualityIndicators, "⚙️") -- Gear for machine translated
@@ -4463,6 +4483,12 @@ openSub.convertNewAPIResponse = function(newData)
         OnDemand = (type(firstFile.file_id) == "string" and #firstFile.file_id > 10)
           or (type(attr.comments) == "string"
               and string.find(string.lower(attr.comments), "will be created on demand", 1, true) ~= nil),
+        -- "... as AI translation from czech language." -> "Czech"
+        OnDemandFrom = (function()
+          local from = type(attr.comments) == "string"
+            and string.match(attr.comments, "AI translation from (%a[%a %-]-) language")
+          return from and (string.upper(string.sub(from, 1, 1)) .. string.sub(from, 2)) or nil
+        end)(),
         MovieReleaseName = attr.release or firstFile.file_name or "Unknown",
 
         -- Enhanced fields for display
