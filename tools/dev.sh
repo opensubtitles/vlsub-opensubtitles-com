@@ -98,9 +98,10 @@ case "${1:-help}" in
       export VLSUB_TRACE_DIALOG=1
       export VLSUB_TRACE_HTTP=1   # shows the raw /download answer (it contains a temporary link)
       echo "Verbose: VLSub lines follow; VLC's own messages (stderr) are shown too."
+      # followers left over from earlier runs would print every line again
+      pkill -f "tail -f $LOG" 2>/dev/null || true
       ( tail -f "$LOG" 2>/dev/null | grep --line-buffered -E "\[VLSub\]|lua (warning|error)|[Dd]ialog" ) &
-      TAIL=$!
-      trap 'kill $TAIL 2>/dev/null' EXIT INT TERM
+      trap 'pkill -f "tail -f $LOG" 2>/dev/null' EXIT INT TERM
       "$VLC" --verbose=2 --file-logging --logfile="$LOG" "$@" || echo "VLC ended with exit code $?"
       sleep 1
       echo "== VLC has ended. Last lines of the log:"
