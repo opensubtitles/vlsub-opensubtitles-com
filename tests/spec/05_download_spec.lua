@@ -259,6 +259,7 @@ H.describe("AI on-demand entry (recorded search answer)", function()
   local function searched()
     local dir = H.tmpdir()
     local env = H.launch({ config = { language = "cs" }, media = "file://" .. dir .. "/Big.Buck.Bunny.2008.mkv" })
+    env.media_dir = dir
     local d = env.ui()
     d:_at(4, 3, "text_input"):set_text("1254207")
     env.server:reset()
@@ -351,11 +352,15 @@ H.describe("AI on-demand entry (recorded search answer)", function()
     ok(not env.message():find("<a ", 1, true), env.message())
   end)
 
-  -- Recorded in real VLC (2026-11-20): POST -> 302 Location
-  -- /api/v1/download/<id>?wait_for_translation=1 -> 302 ...=2 -> ... and, for
-  -- a translation that exists, 200 with this body.
-  local DONE = '{"link":"https:\\/\\/www.opensubtitles.com\\/download\\/AI\\/subfile\\/x.srt","file_name":"",'
-    .. '"requests":"1","remaining":"99999999","message":"This a on-demand translation by AI.OpenSubtitles.com",'
+  -- Recorded in real VLC (2026-11-20).
+  -- New translation: POST -> 302 Location /api/v1/download/<id>?wait_for_translation=1
+  -- -> 302 ...=2 -> 302 ...=3 -> 200 with the subtitle text itself as the body.
+  -- Existing one: POST -> 200 with CACHED, whose link answers 404.
+  local TRANSLATED = "1\n00:00:01,000 --> 00:00:04,000\nAhoj z umelej inteligencie\n"
+  local DONE = TRANSLATED
+  local CACHED = '{"link":"https:\\/\\/ai.opensubtitles.com\\/proxy\\/download\\/' .. ID .. '","file_name":"",'
+    .. '"requests":"1","remaining":"99999999",'
+    .. '"message":"This a on-demand translation by AI.OpenSubtitles.com (file was cached)",'
     .. '"reset_time":"now","reset_time_utc":"2026-11-20T00:06:50.000Z"}'
   local WAIT = "GET api.opensubtitles.com/api/v1/download/*"
 
@@ -371,7 +376,7 @@ H.describe("AI on-demand entry (recorded search answer)", function()
       if n < hops then
         return api.response(302, "", { Location = "/api/v1/download/" .. ID .. "?wait_for_translation=" .. (n + 1) })
       end
-      return api.response(200, DONE)
+      return api.response(200, DONE, { ["Content-Type"] = "text/plain; charset=utf-8" })
     end)
     return seen
   end
@@ -390,8 +395,39 @@ H.describe("AI on-demand entry (recorded search answer)", function()
     end
     has(env.message(), "Success")
     has(env.message(), "AI credits left: 2019")
-    lacks(env.message(), "99999999")
     eq(env.errors(), {})
+    local saved = H.ls(env.media_dir)
+    eq(#saved, 1)
+    eq(H.read_file(env.media_dir .. "/" .. saved[1]), TRANSLATED, "the text of the last answer is the subtitle")
+  end)
+
+  it("exists already (cached): the link answers 404, the text is fetched from the API instead", function()
+    local env = searched()
+    local posts = 0
+    env.server:on(DOWNLOAD, function() posts = posts + 1 return api.response(200, CACHED) end)
+    local asked = {}
+    env.server:on(WAIT, function(req)
+      asked[#asked + 1] = req.target
+      return api.response(200, TRANSLATED, { ["Content-Type"] = "text/plain; charset=utf-8" })
+    end)
+    env.results():_select(1)
+    env.ui():_button("Download"):_click()
+    eq(posts, 1)
+    eq(asked, { "/api/v1/download/" .. ID .. "?wait_for_translation=1" })
+    has(env.message(), "Success")
+    lacks(env.message(), "99999999") -- "remaining" of such an answer is not the daily quota
+    local saved = H.ls(env.media_dir)
+    eq(H.read_file(env.media_dir .. "/" .. saved[1]), TRANSLATED)
+  end)
+
+  it("cached, and the API does not hand the text out either: the failure is reported, nothing is saved", function()
+    local env = searched()
+    env.server:on(DOWNLOAD, function() return api.response(200, CACHED) end)
+    env.server:on(WAIT, function() return api.response(404, { message = "not found" }) end)
+    env.results():_select(1)
+    env.ui():_button("Download"):_click()
+    has(env.message(), "Failed to download")
+    eq(#H.ls(env.media_dir), 0)
   end)
 
   it("a redirect to another host is not followed (the token stays with the API)", function()

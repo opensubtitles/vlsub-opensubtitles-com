@@ -5227,6 +5227,8 @@ openSub.downloadFromNewAPI = function(item, is_retry)
     client:set_timeout(120)
     client:set_deadline(120)
     client:set_retries(0)
+    -- the last answer can be the subtitle text itself: byte for byte
+    client:set_raw(true)
     -- the id goes back digit for digit, as a JSON number (as the Kodi addon
     -- sends it)
     if type(item.FileID) == "string" and string.match(item.FileID, "^%d+$") then
@@ -5270,27 +5272,37 @@ openSub.downloadFromNewAPI = function(item, is_retry)
   -- once. So: one POST, then the trail of redirects is followed - on the API
   -- host only, over plain HTTP, with the same credentials - for at most
   -- three minutes, the message line counting along.
-  local res = traced("POST /download", client:post("http://api.opensubtitles.com/api/v1/download", request_body))
-  if item.OnDemand and res then
+  -- Follows the trail of redirects from `answer`; returns the first answer
+  -- that is not a redirect (nil: no answer, false: gave up after 3 minutes).
+  local function follow_waiting(answer)
     local started, step = os.time(), 0
-    while res and res.status >= 301 and res.status <= 308 do
-      local location = res.headers and res.headers["location"]
+    while answer and answer.status >= 301 and answer.status <= 308 do
+      local location = answer.headers and answer.headers["location"]
       local path = location and (string.match(location, "^https?://api%.opensubtitles%.com(/.*)$")
         or string.match(location, "^(/.*)$"))
       if not path then
         break
       end
       if os.time() - started > 180 then
-        return report_failure(strings.ui_ai_no_answer)
+        return false
       end
       step = step + 1
       setMessage(loading_tag(tr("ui_ai_still_translating", tostring(step))))
       -- a redirect that came back at once: do not hammer the server
       local asked = os.time()
-      res = traced("GET " .. path, client:get("http://api.opensubtitles.com" .. path))
-      if res and res.status >= 301 and res.status <= 308 then
+      answer = traced("GET " .. path, client:get("http://api.opensubtitles.com" .. path))
+      if answer and answer.status >= 301 and answer.status <= 308 then
         while os.time() - asked < 3 do end
       end
+    end
+    return answer
+  end
+
+  local res = traced("POST /download", client:post("http://api.opensubtitles.com/api/v1/download", request_body))
+  if item.OnDemand and res then
+    res = follow_waiting(res)
+    if res == false then
+      return report_failure(strings.ui_ai_no_answer)
     end
   end
   if not res then
@@ -5338,6 +5350,19 @@ openSub.downloadFromNewAPI = function(item, is_retry)
     if answer.link then
       setMessage(openSub.actionLabel..": "..progressBarContent(80))
       subtitle_content = fetch_subtitle(answer.link)
+      if not subtitle_content and item.OnDemand and type(item.FileID) == "string"
+         and string.match(item.FileID, "^%d+$") then
+        -- The link of a translation that exists already ("file was cached")
+        -- answered 404 when this was written. The address a new translation
+        -- is waited for at hands the text out itself, so ask there.
+        dbg("On-demand link failed, asking the API for the translation itself")
+        local direct = follow_waiting(traced("GET wait_for_translation",
+          client:get("http://api.opensubtitles.com/api/v1/download/" .. item.FileID .. "?wait_for_translation=1")))
+        if direct and direct.status == 200 and direct.body and direct.body ~= ""
+           and not decode_object(direct.body) then
+          subtitle_content = direct.body
+        end
+      end
       if not subtitle_content then
         return false
       end

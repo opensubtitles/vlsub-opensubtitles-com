@@ -319,6 +319,13 @@ function M.new(opts)
     return M.response(200, SUBTITLE_TEXT, { ["Content-Type"] = "application/octet-stream" })
   end)
 
+  -- Measured 2026-11-20: the link handed out for an existing on-demand
+  -- translation answers the site's "Page not found".
+  s:on("GET ai.opensubtitles.com/proxy/download/*", function()
+    return M.response(404, "<!DOCTYPE html><html><head><title>Page not found · AI.Opensubtitles.com</title></head></html>",
+                      { ["Content-Type"] = "text/html; charset=UTF-8" })
+  end)
+
   s:on("GET api.github.com/repos/opensubtitles/vlsub-opensubtitles-com/releases/latest", function()
     return M.response(200, { tag_name = "v" .. (opts.latest_version or "0.0.1"),
       name = "VLSub " .. (opts.latest_version or "0.0.1"), body = "Release notes",

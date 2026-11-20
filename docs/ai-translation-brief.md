@@ -394,8 +394,21 @@ The server answers a chain of redirects while it translates; the counter
 goes up by one each time. The extension follows the chain (API host only,
 plain HTTP, same credentials; one POST only; at most three minutes; at least
 3 s per step so a quick redirect is not hammered) until an answer that is
-not a redirect arrives. What the last answer of the chain looks like has not
-been seen yet; it is expected to be the 200 with `link` shown above.
+not a redirect arrives.
+
+Seen to the end (Hungarian, id `431137310411700000000000000000000`): after
+three redirects, **`GET ...?wait_for_translation=3` answers 200 and the body
+is the subtitle text itself** (131 bytes for this short film), not JSON. It
+was saved as `Send.Help.2026.hu.srt` and loaded; the credits went from 417
+to 416. The whole wait took a few seconds.
+
+Asking again for the same translation gives the cached answer (200 with
+`link`), whose link is the one that answers 404. Until that is repaired on
+the server the extension falls back: when the link of an on-demand entry
+fails it asks `GET /api/v1/download/<id>?wait_for_translation=1` for the
+text, as for a new translation. **Whether the server hands a cached
+translation out that way is not confirmed** - it is the next thing to check
+on the Mac.
 
 ## Open questions
 
