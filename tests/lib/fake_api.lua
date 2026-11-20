@@ -234,8 +234,8 @@ function M.new(opts)
     return M.fixture("search_name_en")
   end))
 
-  -- AI credits: the shapes are the examples of the API specification
-  -- (/ai/credits, /ai/credits/buy); srv.ai_credits is the balance.
+  -- AI credits, as recorded from the live API ({"data":{"credits":0}} and
+  -- the packages below); srv.ai_credits is the balance.
   s:on("GET " .. API .. "/ai/credits", guard(function(req, srv)
     if not authorized(req, srv) then return M.response(401, { message = "Unauthorized", status = 401 }) end
     return M.response(200, { data = { credits = srv.ai_credits } })
@@ -243,10 +243,11 @@ function M.new(opts)
   s:on("GET " .. API .. "/ai/credits/buy", guard(function(req, srv)
     if not authorized(req, srv) then return M.response(401, { message = "Unauthorized", status = 401 }) end
     return M.response(200, { data = {
+      -- as recorded live (2026-11-20), the per-user tag replaced
       { name = "500 credits", value = "5 USD", discount_percent = 0,
-        checkout_url = "https://ai.opensubtitles.com/assets/buy_credits.php?tag=EXAMPLE" },
+        checkout_url = "https://ai.opensubtitles.com/assets/buy_credits.php?tag=EXAMPLE&choice=5-usd-500-credits" },
       { name = "1100 credits", value = "10 USD", discount_percent = 10,
-        checkout_url = "https://ai.opensubtitles.com/assets/buy_credits.php?tag=EXAMPLE1" },
+        checkout_url = "https://ai.opensubtitles.com/assets/buy_credits.php?tag=EXAMPLE&choice=10-usd-1100-credits" },
     } })
   end))
 

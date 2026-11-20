@@ -295,17 +295,56 @@ H.describe("AI on-demand entry (recorded search answer)", function()
     eq(#env.server:seen(DOWNLOAD), 1)
   end)
 
-  it("the balance is read first; without credits nothing is asked for and the buy links are shown", function()
+  -- Recorded with an account at 0 credits (live API, 2026-11-20): the POST
+  -- answers 302 to /api/v1/download/preview-<id>?wait_for_translation=1&p=aj
+  -- and that answers 200 with a short translated sample followed by lines
+  -- telling where to add credits.
+  it("without credits: the server's preview is saved and the message says it is only a preview, with buy links", function()
     local env = searched()
     env.server.ai_credits = 0
+    local PREVIEW = "1\n00:00:02,000 --> 00:00:05,000\nBig Buck Bunny\nFilm\n\n"
+      .. "3\n00:00:59,000 --> 00:01:02,000\nAby uzyska\196\135 pe\197\130ne t\197\130umaczenie na \197\188\196\133danie\n"
+    local hops = {}
+    env.server:on(DOWNLOAD, function()
+      return api.response(302, "", { Location = "/api/v1/download/preview-" .. ID .. "?wait_for_translation=1&p=aj" })
+    end)
+    env.server:on("GET api.opensubtitles.com/api/v1/download/*", function(req)
+      hops[#hops + 1] = req.target
+      return api.response(200, PREVIEW, { ["Content-Type"] = "text/plain; charset=utf-8" })
+    end)
     env.results():_select(1)
     env.ui():_button("Download"):_click()
-    eq(#env.server:seen(DOWNLOAD), 0, "no download request")
-    has(env.message(), "needs AI credits - your balance is 0")
-    has(env.message(), "<a href='https://ai.opensubtitles.com/assets/buy_credits.php?tag=EXAMPLE'>500 credits - 5 USD</a>")
+    eq(hops, { "/api/v1/download/preview-" .. ID .. "?wait_for_translation=1&p=aj" })
+    eq(H.read_file(env.media_dir .. "/" .. H.ls(env.media_dir)[1]), PREVIEW)
+    has(env.message(), "only a preview")
+    has(env.message(), "your balance is 0")
+    has(env.message(), "500 credits - 5 USD")
+    lacks(env.message(), "Success")
     for _, line in ipairs(env.vlc._messages()) do
       ok(not line:find("buy_credits", 1, true), "checkout address in the log: " .. line)
     end
+  end)
+
+  -- Recorded (0 credits, a translation that exists): POST answers 200 with
+  -- "link":"https://ai.opensubtitles.com/proxy/download/preview-<id>?p=am".
+  it("without credits, cached: the preview named by the link is asked for - never the full text", function()
+    local env = searched()
+    env.server.ai_credits = 0
+    env.server:on(DOWNLOAD, function()
+      return api.response(200, '{"link":"https:\\/\\/ai.opensubtitles.com\\/proxy\\/download\\/preview-' .. ID
+        .. '?p=am","file_name":"","requests":"1","remaining":"99999999",'
+        .. '"message":"This a on-demand translation by AI.OpenSubtitles.com (file was cached)","reset_time":"now"}')
+    end)
+    local asked = {}
+    env.server:on("GET api.opensubtitles.com/api/v1/download/*", function(req)
+      asked[#asked + 1] = req.target
+      return api.response(200, "1\n00:00:02,000 --> 00:00:05,000\nsample\n", { ["Content-Type"] = "text/plain" })
+    end)
+    env.results():_select(1)
+    env.ui():_button("Download"):_click()
+    eq(asked, { "/api/v1/download/preview-" .. ID .. "?wait_for_translation=1&p=am" })
+    has(env.message(), "only a preview")
+    lacks(env.message(), "Success")
   end)
 
   it("with credits the message names the balance before the request", function()

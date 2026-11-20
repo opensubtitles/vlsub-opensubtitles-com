@@ -3,6 +3,7 @@
 #
 #   tests/vlc/run.sh                         search only (no account needed)
 #   VLSUB_USER=me VLSUB_PASS=secret tests/vlc/run.sh     + login and download
+#   VLSUB_AI=credits   (or nocredits) with that account   + AI on-demand translation
 #   VLC=/path/to/vlc tests/vlc/run.sh        use a specific VLC binary
 #   tests/vlc/run.sh -v                      also show every request, warning and error
 #   tests/vlc/run.sh -vv                     everything the extension logs (debug on),

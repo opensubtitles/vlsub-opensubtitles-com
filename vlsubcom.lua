@@ -529,7 +529,7 @@ local strings = {
   ui_ai_credits_login_first = "Log in to see your AI credits: enter username and password, then Save.",
   ui_ai_credits_unavailable = "The AI credit balance could not be read. Please try again later.",
   ui_ai_buy_credits = "Buy AI credits:",
-  ui_ai_no_credits = "This subtitle is an AI translation made on demand and needs AI credits - your balance is %s.",
+  ui_ai_preview_only = "This is only a preview: the full AI translation needs AI credits, and your balance is %s.",
   ui_ai_creating_translation_credits = "Creating the AI translation (AI credits: %s) - this can take a minute, VLC will not respond meanwhile...",
   ui_ai_credits_left = "AI credits left: %s",
   ui_ai_no_answer = "The AI translation did not arrive in time. It may still be in the making: try again in a minute."
@@ -5244,17 +5244,9 @@ openSub.downloadFromNewAPI = function(item, is_retry)
     if type(item.FileID) == "string" and string.match(item.FileID, "^%d+$") then
       request_body = '{"file_id":' .. item.FileID .. '}'
     end
-    -- the balance first: nothing is asked of the server without credits
+    -- the balance first, so the user sees it before anything is ordered.
+    -- (Without credits the server still answers: with a preview, see below.)
     local credits = ai_credits()
-    if credits and credits <= 0 then
-      local message = error_tag(tr("ui_ai_no_credits", tostring(credits)))
-      local links = ai_buy_links()
-      if links ~= "" then
-        message = message .. "<br>" .. links
-      end
-      setMessage(message)
-      return false
-    end
     setMessage(loading_tag(credits and tr("ui_ai_creating_translation_credits", tostring(credits))
                                     or strings.ui_ai_creating_translation))
   else
@@ -5284,6 +5276,10 @@ openSub.downloadFromNewAPI = function(item, is_retry)
   -- three minutes, the message line counting along.
   -- Follows the trail of redirects from `answer`; returns the first answer
   -- that is not a redirect (nil: no answer, false: gave up after 3 minutes).
+  -- Without credits the server sends the request on to
+  -- /download/preview-<id>...: the first lines translated, followed by lines
+  -- saying where to get credits (measured with an account at 0).
+  local is_preview = false
   local function follow_waiting(answer)
     local started, step = os.time(), 0
     while answer and answer.status >= 301 and answer.status <= 308 do
@@ -5295,6 +5291,9 @@ openSub.downloadFromNewAPI = function(item, is_retry)
       end
       if os.time() - started > 180 then
         return false
+      end
+      if string.find(path, "/download/preview-", 1, true) then
+        is_preview = true
       end
       step = step + 1
       setMessage(loading_tag(tr("ui_ai_still_translating", tostring(step))))
@@ -5359,14 +5358,25 @@ openSub.downloadFromNewAPI = function(item, is_retry)
 
     if answer.link then
       setMessage(openSub.actionLabel..": "..progressBarContent(80))
-      if item.OnDemand and type(item.FileID) == "string" and string.match(item.FileID, "^%d+$") then
-        -- A translation that exists already ("file was cached") comes with a
-        -- link on ai.opensubtitles.com that VLC cannot use (measured: 404
-        -- without a login, and https here cannot carry one). The address a
-        -- new translation is waited for hands the text out as well - no
-        -- credits taken (measured) - so that is asked first.
-        local direct = follow_waiting(traced("GET wait_for_translation",
-          client:get("http://api.opensubtitles.com/api/v1/download/" .. item.FileID .. "?wait_for_translation=1")))
+      -- A translation that exists already ("file was cached") comes with a
+      -- link on ai.opensubtitles.com that VLC cannot use (measured: 404
+      -- without a login, and https here cannot carry one):
+      --   https://ai.opensubtitles.com/proxy/download/<id>
+      --   https://ai.opensubtitles.com/proxy/download/preview-<id>?p=am   (no credits)
+      -- The API hands the same thing out at /download/<that name>, the
+      -- address a new translation is waited for. Exactly what the link names
+      -- is asked for - a preview stays a preview.
+      local name, extra = string.match(answer.link,
+        "^https://ai%.opensubtitles%.com/proxy/download/([%w%-]+)%??([%w%-%._~=&%%]*)$")
+      if item.OnDemand and name then
+        if string.sub(name, 1, 8) == "preview-" then
+          is_preview = true
+        end
+        local path = "/api/v1/download/" .. name .. "?wait_for_translation=1"
+        if extra ~= "" then
+          path = path .. "&" .. extra
+        end
+        local direct = follow_waiting(traced("GET " .. path, client:get("http://api.opensubtitles.com" .. path)))
         if direct and direct.status == 200 and direct.body and direct.body ~= ""
            and not decode_object(direct.body) then
           subtitle_content = direct.body
@@ -5410,7 +5420,18 @@ openSub.downloadFromNewAPI = function(item, is_retry)
     if quota ~= "" then
       message = tr("ui_message_with_quota", message, quota)
     end
-    setMessage(success_tag(message))
+    if is_preview then
+      -- say plainly that this is not the whole subtitle, and where to buy
+      local credits = ai_credits()
+      local notice = error_tag(tr("ui_ai_preview_only", tostring(credits or 0)))
+      local links = ai_buy_links()
+      if links ~= "" then
+        notice = notice .. "<br>" .. links
+      end
+      setMessage(notice)
+    else
+      setMessage(success_tag(message))
+    end
   end
 
   return saved

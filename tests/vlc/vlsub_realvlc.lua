@@ -21,6 +21,10 @@
 --   VLSUB_HOME   sandbox for config/cache/downloads      (required)
 --   VLSUB_USER / VLSUB_PASS   OpenSubtitles.com account  (optional: login + download)
 --   VLSUB_QUERY  title to search                         (default "the matrix")
+--   VLSUB_AI     "credits" / "nocredits": also try an AI on-demand translation
+--                with that account, expecting the full text / the preview.
+--                Uses a translation that exists already (free); a preview
+--                costs nothing either.
 --   VLSUB_VERBOSE  1 = also show what the extension logs (requests, warnings,
 --                  errors); 2 = everything it logs, with debug logging on
 
@@ -31,6 +35,8 @@ local USER, PASS = os.getenv("VLSUB_USER"), os.getenv("VLSUB_PASS")
 -- CI passes unset secrets as empty strings, which are true in Lua.
 if USER == "" or PASS == "" then USER, PASS = nil, nil end
 local QUERY = os.getenv("VLSUB_QUERY") or "the matrix"
+local AI = os.getenv("VLSUB_AI")
+if AI ~= "credits" and AI ~= "nocredits" then AI = nil end
 local VERBOSE = tonumber(os.getenv("VLSUB_VERBOSE") or "0") or 0
 
 local misc = vlc.misc
@@ -145,12 +151,22 @@ do
 end
 
 local function message()
-  -- the status line: row 10 in the main window, row 11 in the configuration
-  -- window (which is the one with a password field)
+  -- the status line: row 10 in the main window; in the configuration window
+  -- (the one with a password field) the label that spans the row above the
+  -- buttons
   local d = ui()
-  local row = (#d:_all("password") > 0) and 11 or 10
+  if #d:_all("password") == 0 then
+    for _, w in ipairs(d.widgets) do
+      if w.kind == "label" and w.row == 10 then return w.text end
+    end
+    return ""
+  end
+  local buttons_row = 0
   for _, w in ipairs(d.widgets) do
-    if w.kind == "label" and w.row == row then return w.text end
+    if w.kind == "button" and w.row > buttons_row then buttons_row = w.row end
+  end
+  for _, w in ipairs(d.widgets) do
+    if w.kind == "label" and w.row == buttons_row - 1 then return w.text end
   end
   return ""
 end
@@ -305,6 +321,63 @@ if USER and PASS then
   end)
 else
   line("SKIP login + download (set VLSUB_USER and VLSUB_PASS to include them)")
+end
+
+if AI and USER and PASS then
+  -- Big Buck Bunny has no Hungarian subtitle, so the API offers one on
+  -- demand; it has been translated before, so nothing is charged for it.
+  local on_demand
+  step("AI: configuration window shows the AI credit balance", function()
+    trigger_menu(2)
+    ui():_button("Show balance"):_click()
+    line("     message: " .. message():gsub("<[^>]+>", " "):gsub("tag=[%w%%%.%-_]+", "tag=<TAG>"))
+    check(message():find("AI credits: %d+"), "no balance shown")
+    if AI == "nocredits" then check(message():find("AI credits: 0"), "this account was expected to have 0 credits") end
+    check(message():find("<a href='https://ai%.opensubtitles%.com/"), "no link to buy credits")
+    trigger_menu(1)
+  end)
+
+  step("AI: search by IMDb id 1254207 in Hungarian offers an on-demand translation", function()
+    choose_languages("Hungarian")
+    ui():_at(2, 1, "text_input"):set_text("")
+    ui():_at(4, 3, "text_input"):set_text("1254207")
+    ui():_button("Search$"):_click()
+    local list = ui():_at(1, 9, "list")
+    show_results(list)
+    for _, v in ipairs(list.values) do
+      if v.text:find("AI on demand", 1, true) then on_demand = v.id end
+    end
+    check(on_demand, "no row marked 'AI on demand'")
+    ui():_at(4, 3, "text_input"):set_text("")
+  end)
+
+  step("AI: download it (" .. (AI == "credits" and "full translation" or "preview, no credits") .. ")", function()
+    check(on_demand, "no on-demand row to download")
+    os.execute('rm -f "' .. SANDBOX .. '/Downloads/"*.srt')
+    local list = ui():_at(1, 9, "list")
+    list:_select(on_demand)
+    ui():_button("Download"):_click()
+    line("     message: " .. message():gsub("<[^>]+>", " "):gsub("tag=[%w%%%.%-_]+", "tag=<TAG>"))
+    local p = io.popen('ls -1 "' .. SANDBOX .. '/Downloads" | grep -i "srt$"')
+    local name = p:read("*l")
+    p:close()
+    check(name, "nothing was saved in the sandbox Downloads folder")
+    local f = io.open(SANDBOX .. "/Downloads/" .. name, "rb")
+    local text = f:read("*a")
+    f:close()
+    line("     saved: " .. name .. " (" .. #text .. " bytes), cues: " .. select(2, text:gsub("%-%->", "")))
+    check(text:find("%-%->"), "the saved file is not a subtitle")
+    check(not text:find("^%s*[{<]"), "the saved file looks like JSON or HTML")
+    if AI == "credits" then
+      check(message():find("AI credits left: %d+"), "credits left not shown")
+      check(not message():find("preview"), "got a preview although the account has credits")
+    else
+      check(message():find("only a preview"), "preview not announced")
+      check(message():find("<a href='https://ai%.opensubtitles%.com/"), "no link to buy credits")
+    end
+  end)
+elseif AI then
+  line("SKIP AI on-demand (VLSUB_AI needs VLSUB_USER and VLSUB_PASS)")
 end
 
 step("interface language: fetch Slovak from the repository, window rebuilt in Slovak", function()

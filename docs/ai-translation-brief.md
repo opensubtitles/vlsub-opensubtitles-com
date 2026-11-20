@@ -412,6 +412,42 @@ bytes of subtitle text, and the credits stayed at 416. The extension
 therefore asks there first for every on-demand entry that comes with a link,
 and tries the link only if that fails.
 
+### Without credits: a preview (live API, account at 0, 2026-11-20)
+
+The server does not refuse. It answers with a **preview**: the first cues
+translated, then cues saying that the full translation needs credits and a
+short link to pay.
+
+- New translation: `POST /download` -> 302 to
+  `/api/v1/download/preview-<id>?wait_for_translation=1&p=aj` -> 200 with the
+  preview text.
+- Existing translation: `POST /download` -> 200 with
+  `"link":"https://ai.opensubtitles.com/proxy/download/preview-<id>?p=am"`;
+  the same preview is at
+  `/api/v1/download/preview-<id>?wait_for_translation=1&p=am`.
+- `/ai/credits` -> `{"data":{"credits":0}}`; `/ai/credits/buy` -> four
+  packages, `checkout_url` = `https://ai.opensubtitles.com/assets/buy_credits.php?tag=<per user>&choice=5-usd-500-credits`.
+
+The extension follows the server: the preview is saved and loaded, and the
+message says "This is only a preview: the full AI translation needs AI
+credits, and your balance is 0" with the links to the packages. For a link
+answer it asks the API for **exactly the name in the link** (`preview-<id>`
+with its `p=`), never for the plain id.
+
+**Server-side hole, reported to the owner:** the account at 0 credits gets
+the *full* text of an existing translation by asking
+`GET /api/v1/download/<id>?wait_for_translation=1` (the id without
+`preview-`). The first version of the fallback did exactly that by accident.
+
+### Live tests in real VLC
+
+`tests/vlc/run.sh` with `VLSUB_AI=credits` or `VLSUB_AI=nocredits` (and that
+account in `VLSUB_USER` / `VLSUB_PASS`) adds three steps: balance and buy
+links in the configuration window, the on-demand row for IMDb 1254207 in
+Hungarian, and its download (full text and "AI credits left", or the preview
+and its notice). Hungarian exists already, so the run costs nothing. Both
+passed on VLC 3.0.16 (Linux) on 2026-11-20: 16 steps each.
+
 ## Open questions
 
 1. Blocked until done on the API side: the User-Agent
