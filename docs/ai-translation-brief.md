@@ -406,9 +406,11 @@ Asking again for the same translation gives the cached answer (200 with
 `link`), whose link is the one that answers 404. Until that is repaired on
 the server the extension falls back: when the link of an on-demand entry
 fails it asks `GET /api/v1/download/<id>?wait_for_translation=1` for the
-text, as for a new translation. **Whether the server hands a cached
-translation out that way is not confirmed** - it is the next thing to check
-on the Mac.
+text, as for a new translation. **Confirmed on the Mac (2026-11-20):** for
+the cached Hungarian translation that address answered 200 with the same 131
+bytes of subtitle text, and the credits stayed at 416. The extension
+therefore asks there first for every on-demand entry that comes with a link,
+and tries the link only if that fails.
 
 ## Open questions
 

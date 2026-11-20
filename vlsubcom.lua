@@ -5349,19 +5349,21 @@ openSub.downloadFromNewAPI = function(item, is_retry)
 
     if answer.link then
       setMessage(openSub.actionLabel..": "..progressBarContent(80))
-      subtitle_content = fetch_subtitle(answer.link)
-      if not subtitle_content and item.OnDemand and type(item.FileID) == "string"
-         and string.match(item.FileID, "^%d+$") then
-        -- The link of a translation that exists already ("file was cached")
-        -- answered 404 when this was written. The address a new translation
-        -- is waited for at hands the text out itself, so ask there.
-        dbg("On-demand link failed, asking the API for the translation itself")
+      if item.OnDemand and type(item.FileID) == "string" and string.match(item.FileID, "^%d+$") then
+        -- A translation that exists already ("file was cached") comes with a
+        -- link on ai.opensubtitles.com that VLC cannot use (measured: 404
+        -- without a login, and https here cannot carry one). The address a
+        -- new translation is waited for hands the text out as well - no
+        -- credits taken (measured) - so that is asked first.
         local direct = follow_waiting(traced("GET wait_for_translation",
           client:get("http://api.opensubtitles.com/api/v1/download/" .. item.FileID .. "?wait_for_translation=1")))
         if direct and direct.status == 200 and direct.body and direct.body ~= ""
            and not decode_object(direct.body) then
           subtitle_content = direct.body
         end
+      end
+      if not subtitle_content then
+        subtitle_content = fetch_subtitle(answer.link)
       end
       if not subtitle_content then
         return false
