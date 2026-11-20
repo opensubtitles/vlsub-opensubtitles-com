@@ -992,8 +992,11 @@ function activate()
     end
     apply_detected_languages(detected_locale, log, progress)
 
-    -- Fetch the translation for that language, if there is a reviewed one
-    if not networkTestsFailed and wanted_interface_language() then
+    -- Fetch the list of interface languages, and the translation for the
+    -- detected one if there is one. The list is fetched even when the
+    -- system language is English: otherwise the "Interface language"
+    -- drop-down of this first window offers nothing but English.
+    if not networkTestsFailed then
       pcall(refresh_interface_language)
     end
   end

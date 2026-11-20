@@ -286,6 +286,17 @@ describe("interface language: first run", function()
     end
   end)
 
+  it("an English system still gets the list: the first configuration window offers every language", function()
+    -- (seen on a Mac set to English: only "Automatic" and "English" were offered)
+    local env = first_run("en_US.UTF-8", { server = server_with("ready") })
+    ok(env.server:last(LOCALE .. "index.json"), "list requested on first run")
+    eq(#env.server:seen(LOCALE .. "sk.json"), 0, "no translation fetched for English")
+    has(env.ui().title, "Configuration")
+    eq(env.ui():_at(2, 9, "dropdown"):_texts(),
+       { "Automatic (system language)", "English", "Sloven\196\141ina" })
+    has(labels(env.ui()), ENGLISH.int_os_username)
+  end)
+
   it("stays English for a language without a translation", function()
     local env = first_run("ja_JP.UTF-8", { server = server_with("ready") })
     eq(env.saved_config().detectedLanguage, "ja")
