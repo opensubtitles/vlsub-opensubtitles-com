@@ -4836,7 +4836,9 @@ end
 
 
 -- Enhanced download_subtitles_v2 function with better no-video handling
-function download_subtitles_v2()
+-- `not_by_click` is true when the download was not asked for by the Download
+-- button (see subtitle_list_click_handler).
+function download_subtitles_v2(not_by_click)
   -- Refresh file info to get current playing item's directory
   openSub.getFileInfo()
 
@@ -4856,6 +4858,14 @@ function download_subtitles_v2()
   setMessage(openSub.actionLabel..": "..progressBarContent(10))
 
   local item = openSub.itemStore[index]
+
+  -- AI credits are spent by the Download button only, never by anything
+  -- that starts a download by itself.
+  if not_by_click == true and item and item.OnDemand then
+    dbg("AI on-demand entry: not downloaded without a click on Download")
+    setMessage("")
+    return false
+  end
 
   -- Check if manual download is explicitly requested
   if openSub.option.downloadBehaviour == 'manual' then
@@ -4986,7 +4996,7 @@ function subtitle_list_click_handler()
   if time_diff < double_click_threshold and is_same_item and last_click_time > 0 then
     -- Double-click detected! Trigger download
     dbg("Double-click detected on item " .. selected_item .. ", triggering download")
-    download_subtitles_v2()
+    download_subtitles_v2(true)
 
     -- Reset to prevent triple-click issues
     last_click_time = 0

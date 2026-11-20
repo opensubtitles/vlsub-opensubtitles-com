@@ -453,6 +453,42 @@ H.describe("AI on-demand entry (recorded search answer)", function()
     has(env.message(), "did not arrive in time")
   end)
 
+  -- VLC tells the extension when the playing item changes (input_changed).
+  -- The extension uses two such calls in quick succession on the same
+  -- selected row as a "double click" and downloads without the button.
+  it("credits are never spent by itself: the automatic download skips an on-demand entry", function()
+    local env = searched()
+    env.server:reset()
+    env.results():_select(1)
+    for _ = 1, 6 do input_changed() end
+    eq(#env.server:seen(DOWNLOAD), 0, "no download request")
+    eq(#env.server:seen("GET api.opensubtitles.com/api/v1/ai/"), 0, "not even the balance is asked")
+    eq(#H.ls(env.media_dir), 0)
+    eq(env.errors(), {})
+    -- the button still works
+    env.ui():_button("Download"):_click()
+    eq(#env.server:seen(DOWNLOAD), 1, "the Download button does download it")
+  end)
+
+  it("the automatic download still takes an ordinary entry (unchanged behaviour)", function()
+    local dir = H.tmpdir()
+    local env = H.launch({ media = "file://" .. dir .. "/Big.Buck.Bunny.2008.mkv" })
+    local d = env.ui()
+    d:_at(2, 1, "text_input"):set_text("big buck bunny")
+    d:_button("Search$"):_click()
+    env.server:reset()
+    env.results():_select(1)
+    for _ = 1, 6 do input_changed() end
+    ok(#env.server:seen(DOWNLOAD) >= 1, "downloaded without the button, as before")
+  end)
+
+  it("a new search by itself (media change) lists on-demand entries but downloads nothing", function()
+    local env = searched()
+    env.server:reset()
+    input_changed()
+    eq(#env.server:seen(DOWNLOAD), 0)
+  end)
+
   it("ordinary entries are not marked", function()
     local env = H.launch()
     local d = env.ui()
