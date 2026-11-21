@@ -377,6 +377,18 @@ H.describe("bad connection on first run: VLC is not made to offer killing the ex
     eq(env.not_responding(), {})
   end)
 
+  it("the API's root answers 403 - that is an answer: the network test passes, the start is not 'offline'", function()
+    -- (the first version of this test took 403 for "no internet" and sent a
+    -- user with a working connection into offline mode)
+    local env = first_run(function() end)
+    has(env.ui().title, "Configuration")
+    for _, line in ipairs(env.vlc._messages()) do
+      ok(not line:lower():find("offline", 1, true), line)
+    end
+    ok(#https_requests(env) >= 1, "the list of interface languages was fetched")
+    eq(env.ui():_at(2, 9, "dropdown").values[2] ~= nil, true)
+  end)
+
   it("slow network (answers take 6 s, https would stall 40 s): no https request at start, no dialog, window opens", function()
     local env = first_run(function(server)
       server.holds_for = 6

@@ -6760,7 +6760,10 @@ function test_network_connectivity()
   local elapsed_ms = math.floor((os.clock() - start_time) * 1000)
   networkSlow = (os.time() - asked_at) >= 4
 
-  if res and res.status and res.status >= 200 and res.status < 400 then
+  -- Any HTTP answer proves the API can be reached. Its root answers 403
+  -- ("You cannot consume this service" - no API key is sent here), and that
+  -- is an answer.
+  if res and res.status then
     update_debug_network(tr("ui_connection_ok_ms", tostring(elapsed_ms)))
     append_debug_log(tr("ui_network_test_passed_ms", url, tostring(elapsed_ms)))
     return true

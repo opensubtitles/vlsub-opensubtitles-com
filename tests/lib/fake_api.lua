@@ -380,8 +380,10 @@ function M.new(opts)
   s:on("GET httpbin.org/get", function(req)
     return M.response(200, { headers = req.headers, url = "https://httpbin.org/get" })
   end)
+  -- The API's root, as it really answers (measured 2026-11-21): 403. The
+  -- first-run network test asks it, and must take this as "reachable".
   s:on("GET api.opensubtitles.com/", function()
-    return M.response(200, "<html>OpenSubtitles API</html>", { ["Content-Type"] = "text/html" })
+    return M.response(403, '{\n  "message":"You cannot consume this service"\n}')
   end)
 
   return s
