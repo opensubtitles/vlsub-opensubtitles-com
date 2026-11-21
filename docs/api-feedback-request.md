@@ -1,210 +1,292 @@
-# Request to the API team: feedback on subtitles (rating, sync, report, comment)
+# Feature request for the OpenSubtitles API: feedback on subtitles
 
-From: VLSub (VLC extension for OpenSubtitles.com), 2026-11-21.
-Also affects: the Kodi addon, which already ships a client for a rating
-endpoint that is not deployed.
+Rating, sync, problem reports, file match, thanks and comments - as API
+endpoints any client can use. Written 2026-11-21 from the work on two
+clients (the Kodi addon and the VLC extension, used as examples below); the
+request is for the API itself.
 
-## Why
+## 1. The gap
 
-The REST API (`api.opensubtitles.com/api/v1`, 30 paths) can only *read*
-feedback: `votes`, `ratings`, `points` in search results and as sort keys.
-Nothing can be written. The old opensubtitles.org XML-RPC API could
-(`SubtitlesVote`, `AddComment`, `GetComments`, `ReportWrongMovieHash`,
-`ReportWrongImdbMovie`, `AddRequest`), so the new clients know less about
-subtitle quality than the old ones did - while the people best placed to
-judge a subtitle are the ones who have just watched a film with it in a
-player.
+`api.opensubtitles.com/api/v1` (30 paths) can only *read* feedback: `votes`,
+`ratings`, `points` in search results. Nothing can be written.
 
-## What exists today
-
-| | Old .org XML-RPC | New REST API | Kodi addon 2.0 |
+| | old .org XML-RPC | REST API today | what clients do |
 |---|---|---|---|
-| Rate | `SubtitlesVote` 1-10 | - | sends `POST /subtitles/rate` `{subtitle_id, rating 1-5, sync}`; gets 404, drops it |
-| Sync verdict | - | - | yes/no, in the same call |
-| Report bad subtitle | `AddComment` + `badsubtitle` | - | - |
-| Report wrong file match | `ReportWrongMovieHash` | - | - |
-| Comment | `AddComment`, `GetComments` | - | - |
-| Thanks | website only | - | - |
+| Rate a subtitle | `SubtitlesVote` (1-10) | - | Kodi 2.0 sends `POST /subtitles/rate`, gets 404, drops it |
+| Was it in sync? | - | - | Kodi asks yes/no and sends it in the same call |
+| Report a bad subtitle | `AddComment` + `badsubtitle` flag | - | nothing |
+| Wrong / right file match | `ReportWrongMovieHash` | - | nothing |
+| Delay the viewer had to set | - | - | Kodi proposes `sync-report` / `sync-hint` (not deployed) |
+| Comment | `AddComment`, `GetComments` | - | nothing |
+| Thanks | website only | - | nothing |
+| Find a subtitle by its file hash | `CheckSubHash` (MD5) | - | nothing |
 
-Weak points of the old methods, worth not repeating:
+The people best placed to judge a subtitle are those who have just watched a
+film with it in a player. Today none of that reaches the site.
 
-- `AddComment` answers 200 even when the comment was rejected (limits,
-  similarity, banned text), and still counts the "bad" flag.
-- The "bad" flag has no reason and, over the API, no limit per user: one
-  account can raise it any number of times.
+Faults of the old methods that a new design should not repeat:
+
+- `AddComment` answers 200 even when the comment was rejected, and still
+  counts the "bad" flag;
+- the "bad" flag has no reason and, over the API, no limit per user;
 - `ReportWrongMovieHash` checks for an earlier report under one id and stores
-  it under another, so the "once per user" rule does not hold.
-- A vote cannot be changed or withdrawn.
-- The rating is a plain mean: three votes of 10 outrank three hundred of 8.
-- Nothing positive can be said about a file match ("this subtitle fits this
-  file"), only negative.
+  it under another, so "once per user" does not hold;
+- a vote cannot be changed or withdrawn;
+- the rating is a plain mean (three votes of 10 outrank three hundred of 8);
+- a file match can only be denied, never confirmed.
 
-## What we ask for
+## 2. Naming the subtitle: id, file id, or hash of the file
 
-All under `/api/v1`, JSON, `Api-Key` + `Authorization: Bearer`, reachable
-over plain HTTP for the VLSub User-Agent like the rest of the API.
+Every write below says which subtitle it is about with one object:
 
-### 1. Rate a subtitle after watching
+```json
+"subtitle": { "subtitle_id": "4224334" }
+"subtitle": { "file_id": "4311373" }
+"subtitle": { "sha1": "3f786850e387550fdab836ed7e6dc881de23001b" }
+```
 
-`PUT /subtitles/{subtitle_id}/rating`
+- `subtitle_id` / `file_id`: as in search results. Accepted as number or
+  string (AI on-demand ids are strings of 33-34 digits).
+- **`sha1`: SHA-1 of the subtitle file's bytes.** For when the client has the
+  file but not the id: a subtitle the user downloaded from the website, took
+  from another program, or kept on disk for years. It also survives renaming.
+  It is what lets a player rate "the subtitle that is loaded", wherever it
+  came from.
+
+What `sha1` needs from the server:
+
+- the SHA-1 of every file **as it is served** by `/download`, stored and
+  indexed (the old database has MD5 for `CheckSubHash`; keep accepting
+  `md5` too if that is cheaper to start with);
+- `sha1` returned by `/download` and in `files[]` of search results, so a
+  client can remember it without hashing;
+- a second, forgiving hash would catch more: clients and users change files
+  (BOM, CRLF, "remove tags", re-encoding to UTF-8). A `sha1_normalized` -
+  text decoded, BOM dropped, line ends unified, trailing space trimmed - is
+  cheap on both sides. The rule has to be written down exactly, or nobody's
+  hashes match;
+- unknown hash: `404 {"code": "unknown_subtitle"}`, never a guess.
+
+A look-up for clients that want to know what they have:
+
+`GET /subtitles/lookup?sha1=...` -> the search-result row of that subtitle
+(with `your_rating` when logged in).
+
+**The video file** stays identified as today: `moviehash` + `moviebytesize`.
+A SHA-1 of a whole video is not asked for - hashing 30 GB takes minutes.
+
+## 3. Endpoints
+
+JSON; `Api-Key` + `Authorization: Bearer`; reachable over plain HTTP for
+the clients that are (VLSub), like the rest of the API.
+
+### 3.1 Rate - `PUT /subtitles/rating`
 
 ```json
 {
+  "subtitle": { "subtitle_id": "4224334" },
   "rating": 4,
   "sync": "good",
-  "sync_offset_ms": 0,
-  "file_id": 4311373,
-  "moviehash": "8e245d9679d31e12",
-  "moviebytesize": 6316316,
+  "video": { "moviehash": "8e245d9679d31e12", "moviebytesize": 6316316 },
   "watched_ratio": 0.93,
-  "client": "vlsub"
+  "client": "kodi"
 }
 ```
 
-- `rating`: 1 to 5 (bad, poor, okay, good, excellent). Five steps are what a
-  viewer can answer in one click; the server can map to its 1-10 scale.
-- `sync`: `good` | `early` | `late` | `drifting` | `unknown`. Optional.
-  `sync_offset_ms`: the delay the viewer had to set in the player, if any -
-  the most useful number for fixing a subtitle. Optional.
-- `file_id`, `moviehash`, `moviebytesize`: which file it was watched with.
-  Optional. A good rating with a hash is a confirmed match; a bad sync
-  verdict with a hash is a wrong-match report (see 3).
-- `watched_ratio`: how much of the film was played with the subtitle.
-  Optional; lets the server weigh or ignore votes from people who saw two
-  minutes.
-- **`PUT`, one rating per user and subtitle: sending again replaces it.**
-  `DELETE` on the same path withdraws it.
-- Answer `200`:
-  `{"your_rating": 4, "rating": 8.2, "votes": 131, "status": "saved"}`
-  (`status`: `saved` | `updated`).
-- Rules the old API had and that should stay: login required; not on one's
-  own upload; a daily limit for new accounts. A refused vote says so:
-  `403 {"code": "own_upload"}` / `429 {"code": "limit", "retry_after": 3600}`
-  - never a silent 200.
-- The same call must work for AI on-demand translations (ids are strings of
-  33-34 digits; a client sends them as the server gave them). A bad rating
-  there is the natural trigger for a quality refund.
+- `rating` 1-5: bad, poor, okay, good, excellent. Five steps are what a
+  viewer answers in one click on a TV remote or in a player window; Kodi
+  already asks this way. The server maps to the site's 1-10 as it likes
+  (x2), and may accept `"scale": 10` from clients that want ten.
+- `sync`: `good` | `early` | `late` | `drifting` | `unknown`. Optional. Kodi
+  asks yes / no / skip today (`true` / `false` accepted as `good` /
+  `unknown`-bad).
+- `video`: what it was watched with. Optional. With a good rating it
+  confirms the match, with a bad sync verdict it questions it (see 3.4).
+- `watched_ratio`: share of the film played with the subtitle. Optional;
+  lets the server weigh, or ignore, votes from two minutes of viewing.
+- One rating per user and subtitle. **Sending again replaces it**;
+  `DELETE /subtitles/rating` with the same `subtitle` object withdraws it.
+- `200 {"status": "saved" | "updated", "your_rating": 4, "rating": 8.2, "votes": 131}`
+- Refusals are said, never a silent 200: `403 own_upload`, `403 read_only`,
+  `429 limit` (+ `retry_after`), `404 unknown_subtitle`, `422 invalid`.
+- Old rules worth keeping: login required; not on one's own upload; a daily
+  limit for new accounts.
+- AI on-demand translations are rated the same way; a bad rating there is the
+  natural trigger for the quality refund.
 
-Suggested additions to existing answers, so a client need not ask twice:
-`your_rating` in `GET /subtitles` rows when logged in; `price` (credits) in
-an on-demand row.
+Alias: `POST /subtitles/rate` with `{subtitle_id, rating, sync: true|false}`
+is what the shipped Kodi addon sends. Accepting it costs little.
 
-### 2. Report a problem
+### 3.2 Sync correction - `POST /subtitles/sync-report`, `GET /subtitles/sync-hint`
 
-`POST /subtitles/{subtitle_id}/reports`
+The Kodi addon's proposal (its `docs/subtitle_sync_plan.md`), unchanged in
+substance:
 
 ```json
-{ "reason": "out_of_sync", "comment": "about 2 s late from minute 40",
-  "file_id": 4311373, "moviehash": "8e245d9679d31e12", "moviebytesize": 6316316 }
+POST /subtitles/sync-report
+{ "subtitle": { "file_id": "4311373" },
+  "video": { "moviehash": "8e245d9679d31e12", "moviebytesize": 6316316 },
+  "delay_ms": 1800, "fps_scale": 1.0 }
 ```
 
-`reason`, a closed list (the old API had one unexplained "bad" counter):
-`out_of_sync`, `wrong_movie`, `wrong_language`, `incomplete`,
-`bad_translation`, `machine_translated`, `ads_or_spam`, `offensive`,
-`not_a_subtitle`, `other` (then `comment` is required).
+`delay_ms`: the delay the viewer ended with (+ = the subtitle was late).
+The server keeps a median per (file, video).
+
+```
+GET /subtitles/sync-hint?file_id=4311373&moviehash=8e245d9679d31e12&moviebytesize=6316316
+-> { "data": { "delay_ms": 1800, "fps_scale": 1.0, "samples": 7, "confidence": 0.9 } }
+```
+
+The next viewer with that file gets the subtitle already shifted. Kodi can
+read the delay from its player; VLC can too (`sub-delay`). One correction by
+one user fixes it for everybody - the highest value per line of code in this
+whole request.
+
+### 3.3 Report a problem - `POST /subtitles/reports`
+
+```json
+{ "subtitle": { "subtitle_id": "4224334" },
+  "reason": "bad_translation",
+  "comment": "names are translated differently from scene to scene",
+  "video": { "moviehash": "8e245d9679d31e12", "moviebytesize": 6316316 } }
+```
+
+`reason` - a closed list, in place of the one unexplained "Sub BAD" counter:
+
+| reason | meaning | what the server can do with it |
+|---|---|---|
+| `out_of_sync` | timing does not fit this video | counts against the match, not the subtitle |
+| `wrong_movie` | subtitle of another film / episode | review; hides the match |
+| `wrong_language` | not the language it is listed under | review |
+| `bad_translation` | poor or wrong translation | lowers quality |
+| `machine_translated` | machine / AI translation not marked as such | sets the flag after review |
+| `incomplete` | parts of the film have no subtitles | review |
+| `hearing_impaired_wrong` | SDH flag missing or wrong | fixes the flag |
+| `foreign_parts_wrong` | "forced" flag missing or wrong | fixes the flag |
+| `bad_formatting` | broken characters, encoding, tags, overlapping lines | review |
+| `ads_or_spam` | advertising inside the subtitle | review / removal |
+| `offensive` | abusive or illegal content | priority review |
+| `not_a_subtitle` | empty or not a subtitle file | removal |
+| `other` | `comment` required | review |
 
 - One open report per user, subtitle and reason; a repeat answers
   `200 {"status": "already_reported"}`.
-- Answer `201 {"status": "received", "report_id": "..."}`.
-- `GET /infos/report_reasons` -> the list with translated labels, so clients
-  do not hard-code it.
+- `201 {"status": "received", "report_id": "r_8c1f"}`
+- `GET /infos/report_reasons?language=sk` -> the list with translated labels,
+  so clients do not hard-code it and new reasons reach old clients.
+- The website's "report wrong data" form (corrected fields, admin approval)
+  is a different thing and stays where it is.
 
-### 3. Does this subtitle fit this file?
-
-`PUT /subtitles/files/{file_id}/match`
+### 3.4 Does it fit this video? - `PUT /subtitles/match`
 
 ```json
-{ "moviehash": "8e245d9679d31e12", "moviebytesize": 6316316, "fits": true }
+{ "subtitle": { "file_id": "4311373" },
+  "video": { "moviehash": "8e245d9679d31e12", "moviebytesize": 6316316 },
+  "fits": true }
 ```
 
-Replaces `ReportWrongMovieHash` and adds the positive side. `fits: false`
-is the old wrong-hash report; `fits: true` strengthens the link (and lets
-hash search find a subtitle that was found by name). Idempotent per user.
-The rating call (1) may do this implicitly when it carries a hash.
+`fits: false` is the old `ReportWrongMovieHash`; `fits: true` is new - it
+strengthens the link, and creates one for a subtitle that was found by name,
+so the next hash search finds it. Idempotent per user. Calls 3.1 and 3.2
+may do this implicitly when they carry `video`.
 
-### 4. Comments
+### 3.5 Thanks - `PUT /subtitles/thanks`
 
-- `GET /subtitles/{subtitle_id}/comments?page=1` ->
+`{ "subtitle": {...} }` -> `200 {"thanks": 57}`. One per user. One click for
+the viewer, the thing uploaders actually see.
+
+### 3.6 Comments
+
+- `GET /subtitles/comments?subtitle_id=4224334&page=1` ->
   `{"total": 12, "data": [{"id", "user": {"name", "rank"}, "created_at", "language", "text", "reply_to"}]}`
-- `POST /subtitles/{subtitle_id}/comments` `{"text": "...", "language": "sk", "reply_to": null}`
-  -> `201` with the stored comment, or `422 {"code": "too_similar" | "banned_text" | "limit"}`.
+- `POST /subtitles/comments` `{"subtitle": {...}, "text": "...", "language": "sk", "reply_to": null}`
+  -> `201` with the stored comment, or
+  `422 {"code": "too_similar" | "banned_text" | "empty"}`, `429 limit`.
 
-Lowest priority for player clients: typing a comment with a remote control
-or in a small player window is rare. Reading the last comments before
-downloading would be used more than writing.
+Players will read more than they write: the last comments before
+downloading are worth showing; typing with a remote is rare.
 
-### 5. Thanks
+### 3.7 Small additions to what exists
 
-`PUT /subtitles/{subtitle_id}/thanks` -> `200 {"thanks": 57}`. One per user.
-Cheap for the viewer, motivating for uploaders.
+- `GET /subtitles` rows, when logged in: `your_rating`, `your_thanks`.
+- `files[]` in search rows and the `/download` answer: `sha1`.
+- AI on-demand rows: `price` (credits), so a client can say what it will
+  cost before the click.
 
-### Across all of them
+## 4. Rules for all of them
 
-- Errors as JSON with a stable `code` and a human `message`; no HTML pages,
-  no redirects.
-- Answers within about 2 seconds: a player extension cannot do anything else
+- Errors are JSON with a stable `code` and a readable `message`. No HTML
+  pages, no redirects.
+- Writes are idempotent (`PUT`, or `POST` with a dedup rule): a retry after a
+  lost answer must not count twice.
+- Answers within about 2 seconds. A player extension can do nothing else
   while it waits.
-- Idempotent writes (`PUT`), so a retry after a lost answer cannot double
-  count.
-- Ids accepted as numbers or as strings.
-- Listed in the OpenAPI document with real request / response examples.
+- Ids accepted as numbers or strings.
+- Nothing personal is needed: ids and hashes only - no titles, file names or
+  paths.
+- In the OpenAPI document, with real request and response examples.
 
-Priority: **1** (rating + sync), then **2** (report), **3** (match),
-**5** (thanks), **4** (comments).
+## 5. Priority
 
-The Kodi addon's existing call (`POST /subtitles/rate` with
-`{subtitle_id, rating, sync: true|false}`) is a subset of (1); if that
-contract is already agreed, keeping it as an alias avoids breaking the
-shipped addon.
+1. **Rating with sync** (3.1) - with the `sha1` identity (2).
+2. **Sync report and hint** (3.2).
+3. **Reports with reasons** (3.3).
+4. **Match** (3.4), **thanks** (3.5).
+5. **Comments** (3.6), lookup by hash, the small additions (3.7).
 
-## How VLSub would use it
+## 6. How clients would use it
+
+### Kodi addon (has most of it already)
+
+- Asks after playback - film ended, or stopped after 30% - with two dialogs:
+  1-5 stars, then "Were the subtitles in sync?". Sends 3.1.
+- Samples the subtitle delay every second: can send 3.2 and apply the hint
+  before the subtitle is shown.
+- A third step "Something wrong?" with the reasons of 3.3 fits the same
+  dialog style.
+- Knows local subtitles it did not download (sidecar files): with `sha1` it
+  can rate those too.
+
+### VLC extension (VLSub)
 
 VLC's Lua gives an extension no timer and no background work, and VLSub
-stops when its window is closed. That shapes everything below.
+stops when its window is closed. So:
 
-**Knowing that a film was watched with a subtitle.** When VLSub loads a
-subtitle it writes a small record next to its settings: subtitle id, file
-id, title, language, the video's hash and length, the time. While VLSub is
-open, VLC tells it when the playing item changes or stops; at that moment,
-and whenever its window is opened, it reads the play position if the same
-video is still loaded and otherwise uses the time since loading. Watched =
-at least 70% of the film's length (same idea as the Kodi addon's 30% / 80%
-rules, with one number).
+- **Knowing a film was watched with a subtitle.** When VLSub loads a
+  subtitle it notes: subtitle id, file id, SHA-1 of the saved file, the
+  video's hash and length, the time. When VLC reports that the playing item
+  changed, and whenever the VLSub window is opened, it reads the play
+  position (or, if the video is gone, the time since loading). Watched = 70%
+  of the length.
+- **Asking.** No pop-up over the film. The next time the VLSub window is
+  opened, one extra line:
 
-**Asking.** Not a pop-up over the film. The next time the VLSub window is
-opened and a watched, unrated subtitle is on record, the main window shows
-one extra line:
+  ```
+  You watched "Coherence" with these subtitles - how were they?
+  [ ★★★★☆ Good ▾ ]  Sync: [ Good ▾ ]   [ Send ]  [ Report a problem ]  [ Not now ]
+  ```
 
-```
-You watched "Coherence" with these subtitles - how were they?
-[ ★★★★☆ Good ▾ ]  Sync: [ Good ▾ ]   [ Send ]  [ Report a problem ]  [ Not now ]
-```
+  Send = one request (3.1) with rating, sync, video hash, watched ratio,
+  and the subtitle delay set in VLC (3.2). "Report a problem" lists the
+  reasons of 3.3 with an optional line of text. Asked once per subtitle;
+  "Not now" three times, or the setting off, ends it.
+- **A subtitle from disk.** "Rate the loaded subtitle" works for any
+  subtitle file through its `sha1`; when the server does not know the hash,
+  VLSub says so.
+- **Showing.** Search rows show the rating that already arrives
+  (`★ 8.2 (131)`) and the user's own. A "Comments" button lists the last
+  few for the selected row.
+- **Never:** anything sent without the click on Send; local files without a
+  known hash; previews of AI translations; users who are not logged in.
 
-- one click on Send: rating + sync + hash + watched ratio in one request (1);
-- "Report a problem" opens the list of reasons (2) with an optional line of
-  text;
-- "Not now" asks again next time; after the third "Not now", or with the
-  setting off, never for that subtitle;
-- a subtitle is asked about once; the answer is remembered locally and, with
-  `your_rating` from the API, across devices.
+## 7. Open questions for the API team
 
-**Settings.** "Ask me to rate subtitles after watching: Yes / No" in the
-filters / configuration window, default Yes; nothing is ever sent without
-the click on Send.
-
-**Not for:** subtitles the user loaded from disk (no id), previews of AI
-translations, a film that was not watched far enough, a user who is not
-logged in (the line then says that rating needs a login).
-
-**What is sent:** only what the request above shows. No titles, no file
-names, no paths.
-
-**Showing ratings.** Search rows would show the rating that already arrives
-(`★ 8.2 (131)`), and the user's own rating when the API returns it.
-
-**Comments.** A "Comments" button for the selected search row that lists the
-last few; writing one from VLC only if asked for.
-
-**Cost.** Roughly 15 new texts in 61 languages, one new record file, one
-extra row in the main window that appears only when there is something to
-rate.
+1. Is `POST /subtitles/rate` (Kodi's contract) final, or can the richer
+   `PUT /subtitles/rating` replace it, with the old one as an alias?
+2. Which file hash does the database have today (MD5 from `CheckSubHash`?),
+   and of which bytes - the stored file, or what `/download` serves after
+   conversion (`sub_format`, encoding)?
+3. Is a normalised hash acceptable, and who writes its exact rule?
+4. Should ratings from players count more than anonymous website clicks
+   (they come with `watched_ratio` and a video hash)?
+5. Reports: who sees them - moderators only, or the uploader too?
