@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Help window: a section about AI translation; the whole window is shorter and in plainer words.
 
 ### Changed
+- "Check Updates" moved from the configuration window to the help window. Updates are still checked automatically once a day.
 - Version 2.0.0: the API offers AI on-demand entries to this version only.
 - **Credits are spent by the Download button only.** A download the extension starts by itself (two media-change events in a row on a selected entry) skips AI on-demand entries.
 - While any request waits, VLC is told the extension is alive, so it no longer offers to kill it after 10 seconds.

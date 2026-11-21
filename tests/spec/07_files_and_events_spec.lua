@@ -285,3 +285,61 @@ describe("update check", function()
     ok(env.ui():_button("Search$"))
   end)
 end)
+
+
+-- Updates are checked by themselves once a day at start. The button for
+-- "check right now" moved from the configuration window (which was full)
+-- to the help window.
+describe("Check Updates button", function()
+  local api = H.fake_api
+  local RELEASE = "GET api.github.com/repos/opensubtitles/vlsub-opensubtitles-com/releases/latest"
+
+  local function has_button(d, pattern)
+    for _, w in ipairs(d.widgets) do
+      if w.kind == "button" and w.text:find(pattern) then return true end
+    end
+    return false
+  end
+
+  it("is not in the configuration window, which keeps Save, Help and Close", function()
+    local env = H.launch()
+    trigger_menu(2)
+    ok(not has_button(env.ui(), "Check Updates"), "no Check Updates button")
+    ok(has_button(env.ui(), "Save$") and has_button(env.ui(), "Help$") and has_button(env.ui(), "Close$"))
+  end)
+
+  it("in the help window: nothing newer -> the help window says so", function()
+    local env = H.launch()
+    trigger_menu(3)
+    env.server:reset()
+    env.ui():_button("Check Updates"):_click()
+    eq(#env.server:seen(RELEASE), 1, "asked even though today's automatic check is done")
+    has(env.ui().title, "Help")
+    local said
+    for _, w in ipairs(env.ui().widgets) do
+      if w.kind == "label" and w.text:find("latest version", 1, true) then said = w.text end
+    end
+    ok(said, "message shown in the help window")
+    eq(env.errors(), {})
+  end)
+
+  it("in the help window: a newer release -> the update window opens", function()
+    local env = H.launch()
+    trigger_menu(3)
+    env.server:on(RELEASE, function()
+      return api.response(200, { tag_name = "v99.0.0", name = "v99.0.0", body = "- fixes",
+        html_url = "https://github.com/opensubtitles/vlsub-opensubtitles-com/releases", assets = {} })
+    end)
+    env.ui():_button("Check Updates"):_click()
+    has(env.ui().title, "Update Available")
+    has(env.ui().title, "99.0.0")
+  end)
+
+  it("help window still closes back to where it was opened from", function()
+    local env = H.launch()
+    trigger_menu(2)
+    env.ui():_button("Help$"):_click()
+    env.ui():_button("Close$"):_click()
+    has(env.ui().title, "Configuration")
+  end)
+end)

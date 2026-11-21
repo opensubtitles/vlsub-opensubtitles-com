@@ -724,7 +724,7 @@ describe("interface language: VLC for macOS", function()
           lines = lines + 1 + select(2, item.shown:gsub("<br>", ""))
         end
       end
-      ok(labels_count <= 14, language.code .. ": " .. labels_count .. " rows")
+      ok(labels_count <= 15, language.code .. ": " .. labels_count .. " rows") -- 14 lines and the message line
       if lines > worst then worst, worst_code = lines, language.code end
     end
     ok(worst <= 26, "tallest help window: " .. worst .. " text lines (" .. tostring(worst_code) .. ")")

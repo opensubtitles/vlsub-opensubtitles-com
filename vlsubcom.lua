@@ -2083,9 +2083,8 @@ function interface_config()
     function() show_help("config") end,
     2, 13, 1, 1)
 
-  dlg:add_button(
-    strings.ui_check_updates,
-    function() check_for_updates(true) end, 3, 13, 1, 1)
+  -- ("Check Updates" lives in the help window: updates are checked once a
+  -- day by themselves, the button is only for "check right now")
 
   dlg:add_button(
     "❌ " .. lang["int_close"],
@@ -2153,6 +2152,11 @@ function interface_help()
     dlg:add_label(line(text), 1, row, 6, 1)
   end
 
+  -- the answer of "Check Updates" when there is nothing newer
+  input_table["message"] = dlg:add_label("", 1, #rows + 1, 6, 1)
+  dlg:add_button(strings.ui_check_updates,
+    function() check_for_updates(true) end, 1, #rows + 2, 2, 1)
+
   dlg:add_button(strings.ui_close,
     function()
       if previous_window == "config" then
@@ -2161,7 +2165,7 @@ function interface_help()
         show_main()
       end
     end,
-    3, #rows + 1, 2, 1)
+    5, #rows + 2, 2, 1)
 end
 
 
