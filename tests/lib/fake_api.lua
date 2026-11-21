@@ -248,6 +248,12 @@ function M.new(opts)
         checkout_url = "https://ai.opensubtitles.com/assets/buy_credits.php?tag=EXAMPLE&choice=5-usd-500-credits" },
       { name = "1100 credits", value = "10 USD", discount_percent = 10,
         checkout_url = "https://ai.opensubtitles.com/assets/buy_credits.php?tag=EXAMPLE&choice=10-usd-1100-credits" },
+      { name = "5750 credits", value = "50 USD", discount_percent = 15,
+        checkout_url = "https://ai.opensubtitles.com/assets/buy_credits.php?tag=EXAMPLE&choice=50-usd-5750-credits" },
+      { name = "18000 credits", value = "150 USD", discount_percent = 20,
+        checkout_url = "https://ai.opensubtitles.com/assets/buy_credits.php?tag=EXAMPLE&choice=150-usd-18000-credits" },
+      { name = "39000 credits", value = "300 USD", discount_percent = 30,
+        checkout_url = "https://ai.opensubtitles.com/assets/buy_credits.php?tag=EXAMPLE&choice=300-usd-39000-credits" },
     } })
   end))
 

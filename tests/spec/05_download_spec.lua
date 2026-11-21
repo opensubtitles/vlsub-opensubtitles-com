@@ -371,6 +371,23 @@ H.describe("AI on-demand entry (recorded search answer)", function()
     eq(#env.server:seen("GET api.opensubtitles.com/api/v1/ai/credits"), 2, "the balance and the packages")
   end)
 
+  it("balance and every package fit the three message lines: three packages per line", function()
+    -- (one long line was cut off at the edge of the window on macOS, hiding
+    -- the larger packages)
+    local env = H.launch()
+    trigger_menu(2)
+    env.ui():_button("Show balance"):_click()
+    local lines = {}
+    for part in (env.message() .. "<br>"):gmatch("(.-)<br>") do lines[#lines + 1] = part end
+    eq(#lines, 3, env.message())
+    has(lines[1], "AI credits: 2019")
+    has(lines[1], "Buy AI credits:")
+    eq(select(2, lines[1]:gsub("<a ", "")), 0, "no package on the first line")
+    eq(select(2, lines[2]:gsub("<a ", "")), 3)
+    eq(select(2, lines[3]:gsub("<a ", "")), 2)
+    has(lines[3], "39000 credits - 300 USD") -- all five the API offers
+  end)
+
   it("opening the configuration window asks the server nothing about credits", function()
     local env = H.launch()
     env.server:reset()

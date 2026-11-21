@@ -5253,7 +5253,7 @@ local function ai_buy_links()
     local url = type(offer) == "table" and offer.checkout_url
     -- only a plain https address of opensubtitles.com is made clickable
     if type(url) == "string" and string.match(url, "^https://[%w%.%-]*opensubtitles%.com/[%w%-%._~:/%?#%[%]@!%$&%(%)%*%+,;=%%]*$")
-       and not string.find(url, "'", 1, true) and #links < 4 then
+       and not string.find(url, "'", 1, true) and #links < 6 then
       local label = tostring(offer.name or "") .. " - " .. tostring(offer.value or "")
       label = string.gsub(label, "[<>&]", "")
       links[#links + 1] = "<a href='" .. url .. "'>" .. label .. "</a>"
@@ -5262,7 +5262,17 @@ local function ai_buy_links()
   if #links == 0 then
     return ""
   end
-  return strings.ui_ai_buy_credits .. " " .. table.concat(links, " &nbsp;|&nbsp; ")
+  -- three packages per line (that much fits; one long line was cut off at
+  -- the window's edge - macOS does not widen a window for its message)
+  local rows = {}
+  for i = 1, #links, 3 do
+    local row = links[i]
+    for j = i + 1, math.min(i + 2, #links) do
+      row = row .. " &nbsp;|&nbsp; " .. links[j]
+    end
+    rows[#rows + 1] = row
+  end
+  return strings.ui_ai_buy_credits .. "<br>" .. table.concat(rows, "<br>")
 end
 
 -- Button of the configuration window: balance and where to buy more.
@@ -5276,10 +5286,12 @@ function show_ai_credits()
     setMessage(error_tag(strings.ui_ai_credits_unavailable))
     return
   end
+  -- three lines, the room the configuration window keeps for its message:
+  -- "AI credits: 394 - Buy AI credits:" and two lines of packages
   local message = "<b>" .. tr("ui_ai_credits_balance", tostring(credits)) .. "</b>"
   local links = ai_buy_links()
   if links ~= "" then
-    message = message .. "<br>" .. links
+    message = message .. " &nbsp;-&nbsp; " .. links
   end
   setMessage(message)
 end
