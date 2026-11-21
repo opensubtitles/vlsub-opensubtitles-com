@@ -62,7 +62,7 @@
   "ui_ai_on_demand":"AI translation kapag hiniling (gumagamit ng AI credits)",
   "ui_ai_on_demand_from":"AI translation mula sa %s (gumagamit ng AI credits)",
   "ui_ai_preview_only":"Preview lang ito: kulang ang AI credits ng iyong account para sa buong translation (mayroon kang %s).",
-  "ui_ai_show_credits":"🤖 Ipakita ang balanse / bumili",
+  "ui_ai_show_credits":"🤖 AI credits: balanse / bumili",
   "ui_ai_still_translating":"Ginagawa ang AI translation: %s s (mga 20 s ang isang buong pelikula; hindi tumutugon ang window na ito habang ginagawa)",
   "ui_ai_translations":"Mga AI translation",
   "ui_all_tests_passed_auto_closing_in_3":"Pumasa ang lahat ng test - kusang magsasara sa loob ng 3 segundo...",

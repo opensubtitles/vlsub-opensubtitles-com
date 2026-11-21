@@ -62,7 +62,7 @@
   "ui_ai_on_demand":"AI-oversættelse efter behov (bruger AI-kreditter)",
   "ui_ai_on_demand_from":"AI-oversættelse fra %s (bruger AI-kreditter)",
   "ui_ai_preview_only":"Dette er kun en forhåndsvisning: din konto har ikke nok AI-kreditter til hele oversættelsen (du har %s).",
-  "ui_ai_show_credits":"🤖 Vis saldo / køb",
+  "ui_ai_show_credits":"🤖 AI-kreditter: saldo / køb",
   "ui_ai_still_translating":"AI-oversættelsen laves: %s s (en hel film tager ca. 20 s; dette vindue svarer ikke imens)",
   "ui_ai_translations":"AI-oversættelser",
   "ui_all_tests_passed_auto_closing_in_3":"Alle test bestået - lukker automatisk om 3 sekunder...",

@@ -62,7 +62,7 @@
   "ui_ai_on_demand":"按需 AI 翻译 (消耗 AI 点数)",
   "ui_ai_on_demand_from":"AI 翻译，源语言 %s (消耗 AI 点数)",
   "ui_ai_preview_only":"这只是预览: 您的帐户 AI 点数不足，无法获取完整翻译 (当前有 %s)。",
-  "ui_ai_show_credits":"🤖 查看余额 / 购买",
+  "ui_ai_show_credits":"🤖 AI 点数: 余额 / 购买",
   "ui_ai_still_translating":"正在生成 AI 翻译: %s 秒 (整部影片约需 20 秒；期间此窗口不会响应)",
   "ui_ai_translations":"AI 翻译",
   "ui_all_tests_passed_auto_closing_in_3":"所有测试均已通过 - 3 秒后自动关闭...",

@@ -62,7 +62,7 @@
   "ui_ai_on_demand":"AA itzulpena eskatuta (AA kredituak gastatzen ditu)",
   "ui_ai_on_demand_from":"AA itzulpena, jatorria: %s (AA kredituak gastatzen ditu)",
   "ui_ai_preview_only":"Hau aurrebista bat baino ez da: zure kontuak ez du AA kreditu nahikorik itzulpen osorako (%s dituzu).",
-  "ui_ai_show_credits":"🤖 Erakutsi saldoa / erosi",
+  "ui_ai_show_credits":"🤖 AA kredituak: saldoa / erosi",
   "ui_ai_still_translating":"AA itzulpena egiten ari da: %s s (film oso batek 20 s inguru behar ditu; leiho honek ez du erantzuten bitartean)",
   "ui_ai_translations":"AA itzulpenak",
   "ui_all_tests_passed_auto_closing_in_3":"Proba guztiak gaindituta - leihoa 3 segundo barru itxiko da...",

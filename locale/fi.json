@@ -62,7 +62,7 @@
   "ui_ai_on_demand":"Tekoälykäännös pyynnöstä (kuluttaa tekoälykrediittejä)",
   "ui_ai_on_demand_from":"Tekoälykäännös kielestä %s (kuluttaa tekoälykrediittejä)",
   "ui_ai_preview_only":"Tämä on vain esikatselu: tililläsi ei ole tarpeeksi tekoälykrediittejä koko käännökseen (sinulla on %s).",
-  "ui_ai_show_credits":"🤖 Näytä saldo / osta",
+  "ui_ai_show_credits":"🤖 Tekoälykrediitit: saldo / osta",
   "ui_ai_still_translating":"Tekoälykäännöstä tehdään: %s s (koko elokuva vie noin 20 s; tämä ikkuna ei vastaa sillä välin)",
   "ui_ai_translations":"Tekoälykäännökset",
   "ui_all_tests_passed_auto_closing_in_3":"Kaikki testit läpäisty - ikkuna sulkeutuu 3 sekunnin kuluttua...",

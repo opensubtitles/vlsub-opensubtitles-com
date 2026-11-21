@@ -62,7 +62,7 @@
   "ui_ai_on_demand":"オンデマンドAI翻訳 (AIクレジットを使用)",
   "ui_ai_on_demand_from":"%s からAI翻訳 (AIクレジットを使用)",
   "ui_ai_preview_only":"これはプレビューのみです: アカウントのAIクレジットが完全な翻訳には足りません (残高: %s)。",
-  "ui_ai_show_credits":"🤖 残高を表示 / 購入",
+  "ui_ai_show_credits":"🤖 AIクレジット: 残高 / 購入",
   "ui_ai_still_translating":"AI翻訳を作成中: %s 秒 (映画1本で約20秒かかります。その間このウィンドウは応答しません)",
   "ui_ai_translations":"AI翻訳",
   "ui_all_tests_passed_auto_closing_in_3":"すべてのテストに合格しました - 3 秒後に自動的に閉じます...",

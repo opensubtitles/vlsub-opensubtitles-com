@@ -62,7 +62,7 @@
   "ui_ai_on_demand":"Terjemahan AI sesuai permintaan (memakai kredit AI)",
   "ui_ai_on_demand_from":"Terjemahan AI dari %s (memakai kredit AI)",
   "ui_ai_preview_only":"Ini hanya pratinjau: akun Anda tidak memiliki cukup kredit AI untuk terjemahan lengkap (Anda punya %s).",
-  "ui_ai_show_credits":"🤖 Lihat saldo / beli",
+  "ui_ai_show_credits":"🤖 Kredit AI: saldo / beli",
   "ui_ai_still_translating":"Terjemahan AI sedang dibuat: %s dtk (satu film utuh butuh sekitar 20 dtk; jendela ini tidak merespons untuk sementara)",
   "ui_ai_translations":"Terjemahan AI",
   "ui_all_tests_passed_auto_closing_in_3":"Semua pengujian lulus - menutup otomatis dalam 3 detik...",

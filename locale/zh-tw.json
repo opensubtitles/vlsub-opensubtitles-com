@@ -62,7 +62,7 @@
   "ui_ai_on_demand":"隨選 AI 翻譯 (使用 AI 點數)",
   "ui_ai_on_demand_from":"AI 翻譯，來源語言 %s (使用 AI 點數)",
   "ui_ai_preview_only":"這只是預覽: 您的帳號 AI 點數不足，無法取得完整翻譯 (目前有 %s)。",
-  "ui_ai_show_credits":"🤖 查看餘額 / 購買",
+  "ui_ai_show_credits":"🤖 AI 點數: 餘額 / 購買",
   "ui_ai_still_translating":"正在產生 AI 翻譯: %s 秒 (整部影片約需 20 秒；期間此視窗不會回應)",
   "ui_ai_translations":"AI 翻譯",
   "ui_all_tests_passed_auto_closing_in_3":"所有測試皆已通過 - 3 秒後自動關閉...",

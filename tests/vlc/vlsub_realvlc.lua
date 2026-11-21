@@ -333,7 +333,7 @@ if AI and USER and PASS then
   local on_demand
   step("AI: configuration window shows the AI credit balance", function()
     trigger_menu(2)
-    ui():_button("Show balance"):_click()
+    ui():_button("AI credits: balance"):_click()
     line("     message: " .. message():gsub("<[^>]+>", " "):gsub("tag=[%w%%%.%-_]+", "tag=<TAG>"))
     check(message():find("AI credits: %d+"), "no balance shown")
     if AI == "nocredits" then check(message():find("AI credits: 0"), "this account was expected to have 0 credits") end

@@ -62,7 +62,7 @@
   "ui_ai_on_demand":"KI-oversettelse på forespørsel (KI-kreditter)",
   "ui_ai_on_demand_from":"KI-oversettelse fra %s (KI-kreditter)",
   "ui_ai_preview_only":"Dette er bare en forhåndsvisning: kontoen din har ikke nok KI-kreditter til hele oversettelsen (du har %s).",
-  "ui_ai_show_credits":"🤖 Vis saldo / kjøp",
+  "ui_ai_show_credits":"🤖 KI-kreditter: saldo / kjøp",
   "ui_ai_still_translating":"KI-oversettelsen lages: %s s (en hel film tar omtrent 20 s; dette vinduet svarer ikke i mellomtiden)",
   "ui_ai_translations":"KI-oversettelser",
   "ui_all_tests_passed_auto_closing_in_3":"Alle tester bestått - lukkes automatisk om 3 sekunder...",

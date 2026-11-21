@@ -62,7 +62,7 @@
   "ui_ai_on_demand":"Traduccion IA a la demanda (crèdits IA)",
   "ui_ai_on_demand_from":"Traduccion IA dempuèi %s (crèdits IA)",
   "ui_ai_preview_only":"Aquò es sonque un apercebut: vòstre compte a pas pro de crèdits IA per la traduccion complèta (n'avètz %s).",
-  "ui_ai_show_credits":"🤖 Sòlde / crompar",
+  "ui_ai_show_credits":"🤖 Crèdits IA: sòlde / crompar",
   "ui_ai_still_translating":"La traduccion IA es en cors de creacion: %s s (un film entièr pren a l'entorn de 20 s; aquesta fenèstra respond pas d'aquel temps)",
   "ui_ai_translations":"Traduccions IA",
   "ui_all_tests_passed_auto_closing_in_3":"Totes los tèsts capitats - tampadura automatica dins 3 segondas...",

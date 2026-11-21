@@ -62,7 +62,7 @@
   "ui_ai_on_demand":"So'rov bo'yicha SI tarjimasi (SI kreditlari sarflanadi)",
   "ui_ai_on_demand_from":"SI tarjimasi, manba til: %s (SI kreditlari sarflanadi)",
   "ui_ai_preview_only":"Bu faqat namuna: hisobingizda to'liq tarjima uchun SI kreditlari yetarli emas (sizda %s bor).",
-  "ui_ai_show_credits":"🤖 Balans / sotib olish",
+  "ui_ai_show_credits":"🤖 SI kreditlari: balans / sotib olish",
   "ui_ai_still_translating":"SI tarjimasi tayyorlanmoqda: %s s (butun film taxminan 20 s oladi; bu vaqtda ushbu oyna javob bermaydi)",
   "ui_ai_translations":"SI tarjimalari",
   "ui_all_tests_passed_auto_closing_in_3":"Barcha testlar o'tdi - 3 soniyadan so'ng avtomatik yopiladi...",

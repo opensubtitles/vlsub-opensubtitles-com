@@ -62,7 +62,7 @@
   "ui_ai_on_demand":"Tafsiri ya AI kwa ombi (hutumia krediti za AI)",
   "ui_ai_on_demand_from":"Tafsiri ya AI kutoka %s (hutumia krediti za AI)",
   "ui_ai_preview_only":"Hiki ni kionjo tu: akaunti yako haina krediti za AI za kutosha kwa tafsiri kamili (una %s).",
-  "ui_ai_show_credits":"🤖 Onyesha salio / nunua",
+  "ui_ai_show_credits":"🤖 Krediti za AI: salio / nunua",
   "ui_ai_still_translating":"Tafsiri ya AI inatengenezwa: sekunde %s (filamu nzima huchukua takriban sekunde 20; dirisha hili halijibu wakati huo)",
   "ui_ai_translations":"Tafsiri za AI",
   "ui_all_tests_passed_auto_closing_in_3":"Majaribio yote yamefaulu - itajifunga baada ya sekunde 3...",

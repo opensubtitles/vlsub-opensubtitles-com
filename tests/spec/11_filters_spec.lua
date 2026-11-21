@@ -168,7 +168,7 @@ describe("search filters: AI translations off", function()
   it("the balance button stays in the configuration window", function()
     local env = H.launch({ config = { aiTranslations = false } })
     trigger_menu(2)
-    ok(env.ui():_button("Show balance"), "button present")
+    ok(env.ui():_button("AI credits: balance"), "button present")
   end)
 end)
 

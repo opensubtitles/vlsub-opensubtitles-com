@@ -29,6 +29,14 @@
 
 local M = {}
 M.unsafe_closes = {} -- see dialog hide(): windows closed while a label update was pending (macOS)
+-- VLC offers to kill an extension that has not returned or called
+-- vlc.keep_alive() for 10 s ("Extension not responding!"). A blocking call
+-- cannot call anything, so one that lasts 10 s or more always trips it.
+M.not_responding = {} -- what was blocking, each time the dialog would have appeared
+function M.blocked(seconds, what)
+  if M.wait then M.wait(seconds) end
+  if seconds >= 10 then M.not_responding[#M.not_responding + 1] = what end
+end
 local real_popen = io.popen -- tests may replace io.popen for the extension
 
 -- ------------------------------------------------------------ namespaces --
@@ -527,7 +535,7 @@ function M.new(opts)
       if not server or not server:resolve(host, port) then
         -- a dead network is not refused at once: VLC blocks until the system
         -- gives up (server.blocks_for seconds, when a test sets it)
-        if server and server.blocks_for and M.wait then M.wait(server.blocks_for) end
+        if server and server.blocks_for then M.blocked(server.blocks_for, "connect " .. host) end
         conns[fd] = { host = host, port = port, dead = true, open = false }
         vlc._failed_connects = vlc._failed_connects + 1
         return fd
@@ -648,8 +656,13 @@ function M.new(opts)
       while true do
         local u = url_parse(url)
         local port = (u.port ~= 0 and u.port) or (u.protocol == "https" and 443 or 80)
+        -- https on a bad connection: vlc.stream sits there, whether it
+        -- succeeds in the end or not (server.https_stalls_for seconds)
+        if server.https_stalls_for and u.protocol == "https" then
+          M.blocked(server.https_stalls_for, "vlc.stream " .. u.host)
+        end
         if not server:resolve(u.host, port) then
-          if server.blocks_for and M.wait then M.wait(server.blocks_for) end
+          if server.blocks_for then M.blocked(server.blocks_for, "vlc.stream " .. u.host) end
           vlc._failed_streams = (vlc._failed_streams or 0) + 1
           return nil, "Error when opening stream"
         end

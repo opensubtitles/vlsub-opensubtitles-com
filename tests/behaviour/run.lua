@@ -90,6 +90,12 @@ EXCEPTIONS[7] = {
      .. "offers only to 2.x User-Agents are marked and paid with credits. Nothing else "
      .. "may change: the row is left out of the comparison.",
 }
+EXCEPTIONS[8] = {
+  name = "first-run network test asks the API only",
+  why = "bug fix: the test began with https://www.google.com through vlc.stream, which cannot "
+     .. "be timed out; on a bad connection VLC offered to kill the extension. The requests of "
+     .. "the network test (google.com, httpbin.org, the API's root) are not compared.",
+}
 local DROP_CONFIG_KEYS = EXCEPTIONS[2].drop_config_keys
 DROP_CONFIG_KEYS.interfaceLanguage = true
 DROP_CONFIG_KEYS.detectedLanguage = true
@@ -102,6 +108,13 @@ local LOCALE_REQUEST = "raw.githubusercontent.com/opensubtitles/vlsub-opensubtit
 -- exception 7: requests about AI credits, and the balance in the Save message
 local function is_ai_request(text)
   return text:find("/api/v1/ai/", 1, true) ~= nil
+end
+
+-- exception 8: the first-run network test. v1.4.0 asked https://www.google.com
+-- (then the API, then httpbin.org); 2.0 asks the API only, over plain HTTP.
+local function is_network_test(text)
+  return text:find("www.google.com", 1, true) ~= nil or text:find("httpbin.org", 1, true) ~= nil
+      or text:find("api%.opensubtitles%.com:?%d*/?$") ~= nil
 end
 
 local function is_locale_request(text)
@@ -176,7 +189,8 @@ local function snapshot(env, norm, cursor)
   snap.requests = {}
   for i = cursor.requests + 1, #env.server.requests do
     local r = env.server.requests[i]
-    if not is_locale_request(r.host .. r.path) and not is_ai_request(r.host .. r.path) then
+    if not is_locale_request(r.host .. r.path) and not is_ai_request(r.host .. r.path)
+       and not is_network_test(r.host .. r.path) then
     local headers = {}
     for _, h in ipairs(r.header_list) do headers[#headers + 1] = h[1] .. ": " .. h[2] end
     table.sort(headers) -- custom headers are emitted in table order, which is not behaviour
@@ -280,7 +294,8 @@ local function snapshot(env, norm, cursor)
     for _, pattern in ipairs(EXCEPTIONS[5].log_lines) do
       if l.msg:find(pattern) then unreachable = true end
     end
-    if l.level ~= "dbg" and not is_locale_request(l.msg) and not is_ai_request(l.msg) and not unreachable then
+    if l.level ~= "dbg" and not is_locale_request(l.msg) and not is_ai_request(l.msg) and not unreachable
+       and not is_network_test(l.msg) then
       snap.log[#snap.log + 1] = l.level .. " " .. norm(l.msg)
     end
   end
@@ -421,5 +436,6 @@ print(string.format("\n%d sessions, %d steps compared on %s: %d identical, %d di
 -- which has them all, so their rules no longer hide anything; they stay for
 -- comparing against an older script (CANDIDATE / baseline swapped by hand).
 print("baseline: v" .. tostring((H.read_file(BASELINE) or ""):match('local app_version = "([^"]+)"'))
-  .. "   agreed exceptions: " .. EXCEPTIONS[1].name .. "; " .. EXCEPTIONS[7].name)
+  .. "   agreed exceptions: " .. EXCEPTIONS[1].name .. "; " .. EXCEPTIONS[7].name
+  .. "; " .. EXCEPTIONS[8].name)
 os.exit(failed == 0 and 0 or 1)

@@ -62,7 +62,7 @@
   "ui_ai_on_demand":"AI překlad na vyžádání (za AI kredity)",
   "ui_ai_on_demand_from":"AI překlad z jazyka %s (za AI kredity)",
   "ui_ai_preview_only":"Toto je pouze ukázka: na účtu nemáte dost AI kreditů na celý překlad (máte %s).",
-  "ui_ai_show_credits":"🤖 Zobrazit stav / koupit",
+  "ui_ai_show_credits":"🤖 AI kredity: stav / koupit",
   "ui_ai_still_translating":"Vytváří se AI překlad: %s s (celý film trvá asi 20 s; toto okno mezitím nereaguje)",
   "ui_ai_translations":"AI překlady",
   "ui_all_tests_passed_auto_closing_in_3":"Všechny testy proběhly úspěšně - okno se zavře za 3 sekundy...",

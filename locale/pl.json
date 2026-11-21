@@ -62,7 +62,7 @@
   "ui_ai_on_demand":"Tłumaczenie AI na żądanie (zużywa kredyty AI)",
   "ui_ai_on_demand_from":"Tłumaczenie AI z: %s (zużywa kredyty AI)",
   "ui_ai_preview_only":"To tylko podgląd: na koncie nie ma wystarczającej liczby kredytów AI na pełne tłumaczenie (masz: %s).",
-  "ui_ai_show_credits":"🤖 Pokaż saldo / kup",
+  "ui_ai_show_credits":"🤖 Kredyty AI: saldo / kup",
   "ui_ai_still_translating":"Trwa tworzenie tłumaczenia AI: %s s (cały film zajmuje około 20 s; w tym czasie to okno nie odpowiada)",
   "ui_ai_translations":"Tłumaczenia AI",
   "ui_all_tests_passed_auto_closing_in_3":"Wszystkie testy zakończone pomyślnie - okno zamknie się za 3 sekundy...",

@@ -62,7 +62,7 @@
   "ui_ai_on_demand":"Gervigreindarþýðing eftir pöntun (notar gervigreindarinneign)",
   "ui_ai_on_demand_from":"Gervigreindarþýðing úr %s (notar gervigreindarinneign)",
   "ui_ai_preview_only":"Þetta er aðeins sýnishorn: aðgangurinn þinn á ekki næga gervigreindarinneign fyrir alla þýðinguna (þú átt %s).",
-  "ui_ai_show_credits":"🤖 Sýna stöðu / kaupa",
+  "ui_ai_show_credits":"🤖 Gervigreindarinneign: staða / kaupa",
   "ui_ai_still_translating":"Gervigreindarþýðing í vinnslu: %s sek. (heil kvikmynd tekur um 20 sek.; þessi gluggi svarar ekki á meðan)",
   "ui_ai_translations":"Gervigreindarþýðingar",
   "ui_all_tests_passed_auto_closing_in_3":"Allar prófanir tókust - glugginn lokast eftir 3 sekúndur...",

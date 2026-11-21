@@ -178,3 +178,24 @@ unresponsive for 20 s (the player itself keeps playing). What helps:
 - The window is repainted on `dlg:update()` even in the middle of a
   callback, so a message can count the seconds
   (`client:set_on_wait(fn)`).
+
+## "Extension not responding!" (VLC's watchdog)
+
+VLC shows that dialog, with a button to kill the extension, when a callback
+has neither returned nor called `vlc.keep_alive()` for 10 seconds.
+
+- Plain HTTP goes through `socket_exchange`, which calls `vlc.keep_alive()`
+  once a second while it waits and has a deadline: safe.
+- `vlc.net.connect_tcp` itself blocks while the system looks the name up and
+  connects (VLC's own limit: about 5 s). Nothing can be called meanwhile.
+- **`vlc.stream` (every https request) blocks for as long as VLC likes** and
+  cannot call anything. On a bad connection it stalls for longer than 10 s
+  and the dialog appears. So: nothing that must work goes through
+  `vlc.stream`; the first-run network test asks the API over plain HTTP
+  (it used to start with `https://www.google.com`), and when that answer is
+  slow (4 s or more) the optional https fetches of that start - interface
+  translations, update check - are skipped.
+
+The test mock records every blocking call of 10 s or more
+(`env.not_responding()`); `server.https_stalls_for`, `server.blocks_for` and
+`server.holds_for` play a bad connection.

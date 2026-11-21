@@ -62,7 +62,7 @@
   "ui_ai_on_demand":"주문형 AI 번역 (AI 크레딧 사용)",
   "ui_ai_on_demand_from":"%s에서 AI 번역 (AI 크레딧 사용)",
   "ui_ai_preview_only":"미리보기일 뿐입니다: 계정에 전체 번역에 필요한 AI 크레딧이 부족합니다 (보유: %s).",
-  "ui_ai_show_credits":"🤖 잔액 보기 / 구매",
+  "ui_ai_show_credits":"🤖 AI 크레딧: 잔액 / 구매",
   "ui_ai_still_translating":"AI 번역 생성 중: %s초 (영화 한 편에 약 20초가 걸리며, 그동안 이 창은 응답하지 않습니다)",
   "ui_ai_translations":"AI 번역",
   "ui_all_tests_passed_auto_closing_in_3":"모든 테스트 통과 - 3초 후 자동으로 닫힙니다...",

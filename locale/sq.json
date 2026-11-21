@@ -62,7 +62,7 @@
   "ui_ai_on_demand":"Përkthim me IA sipas kërkesës (përdor kredite IA)",
   "ui_ai_on_demand_from":"Përkthim me IA nga %s (përdor kredite IA)",
   "ui_ai_preview_only":"Kjo është vetëm një pamje paraprake: llogaria juaj nuk ka mjaftueshëm kredite IA për përkthimin e plotë (keni %s).",
-  "ui_ai_show_credits":"🤖 Shfaq gjendjen / bli",
+  "ui_ai_show_credits":"🤖 Kredite IA: gjendja / bli",
   "ui_ai_still_translating":"Përkthimi me IA po krijohet: %s s (një film i plotë kërkon rreth 20 s; kjo dritare nuk përgjigjet ndërkohë)",
   "ui_ai_translations":"Përkthime me IA",
   "ui_all_tests_passed_auto_closing_in_3":"Të gjitha provat kaluan - dritarja mbyllet pas 3 sekondash...",

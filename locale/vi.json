@@ -62,7 +62,7 @@
   "ui_ai_on_demand":"Bản dịch AI theo yêu cầu (dùng tín dụng AI)",
   "ui_ai_on_demand_from":"Bản dịch AI từ %s (dùng tín dụng AI)",
   "ui_ai_preview_only":"Đây chỉ là bản xem trước: tài khoản của bạn không đủ tín dụng AI cho bản dịch đầy đủ (bạn có %s).",
-  "ui_ai_show_credits":"🤖 Xem số dư / mua",
+  "ui_ai_show_credits":"🤖 Tín dụng AI: số dư / mua",
   "ui_ai_still_translating":"Đang tạo bản dịch AI: %s giây (cả bộ phim mất khoảng 20 giây; trong lúc đó cửa sổ này không phản hồi)",
   "ui_ai_translations":"Bản dịch AI",
   "ui_all_tests_passed_auto_closing_in_3":"Mọi kiểm tra đều đạt - tự đóng sau 3 giây...",

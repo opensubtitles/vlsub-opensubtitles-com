@@ -62,7 +62,7 @@
   "ui_ai_on_demand":"KI-Übersetzung auf Abruf (kostet KI-Guthaben)",
   "ui_ai_on_demand_from":"KI-Übersetzung aus %s (kostet KI-Guthaben)",
   "ui_ai_preview_only":"Dies ist nur eine Vorschau: Ihr Konto hat nicht genug KI-Guthaben für die vollständige Übersetzung (Sie haben %s).",
-  "ui_ai_show_credits":"🤖 Guthaben anzeigen / kaufen",
+  "ui_ai_show_credits":"🤖 KI-Guthaben: anzeigen / kaufen",
   "ui_ai_still_translating":"Die KI-Übersetzung wird erstellt: %s s (ein ganzer Film dauert etwa 20 s; dieses Fenster reagiert währenddessen nicht)",
   "ui_ai_translations":"KI-Übersetzungen",
   "ui_all_tests_passed_auto_closing_in_3":"Alle Tests bestanden - Fenster schließt sich in 3 Sekunden...",

@@ -62,7 +62,7 @@
   "ui_ai_on_demand":"AI-vertaling op aanvraag (kost AI-credits)",
   "ui_ai_on_demand_from":"AI-vertaling uit %s (kost AI-credits)",
   "ui_ai_preview_only":"Dit is slechts een voorbeeld: je account heeft niet genoeg AI-credits voor de volledige vertaling (je hebt er %s).",
-  "ui_ai_show_credits":"🤖 Saldo tonen / kopen",
+  "ui_ai_show_credits":"🤖 AI-credits: saldo / kopen",
   "ui_ai_still_translating":"De AI-vertaling wordt gemaakt: %s s (een hele film duurt ongeveer 20 s; dit venster reageert ondertussen niet)",
   "ui_ai_translations":"AI-vertalingen",
   "ui_all_tests_passed_auto_closing_in_3":"Alle tests geslaagd - venster sluit over 3 seconden...",

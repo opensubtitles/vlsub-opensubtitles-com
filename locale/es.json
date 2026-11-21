@@ -62,7 +62,7 @@
   "ui_ai_on_demand":"Traducción por IA a petición (usa créditos de IA)",
   "ui_ai_on_demand_from":"Traducción por IA desde %s (usa créditos de IA)",
   "ui_ai_preview_only":"Esto es solo una vista previa: su cuenta no tiene suficientes créditos de IA para la traducción completa (tiene %s).",
-  "ui_ai_show_credits":"🤖 Ver saldo / comprar",
+  "ui_ai_show_credits":"🤖 Créditos de IA: saldo / comprar",
   "ui_ai_still_translating":"Se está creando la traducción por IA: %s s (una película entera tarda unos 20 s; esta ventana no responde mientras tanto)",
   "ui_ai_translations":"Traducciones por IA",
   "ui_all_tests_passed_auto_closing_in_3":"Todas las pruebas superadas - cierre automático en 3 segundos...",

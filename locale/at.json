@@ -62,7 +62,7 @@
   "ui_ai_on_demand":"Traducción por IA baxo demanda (usa créditos d'IA)",
   "ui_ai_on_demand_from":"Traducción por IA dende %s (usa créditos d'IA)",
   "ui_ai_preview_only":"Esto ye namás una vista previa: la to cuenta nun tien abondos créditos d'IA pa la traducción completa (tienes %s).",
-  "ui_ai_show_credits":"🤖 Amosar saldu / mercar",
+  "ui_ai_show_credits":"🤖 Créditos d'IA: saldu / mercar",
   "ui_ai_still_translating":"Ta faciéndose la traducción por IA: %s s (una película entera tarda unos 20 s; esta ventana nun respuende mentanto)",
   "ui_ai_translations":"Traducciones por IA",
   "ui_all_tests_passed_auto_closing_in_3":"Toles pruebes pasaron - zarramientu automáticu en 3 segundos...",

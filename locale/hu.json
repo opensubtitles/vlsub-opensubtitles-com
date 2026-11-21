@@ -62,7 +62,7 @@
   "ui_ai_on_demand":"MI-fordítás kérésre (MI-kreditekbe kerül)",
   "ui_ai_on_demand_from":"MI-fordítás ebből: %s (MI-kreditekbe kerül)",
   "ui_ai_preview_only":"Ez csak előnézet: a fiókjában nincs elég MI-kredit a teljes fordításhoz (egyenlege: %s).",
-  "ui_ai_show_credits":"🤖 Egyenleg / vásárlás",
+  "ui_ai_show_credits":"🤖 MI-kreditek: egyenleg / vásárlás",
   "ui_ai_still_translating":"Az MI-fordítás készül: %s mp (egy teljes film kb. 20 mp; ez az ablak közben nem válaszol)",
   "ui_ai_translations":"MI-fordítások",
   "ui_all_tests_passed_auto_closing_in_3":"Minden teszt sikeres - az ablak 3 másodperc múlva bezárul...",

@@ -340,3 +340,70 @@ H.describe("network down: the window is blocked once, not again and again", func
     eq(attempts(env), 1)
   end)
 end)
+
+
+-- "My bad internet connection causes this": on first run VLC showed
+-- "Extension not responding! Do you want to kill it now?" while the
+-- extension was still at its first step, "Testing: https://www.google.com".
+-- VLC shows that dialog when an extension neither returns nor calls
+-- vlc.keep_alive() for 10 s; an https request (vlc.stream) can do neither.
+H.describe("bad connection on first run: VLC is not made to offer killing the extension", function()
+  local it, eq, ok, has = H.it, H.eq, H.ok, H.has
+  local api = H.fake_api
+
+  local function first_run(prepare)
+    local server = api.new()
+    prepare(server)
+    local env = H.launch({ first_run = true, server = server, host_locale = "C",
+      env = { LANG = "en_US.UTF-8", LC_ALL = false, LANGUAGE = false },
+      popen = function(cmd) if cmd:find("uname") then return "Linux\n" end return "" end })
+    return env
+  end
+
+  local function https_requests(env)
+    local list = {}
+    for _, url in ipairs(env.vlc._streams) do
+      if url:find("^https://") then list[#list + 1] = url end
+    end
+    return list
+  end
+
+  it("the network test asks the API itself over plain HTTP - not google.com, not over https", function()
+    local env = first_run(function() end)
+    eq(#env.server:seen("GET www.google.com/"), 0)
+    eq(#env.server:seen("GET httpbin.org/"), 0)
+    ok(env.server:last("GET api.opensubtitles.com/"), "API asked")
+    eq(env.server:last("GET api.opensubtitles.com/").scheme, "http")
+    eq(env.not_responding(), {})
+  end)
+
+  it("slow network (answers take 6 s, https would stall 40 s): no https request at start, no dialog, window opens", function()
+    local env = first_run(function(server)
+      server.holds_for = 6
+      server.https_stalls_for = 40
+    end)
+    eq(https_requests(env), {}, "optional https fetches skipped")
+    eq(env.not_responding(), {})
+    has(env.ui().title, "Configuration")
+    ok(env.vlc._keep_alives > 0, "VLC told the extension is alive while it waited")
+  end)
+
+  it("no network (a connection attempt gives up after 5 s): one attempt, no https, no dialog, offline start", function()
+    local env = first_run(function(server)
+      server.offline = true
+      server.blocks_for = 5
+      server.https_stalls_for = 40
+    end)
+    eq(env.vlc._failed_connects, 1, "connection attempts")
+    eq(https_requests(env), {})
+    eq(env.not_responding(), {})
+    ok(env.ui(), "a window is shown")
+  end)
+
+  it("the mock does report a 40 s https stall as 'not responding' (so the tests above mean something)", function()
+    local env = H.launch()
+    env.server.https_stalls_for = 40
+    env.vlc.stream("https://raw.githubusercontent.com/x")
+    eq(#env.not_responding(), 1)
+  end)
+end)

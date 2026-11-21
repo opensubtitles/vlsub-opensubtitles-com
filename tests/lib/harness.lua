@@ -192,6 +192,7 @@ function H.launch(o)
   o = o or {}
   local env = { home = H.tmpdir() }
   mock.unsafe_closes = {}
+  mock.not_responding = {}
   mock.wait = H.wait
   if o.macos then -- VLC's folder on macOS; the mock then renders labels as macOS does
     env.home = env.home .. "/Library/Application Support/org.videolan.vlc"
@@ -315,6 +316,8 @@ function H.launch(o)
   function env.errors() return env.vlc._messages("err") end
   -- macOS: windows closed in the click that had just changed one of their labels
   function env.unsafe_closes() return mock.unsafe_closes end
+  -- blocking calls that would have made VLC show "Extension not responding!"
+  function env.not_responding() return mock.not_responding end
 
   if o.activate ~= false then activate() end
   return env

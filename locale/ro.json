@@ -62,7 +62,7 @@
   "ui_ai_on_demand":"Traducere IA la cerere (consumă credite IA)",
   "ui_ai_on_demand_from":"Traducere IA din %s (consumă credite IA)",
   "ui_ai_preview_only":"Aceasta este doar o previzualizare: contul nu are suficiente credite IA pentru traducerea completă (aveți %s).",
-  "ui_ai_show_credits":"🤖 Sold / cumpără",
+  "ui_ai_show_credits":"🤖 Credite IA: sold / cumpără",
   "ui_ai_still_translating":"Traducerea IA este în lucru: %s s (un film întreg durează aproximativ 20 s; această fereastră nu răspunde între timp)",
   "ui_ai_translations":"Traduceri IA",
   "ui_all_tests_passed_auto_closing_in_3":"Toate testele au reușit - închidere automată în 3 secunde...",

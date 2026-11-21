@@ -62,7 +62,7 @@
   "ui_ai_on_demand":"Sifarişlə Sİ tərcüməsi (Sİ kreditləri işlədir)",
   "ui_ai_on_demand_from":"%s dilindən Sİ tərcüməsi (Sİ kreditləri işlədir)",
   "ui_ai_preview_only":"Bu, yalnız ön baxışdır: hesabınızda tam tərcümə üçün kifayət qədər Sİ krediti yoxdur (sizdə %s var).",
-  "ui_ai_show_credits":"🤖 Balansı göstər / al",
+  "ui_ai_show_credits":"🤖 Sİ kreditləri: balans / al",
   "ui_ai_still_translating":"Sİ tərcüməsi hazırlanır: %s san (bütöv film təxminən 20 san çəkir; bu müddətdə bu pəncərə cavab vermir)",
   "ui_ai_translations":"Sİ tərcümələri",
   "ui_all_tests_passed_auto_closing_in_3":"Bütün testlər keçdi - 3 saniyəyə avtomatik bağlanacaq...",

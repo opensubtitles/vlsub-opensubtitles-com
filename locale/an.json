@@ -62,7 +62,7 @@
   "ui_ai_on_demand":"Traducción per IA a demanda (fa servir creditos d'IA)",
   "ui_ai_on_demand_from":"Traducción per IA dende %s (fa servir creditos d'IA)",
   "ui_ai_preview_only":"Isto ye nomás una vista previa: a vuestra cuenta no tiene prous creditos d'IA pa la traducción completa (en tenez %s).",
-  "ui_ai_show_credits":"🤖 Amostrar saldo / crompar",
+  "ui_ai_show_credits":"🤖 Creditos d'IA: saldo / crompar",
   "ui_ai_still_translating":"Se ye fendo a traducción per IA: %s s (una pelicula entera tarda uns 20 s; esta finestra no responde mientres tanto)",
   "ui_ai_translations":"Traduccions per IA",
   "ui_all_tests_passed_auto_closing_in_3":"Todas as prebas superadas - zarre automatico en 3 segundos...",

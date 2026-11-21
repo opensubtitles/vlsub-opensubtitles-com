@@ -543,7 +543,7 @@ local strings = {
   ui_filters_saved = "Filters saved. They apply from the next search.",
   ui_filters_active = "Search filters are set - some subtitles may be hidden (Config, Search filters)",
   ui_back = "↩ Back",
-  ui_ai_show_credits = "🤖 Show balance / buy",
+  ui_ai_show_credits = "🤖 AI credits: balance / buy",
   ui_ai_credits_balance = "AI credits: %s",
   ui_ai_credits_login_first = "Log in to see your AI credits: enter username and password, then Save.",
   ui_ai_credits_unavailable = "The AI credit balance could not be read. Please try again later.",
@@ -1018,7 +1018,7 @@ function activate()
     -- detected one if there is one. The list is fetched even when the
     -- system language is English: otherwise the "Interface language"
     -- drop-down of this first window offers nothing but English.
-    if not networkTestsFailed then
+    if not networkTestsFailed and not networkSlow then
       pcall(refresh_interface_language)
     end
   end
@@ -1513,8 +1513,8 @@ end
 function check_for_updates(force_check)
 
   -- Don't check if no internet connection (unless forced)
-  if networkTestsFailed and not force_check then
-    dbg("Skipping update check - no internet connection")
+  if (networkTestsFailed or networkSlow) and not force_check then
+    dbg("Skipping update check - no or slow internet connection")
     return
   end
 
@@ -6726,39 +6726,46 @@ function get_downloads_folder()
 end
 
 
--- 1. FIXED: test_network_connectivity function - remove ping commands for Windows
+-- First run: can the API be reached?
+--
+-- Only the API itself is asked, over plain HTTP like every API request:
+-- that goes through the extension's own socket client, which has a deadline
+-- and tells VLC it is alive while it waits. (It used to ask
+-- https://www.google.com first. https goes through vlc.stream, which cannot
+-- be timed out: on a bad connection it sat there until VLC offered to kill
+-- the extension - "Extension not responding" - before the first window was
+-- even up.)
+--
+-- A reachable but slow network (the answer took 4 s or more) sets
+-- networkSlow: the optional https fetches of this start - list of interface
+-- translations, update check - are skipped then, because they cannot be
+-- timed out either.
+networkSlow = false
 function test_network_connectivity()
   update_debug_network(strings.ui_testing_network_connectivity)
 
-  -- For Windows, use only HTTP tests with VLC's built-in networking (no external commands)
-  local test_urls = {
-    "https://www.google.com",
-    "http://api.opensubtitles.com",
-    "https://httpbin.org/get"
-  }
+  local url = "http://api.opensubtitles.com"
+  update_debug_network(tr("ui_testing_connection_n_of", "1", "1"))
+  append_debug_log(tr("ui_testing", url))
 
-  for i, url in ipairs(test_urls) do
-    update_debug_network(tr("ui_testing_connection_n_of", tostring(i), tostring(#test_urls)))
-    append_debug_log(tr("ui_testing", url))
+  local test_client = Curl.new() -- This uses VLC's networking, not curl
+  test_client:set_aggressive_timeouts()
+  test_client:set_timeout(8)
+  test_client:set_deadline(8)
+  test_client:set_retries(0)
 
-    local test_client = Curl.new() -- This uses VLC's networking, not curl
-    test_client:set_aggressive_timeouts()
-    test_client:set_timeout(3)
-    test_client:set_retries(0)
+  local asked_at = os.time()
+  local start_time = os.clock()
+  local res = test_client:get(url)
+  local elapsed_ms = math.floor((os.clock() - start_time) * 1000)
+  networkSlow = (os.time() - asked_at) >= 4
 
-    local start_time = os.clock()
-    local res = test_client:get(url)
-    local end_time = os.clock()
-    local elapsed_ms = math.floor((end_time - start_time) * 1000)
-
-    if res and res.status and res.status >= 200 and res.status < 400 then
-      update_debug_network(tr("ui_connection_ok_ms", tostring(elapsed_ms)))
-      append_debug_log(tr("ui_network_test_passed_ms", url, tostring(elapsed_ms)))
-      return true
-    else
-      append_debug_log(tr("ui_network_test_failed_ms", url, tostring(elapsed_ms)))
-    end
+  if res and res.status and res.status >= 200 and res.status < 400 then
+    update_debug_network(tr("ui_connection_ok_ms", tostring(elapsed_ms)))
+    append_debug_log(tr("ui_network_test_passed_ms", url, tostring(elapsed_ms)))
+    return true
   end
+  append_debug_log(tr("ui_network_test_failed_ms", url, tostring(elapsed_ms)))
 
   update_debug_network(strings.ui_offline_mode_limited_functionality)
   append_debug_log(strings.ui_warning_no_internet_connection_detected)
@@ -7557,8 +7564,16 @@ function VLCHttpClient:_make_request_stream(method, url, data)
     local final_url = self:_build_url_params(url, data)
 
     -- Single attempt with aggressive timeout
+    -- vlc.stream cannot be timed out and nothing runs while it waits: at
+    -- least start it with VLC's 10 s "not responding" clock at zero
+    if vlc.keep_alive then
+        pcall(vlc.keep_alive)
+    end
     local asked_at = os.time()
     local stream = vlc.stream(final_url)
+    if vlc.keep_alive then
+        pcall(vlc.keep_alive)
+    end
     if not stream then
         -- nil is also an HTTP error status, which comes back quickly; a
         -- network that is down takes VLC several seconds to give up on

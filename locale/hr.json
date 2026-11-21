@@ -62,7 +62,7 @@
   "ui_ai_on_demand":"AI prijevod na zahtjev (troši AI kredite)",
   "ui_ai_on_demand_from":"AI prijevod s jezika %s (troši AI kredite)",
   "ui_ai_preview_only":"Ovo je samo pregled: vaš račun nema dovoljno AI kredita za cijeli prijevod (imate ih %s).",
-  "ui_ai_show_credits":"🤖 Prikaži stanje / kupi",
+  "ui_ai_show_credits":"🤖 AI krediti: stanje / kupi",
   "ui_ai_still_translating":"AI prijevod se izrađuje: %s s (cijeli film traje oko 20 s; ovaj prozor u međuvremenu ne reagira)",
   "ui_ai_translations":"AI prijevodi",
   "ui_all_tests_passed_auto_closing_in_3":"Sve su provjere uspješne - prozor se zatvara za 3 sekunde...",

@@ -62,7 +62,7 @@
   "ui_ai_on_demand":"İsteğe bağlı AI çevirisi (AI kredileri kullanır)",
   "ui_ai_on_demand_from":"%s dilinden AI çevirisi (AI kredileri kullanır)",
   "ui_ai_preview_only":"Bu yalnızca bir önizlemedir: hesabınızda çevirinin tamamı için yeterli AI kredileri yok (bakiyeniz: %s).",
-  "ui_ai_show_credits":"🤖 Bakiyeyi göster / satın al",
+  "ui_ai_show_credits":"🤖 AI kredileri: bakiye / satın al",
   "ui_ai_still_translating":"AI çevirisi hazırlanıyor: %s sn (bütün bir film yaklaşık 20 sn sürer; bu sırada bu pencere yanıt vermez)",
   "ui_ai_translations":"AI çevirileri",
   "ui_all_tests_passed_auto_closing_in_3":"Tüm testler başarılı - 3 saniye içinde otomatik kapanacak...",

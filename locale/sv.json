@@ -62,7 +62,7 @@
   "ui_ai_on_demand":"AI-översättning på begäran (använder AI-krediter)",
   "ui_ai_on_demand_from":"AI-översättning från %s (använder AI-krediter)",
   "ui_ai_preview_only":"Detta är bara en förhandsvisning: ditt konto har inte tillräckligt med AI-krediter för hela översättningen (du har %s).",
-  "ui_ai_show_credits":"🤖 Visa saldo / köp",
+  "ui_ai_show_credits":"🤖 AI-krediter: saldo / köp",
   "ui_ai_still_translating":"AI-översättningen skapas: %s s (en hel film tar cirka 20 s; det här fönstret svarar inte under tiden)",
   "ui_ai_translations":"AI-översättningar",
   "ui_all_tests_passed_auto_closing_in_3":"Alla tester godkända - stängs automatiskt om 3 sekunder...",
