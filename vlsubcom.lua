@@ -1977,7 +1977,11 @@ function interface_config()
   -- wide), so the fields line up under each other; the four buttons of the
   -- last row use columns 1 to 4.
   -- Row 1: OpenSubtitles username
-  dlg:add_label(lang["int_os_username"]..":", 1, 1, 1, 1)
+  -- "OpenSubtitles.com" in the label is a link to the site (where an account
+  -- is made); whatever the language, the name is written the same way
+  local username_label = string.gsub(lang["int_os_username"], "OpenSubtitles%.com",
+    "<a href='https://www.opensubtitles.com'>OpenSubtitles.com</a>", 1)
+  dlg:add_label(username_label..":", 1, 1, 1, 1)
   input_table['os_username'] = dlg:add_text_input(
     type(openSub.option.os_username) == "string"
     and openSub.option.os_username or "", 2, 1, 2, 1)

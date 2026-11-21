@@ -26,7 +26,8 @@ end
 local function labels(d)
   local out = {}
   for _, w in ipairs(d.widgets) do
-    if w.kind == "label" or w.kind == "button" then out[#out + 1] = w.text end
+    -- (links are not part of what a label says)
+    if w.kind == "label" or w.kind == "button" then out[#out + 1] = (w.text:gsub("</?a[^>]*>", "")) end
   end
   return table.concat(out, "\n")
 end

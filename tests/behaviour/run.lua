@@ -222,6 +222,8 @@ local function snapshot(env, norm, cursor)
         local col = (is_config and x.kind == "dropdown") and "*" or tostring(x.col) -- exception 6
         local text = norm(x.text or "")
         if is_config then text = text:gsub("<br>AI credits: %d+", "") end -- exception 7
+        -- the site's name in the username label is a link since 2.0
+        if is_config then text = text:gsub("<a href='https://www%.opensubtitles%.com'>OpenSubtitles%.com</a>", "OpenSubtitles.com") end
         local line = string.format("%s @%s,%s %q", x.kind, col, tostring(row), text)
         if x.kind == "check_box" then line = line .. " checked=" .. tostring(x.checked) end
         w[#w + 1] = line

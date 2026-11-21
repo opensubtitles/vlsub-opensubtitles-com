@@ -104,6 +104,13 @@ describe("login", function()
     lacks(env.message(), "AI credits")
   end)
 
+  it("configuration window: the site's name in the username label is a link to opensubtitles.com", function()
+    local env = H.launch()
+    trigger_menu(2)
+    local first = env.ui().widgets[1]
+    eq(first.text, "<a href='https://www.opensubtitles.com'>OpenSubtitles.com</a> Username:")
+  end)
+
   it("configuration window: every field starts in the same column, labels in the first", function()
     local env = H.launch()
     trigger_menu(2)
