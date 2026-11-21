@@ -5396,7 +5396,14 @@ end
 
 -- Button of the configuration window: balance and where to buy more.
 function show_ai_credits()
-  if not openSub.checkSession() then
+  -- Credits belong to an account: without a login there is nothing to ask.
+  -- (A session can exist without one - searching needs none - so the stored
+  -- username and password are what is looked at.)
+  local username = openSub.option.os_username
+  local password = openSub.option.os_password
+  local has_login = type(username) == "string" and username ~= ""
+    and type(password) == "string" and password ~= ""
+  if not has_login or not openSub.checkSession() or not openSub.getAuthHeader() then
     setMessage(error_tag(strings.ui_ai_credits_login_first))
     return
   end

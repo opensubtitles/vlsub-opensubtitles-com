@@ -388,6 +388,25 @@ H.describe("AI on-demand entry (recorded search answer)", function()
     has(lines[3], "39000 credits - 300 USD") -- all five the API offers
   end)
 
+  it("the AI credits button without a login says to log in first - and asks the server nothing", function()
+    -- (it said "The AI credit balance could not be read. Please try again later.")
+    for _, config in ipairs({ { os_username = "", os_password = "" }, { os_username = "tester", os_password = "" } }) do
+      local env = H.launch({ config = config })
+      trigger_menu(2)
+      env.server:reset()
+      env.ui():_button("AI credits: balance"):_click()
+      has(env.message(), "Log in to see your AI credits")
+      eq(#env.server:seen("GET api.opensubtitles.com/api/v1/ai/"), 0)
+    end
+  end)
+
+  it("with a login the server refuses (wrong password): also 'log in', not 'try again later'", function()
+    local env = H.launch({ config = { os_username = "tester", os_password = "wrong" } })
+    trigger_menu(2)
+    env.ui():_button("AI credits: balance"):_click()
+    has(env.message(), "Log in to see your AI credits")
+  end)
+
   it("opening the configuration window asks the server nothing about credits", function()
     local env = H.launch()
     env.server:reset()
