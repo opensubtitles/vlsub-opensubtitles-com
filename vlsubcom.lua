@@ -187,6 +187,12 @@ local options = {
   -- demand nor AI translations somebody uploaded. (A config file without
   -- this key, from an older version, means true.)
   aiTranslations = true,
+  -- More search filters (window "Search filters"). The defaults are the
+  -- API's own, so nothing changes until the user sets one.
+  machineTranslations = false,      -- true: also list machine translations
+  hearingImpaired = "include",      -- include / exclude / only (SDH, CC)
+  foreignPartsOnly = "include",     -- include / exclude / only (forced)
+  trustedOnly = false,              -- true: trusted uploaders only
   progressBarSize = 80
 }
 
@@ -525,6 +531,18 @@ local strings = {
   ui_ai_creating_translation = "Creating the AI translation - this can take a minute, VLC will not respond meanwhile...",
   ui_ai_still_translating = "The AI translation is being made: %s s (a whole film takes about 20 s; this window does not respond meanwhile)",
   ui_ai_translations = "AI translations",
+  ui_filters = "Search filters",
+  ui_filters_open = "🔧 Set filters",
+  ui_filter_machine = "Machine translations",
+  ui_filter_hearing_impaired = "For hearing impaired (SDH / CC)",
+  ui_filter_foreign_parts = "Foreign parts only (forced)",
+  ui_filter_trusted = "Trusted uploaders only",
+  ui_filter_include = "Include",
+  ui_filter_exclude = "Exclude",
+  ui_filter_only = "Only these",
+  ui_filters_saved = "Filters saved. They apply from the next search.",
+  ui_filters_active = "Search filters are set - some subtitles may be hidden (Config, Search filters)",
+  ui_back = "↩ Back",
   ui_ai_show_credits = "🤖 Show balance / buy",
   ui_ai_credits_balance = "AI credits: %s",
   ui_ai_credits_login_first = "Log in to see your AI credits: enter username and password, then Save.",
@@ -2023,8 +2041,8 @@ function interface_config()
 
   -- Row 10: AI credits (asked for on click: no request just for opening
   -- this window)
-  dlg:add_label(strings.ui_ai_translations..":", 1, 10, 1, 1)
-  input_table['aiTranslations'] = dlg:add_dropdown(2, 10, 1, 1)
+  dlg:add_label(strings.ui_filters..":", 1, 10, 1, 1)
+  dlg:add_button(strings.ui_filters_open, show_filters, 2, 10, 1, 1)
   dlg:add_button(strings.ui_ai_show_credits, show_ai_credits, 3, 10, 1, 1)
 
   -- Row 11: Working directory
@@ -2074,10 +2092,6 @@ function interface_config()
     show_main, 4, 13, 1, 1)
 
   -- Setup dropdown values for existing dropdowns
-  -- the current choice first (VLC selects whatever is added first)
-  local ai_on = openSub.option.aiTranslations ~= false
-  input_table['aiTranslations']:add_value(lang["int_bool_"..tostring(ai_on)], 1)
-  input_table['aiTranslations']:add_value(lang["int_bool_"..tostring(not ai_on)], 2)
   input_table['langExt']:add_value(
     lang["int_bool_"..tostring(openSub.option.langExt)], 1)
   input_table['langExt']:add_value(
@@ -2168,8 +2182,109 @@ function trigger_menu(dlg_id)
     dlg = new_dialog(
       openSub.conf.useragent..': '..lang["int_help"])
     interface_help()
+  elseif dlg_id == 4 then
+    close_dlg()
+    dlg = new_dialog(
+      openSub.conf.useragent..': '..strings.ui_filters)
+    interface_filters()
   end
   collectgarbage() --~ !important
+end
+
+function show_filters()
+  trigger_menu(4)
+end
+
+-- The search filters the API offers, each with the values of its drop-down.
+-- The value stored in the settings is the first field of a choice.
+local FILTERS = {
+  { option = "aiTranslations", label = "ui_ai_translations", default = true,
+    choices = { { true, "int_bool_true" }, { false, "int_bool_false" } } },
+  { option = "machineTranslations", label = "ui_filter_machine", default = false,
+    choices = { { true, "int_bool_true" }, { false, "int_bool_false" } } },
+  { option = "hearingImpaired", label = "ui_filter_hearing_impaired", default = "include",
+    choices = { { "include", "ui_filter_include" }, { "exclude", "ui_filter_exclude" }, { "only", "ui_filter_only" } } },
+  { option = "foreignPartsOnly", label = "ui_filter_foreign_parts", default = "include",
+    choices = { { "include", "ui_filter_include" }, { "exclude", "ui_filter_exclude" }, { "only", "ui_filter_only" } } },
+  { option = "trustedOnly", label = "ui_filter_trusted", default = false,
+    choices = { { true, "int_bool_true" }, { false, "int_bool_false" } } },
+}
+
+-- What a filter is set to; anything unknown (an old or edited config file)
+-- counts as its default.
+local function filter_value(filter)
+  local value = openSub.option[filter.option]
+  for _, choice in ipairs(filter.choices) do
+    if choice[1] == value then
+      return value
+    end
+  end
+  return filter.default
+end
+
+-- True when any filter differs from its default, i.e. can hide subtitles
+-- that would be listed otherwise (machine translations: can add some).
+function filters_active()
+  for _, filter in ipairs(FILTERS) do
+    if filter_value(filter) ~= filter.default then
+      return true
+    end
+  end
+  return false
+end
+
+-- The query parameters the filters add to a search. Defaults are not sent.
+function filter_params(params)
+  local function set(name, filter_index, sent)
+    local value = filter_value(FILTERS[filter_index])
+    if sent[value] then
+      params[name] = sent[value]
+    end
+  end
+  set("ai_translated", 1, { [false] = "exclude" })
+  set("machine_translated", 2, { [true] = "include" })
+  set("hearing_impaired", 3, { exclude = "exclude", only = "only" })
+  set("foreign_parts_only", 4, { exclude = "exclude", only = "only" })
+  set("trusted_sources", 5, { [true] = "only" })
+end
+
+function interface_filters()
+  for row, filter in ipairs(FILTERS) do
+    dlg:add_label(strings[filter.label] .. ":", 1, row, 1, 1)
+    local dropdown = dlg:add_dropdown(2, row, 1, 1)
+    -- the current choice first (VLC selects whatever is added first); the id
+    -- of an entry is its position in the list of choices
+    local current = filter_value(filter)
+    for id, choice in ipairs(filter.choices) do
+      if choice[1] == current then
+        dropdown:add_value(strings[choice[2]], id)
+      end
+    end
+    for id, choice in ipairs(filter.choices) do
+      if choice[1] ~= current then
+        dropdown:add_value(strings[choice[2]], id)
+      end
+    end
+    input_table["filter_" .. filter.option] = dropdown
+  end
+  input_table["message"] = dlg:add_label("", 1, #FILTERS + 1, 2, 1)
+  dlg:add_button("💾 " .. lang["int_save"], apply_filters, 1, #FILTERS + 2, 1, 1)
+  dlg:add_button(strings.ui_back, show_conf, 2, #FILTERS + 2, 1, 1)
+end
+
+function apply_filters()
+  for _, filter in ipairs(FILTERS) do
+    local dropdown = input_table["filter_" .. filter.option]
+    local choice = dropdown and filter.choices[dropdown:get_value()]
+    if choice then
+      openSub.option[filter.option] = choice[1]
+    end
+  end
+  if save_config() then
+    setMessage(success_tag(strings.ui_filters_saved))
+  else
+    setError(lang["mess_err_conf_access"])
+  end
 end
 
 -- Enhanced show_main function with automatic search
@@ -2440,6 +2555,9 @@ function display_subtitles()
 
     if transportError then
       message = message .. "<br/>" .. error_tag(transportError)
+    elseif filters_active() then
+      -- nothing found, and a filter may be the reason: say so
+      message = message .. "<br/>" .. strings.ui_filters_active
     end
 
     setMessage(message)
@@ -3220,9 +3338,6 @@ function apply_config()
   -- Save boolean options (these should always be saved regardless of login status)
   if input_table["langExt"]:get_value() == 2 then
     openSub.option.langExt = not openSub.option.langExt
-  end
-  if input_table["aiTranslations"] and input_table["aiTranslations"]:get_value() == 2 then
-    openSub.option.aiTranslations = not (openSub.option.aiTranslations ~= false)
   end
 
   if input_table["removeTag"]:get_value() == 2 then
@@ -6891,10 +7006,9 @@ local function search_get(params, protected)
     params["order_direction"] = (openSub.option.sortDirection == "asc") and "asc" or "desc"
   end
 
-  if openSub.option.aiTranslations == false then
-    -- measured: this removes the on-demand entries and the AI uploads
-    params["ai_translated"] = "exclude"
-  end
+  -- (measured: ai_translated=exclude removes the on-demand entries and the
+  -- AI uploads)
+  filter_params(params)
 
   local url = build_sorted_url(SUBTITLES_URL, params)
 

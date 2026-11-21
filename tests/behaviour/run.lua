@@ -84,7 +84,8 @@ EXCEPTIONS[6] = {
 EXCEPTIONS[7] = {
   name = "AI on-demand subtitles (2.0)",
   why = "new feature: an 'AI credits' row in the configuration window, the balance in "
-     .. "the message after Save (one request to /ai/credits); the help window "
+     .. "the message after Save (one request to /ai/credits); a 'Search filters' "
+     .. "row and window, whose settings change nothing while at their defaults; the help window "
      .. "rewritten (shorter, with an AI section); entries the API "
      .. "offers only to 2.x User-Agents are marked and paid with credits. Nothing else "
      .. "may change: the row is left out of the comparison.",
@@ -93,6 +94,9 @@ local DROP_CONFIG_KEYS = EXCEPTIONS[2].drop_config_keys
 DROP_CONFIG_KEYS.interfaceLanguage = true
 DROP_CONFIG_KEYS.detectedLanguage = true
 DROP_CONFIG_KEYS.aiTranslations = true -- exception 7
+for _, key in ipairs({ "machineTranslations", "hearingImpaired", "foreignPartsOnly", "trustedOnly" }) do
+  DROP_CONFIG_KEYS[key] = true -- the "Search filters" window (2.0)
+end
 
 local LOCALE_REQUEST = "raw.githubusercontent.com/opensubtitles/vlsub-opensubtitles-com/main/locale/"
 -- exception 7: requests about AI credits, and the balance in the Save message
@@ -199,7 +203,7 @@ local function snapshot(env, norm, cursor)
       for _, x in ipairs(d.widgets) do
         -- rows the baseline did not have: interface language (if it predates
         -- it) and AI credits
-        if x.kind == "label" and (x.text == "Interface language:" or x.text == "AI translations:") then
+        if x.kind == "label" and (x.text == "Interface language:" or x.text == "Search filters:") then
           skip[x.row] = true
         end
       end

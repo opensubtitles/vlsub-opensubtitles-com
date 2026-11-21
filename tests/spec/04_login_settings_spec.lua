@@ -300,9 +300,10 @@ describe("configuration window", function()
     local keys = {}
     for k in pairs(env.saved_config()) do keys[#keys + 1] = k end
     table.sort(keys)
-    eq(keys, { "aiTranslations", "detectedLanguage", "downloadBehaviour", "interfaceLanguage", "langExt",
-               "language", "language2", "language3", "os_password", "os_username",
-               "progressBarSize", "removeTag", "sortDirection" })
+    eq(keys, { "aiTranslations", "detectedLanguage", "downloadBehaviour", "foreignPartsOnly",
+               "hearingImpaired", "interfaceLanguage", "langExt", "language", "language2", "language3",
+               "machineTranslations", "os_password", "os_username", "progressBarSize", "removeTag",
+               "sortDirection", "trustedOnly" })
     ok(#H.read_file(env.dir .. "/vlsub_conf.json") < 600, "file is small")
   end)
 

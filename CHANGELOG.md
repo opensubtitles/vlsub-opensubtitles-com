@@ -10,7 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - **AI translation on demand.** When no subtitle exists in a language, the API offers an AI translation of an existing subtitle, made when it is downloaded and paid with the AI credits of the OpenSubtitles account. VLSub lists such an entry as "🤖 AI translation from <language> (uses AI credits)", shows the balance before and after, counts the seconds while the server translates (about 20 s for a whole film), and delivers a translation that exists already at once and for free. Without enough credits the server sends a preview; the message says so and links to the credit packages.
 - **AI credits in the configuration window**: the balance after Save, and a button that shows it together with the credit packages.
-- **Setting "AI translations: Yes / No"** (configuration window). No leaves every AI subtitle out of the search results: the on-demand translations and AI translations uploaded by others. Default: Yes.
+- **Search filters** (Config > Set filters): AI translations (Yes / No - No leaves out the on-demand translations and AI translations uploaded by others), machine translations, subtitles for the hearing impaired (include / exclude / only), foreign parts only (include / exclude / only), trusted uploaders only. Defaults are the API's, so nothing changes until one is set. A search that finds nothing while a filter is set says so.
+- The site's name in the username label of the configuration window is a link to opensubtitles.com.
 - Help window: a section about AI translation; the whole window is shorter and in plainer words.
 
 ### Changed

@@ -540,6 +540,14 @@ describe("interface language: nothing is left in English", function()
     eq(unmarked(env, env.ui()), {})
   end)
 
+  it("search filters window: the same", function()
+    local env = with_translation("xx", pseudo)
+    trigger_menu(4)
+    eq(unmarked(env, env.ui()), {})
+    env.ui():_button("Save$"):_click()
+    has(env.message(), MARK)
+  end)
+
   it("after a search and a download: the messages too", function()
     local dir = H.tmpdir()
     local env = with_translation("xx", pseudo, { media = "file://" .. dir .. "/Big.Buck.Bunny.2008.mkv" })
@@ -565,6 +573,7 @@ describe("interface language: VLC for macOS", function()
     local list = { { "main", env.ui() } }
     trigger_menu(2) list[#list + 1] = { "configuration", env.ui() }
     trigger_menu(3) list[#list + 1] = { "help", env.ui() }
+    trigger_menu(4) list[#list + 1] = { "filters", env.ui() }
     return list
   end
 

@@ -163,9 +163,24 @@ it.
   shown after Save.
 - Credits are only ever spent by the **Download** button on such an entry -
   never by a search or by itself.
-- Do not want AI subtitles at all? Config > *AI translations* > **No**: the
-  on-demand entries and AI translations uploaded by others are left out of
-  every search.
+- Do not want AI subtitles at all? Config > *Set filters* > *AI
+  translations* > **No**: the on-demand entries and AI translations uploaded
+  by others are left out of every search.
+
+### 🔧 Search Filters (2.0)
+
+Config > **Set filters** opens a window with what a search may return:
+
+| Filter | Choices | Default |
+|---|---|---|
+| AI translations | Yes / No | Yes |
+| Machine translations | Yes / No | No |
+| For hearing impaired (SDH / CC) | Include / Exclude / Only these | Include |
+| Foreign parts only (forced) | Include / Exclude / Only these | Include |
+| Trusted uploaders only | Yes / No | No |
+
+The defaults are those of the OpenSubtitles API. When a search finds nothing
+while a filter is set, the message says so.
 
 ## 📸 Screenshots
 
