@@ -40,6 +40,10 @@ local AI = os.getenv("VLSUB_AI")
 -- Hungarian translation exists already, so the run is free)
 local AI_IMDB = os.getenv("VLSUB_AI_IMDB") or "1254207"
 local AI_LANGUAGE = os.getenv("VLSUB_AI_LANGUAGE") or "Hungarian"
+-- VLSUB_UPLOAD=dev: upload a small test subtitle to The Matrix. Only with
+-- VLSUB_API_URL set (the development API through tools/devproxy.py), never
+-- against production. The subtitle id is printed: withdraw it afterwards.
+local UPLOAD = os.getenv("VLSUB_UPLOAD") == "dev" and (os.getenv("VLSUB_API_URL") or "") ~= ""
 if AI ~= "credits" and AI ~= "nocredits" then AI = nil end
 local VERBOSE = tonumber(os.getenv("VLSUB_VERBOSE") or "0") or 0
 
@@ -155,16 +159,9 @@ do
 end
 
 local function message()
-  -- the status line: row 10 in the main window; in the configuration window
-  -- (the one with a password field) the label that spans the row above the
-  -- buttons
+  -- the status line: in every window the label that spans the row above
+  -- the last row of buttons
   local d = ui()
-  if #d:_all("password") == 0 then
-    for _, w in ipairs(d.widgets) do
-      if w.kind == "label" and w.row == 10 then return w.text end
-    end
-    return ""
-  end
   local buttons_row = 0
   for _, w in ipairs(d.widgets) do
     if w.kind == "button" and w.row > buttons_row then buttons_row = w.row end
@@ -325,6 +322,31 @@ if USER and PASS then
   end)
 else
   line("SKIP login + download (set VLSUB_USER and VLSUB_PASS to include them)")
+end
+
+if UPLOAD and USER and PASS then
+  step("upload (development API): Find the film by IMDb id, Check, Upload", function()
+    local path = SANDBOX .. "/upload-test.en.srt"
+    local f = assert(io.open(path, "wb"))
+    f:write("1\r\n00:00:01,000 --> 00:00:04,000\r\nVLSub upload test from real VLC " .. os.time()
+      .. "\r\n\r\n2\r\n00:00:05,000 --> 00:00:08,000\r\nWithdrawn right after the test.\r\n")
+    f:close()
+    trigger_menu(1)
+    ui():_button("Upload$"):_click()
+    check(ui().title:find("Upload"), "the upload window did not open: " .. message())
+    ui():_at(2, 2, "text_input"):set_text(path)
+    ui():_at(2, 3, "dropdown"):_choose_text("^English$")
+    ui():_at(2, 5, "text_input"):set_text("tt0133093")
+    ui():_button("Find$"):_click()
+    line("     film: " .. ui():_at(2, 4, "label"):get_text())
+    check(ui():_at(2, 4, "label"):get_text():find("Matrix"), "film not found")
+    ui():_button("Check$"):_click()
+    line("     check: " .. message():gsub("<[^>]+>", ""))
+    check(message():find("Ready"), "check did not say ready")
+    ui():_at(2, 12, "button"):_click()
+    line("     upload: " .. message():gsub("<[^>]+>", ""))
+    check(message():find("Uploaded"), "upload failed")
+  end)
 end
 
 if AI and USER and PASS then

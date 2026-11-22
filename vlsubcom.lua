@@ -567,6 +567,45 @@ local strings = {
   ui_filters_saved = "Filters saved. They apply from the next search.",
   ui_filters_active = "Search filters are set - some subtitles may be hidden (Config, Search filters)",
   ui_back = "↩ Back",
+
+  -- Upload
+  ui_upload = "⬆ Upload",
+  ui_upload_title = "Upload subtitles",
+  ui_upload_file = "Subtitle file",
+  ui_upload_other_path = "Or full path of the file",
+  ui_upload_language = "Language",
+  ui_upload_film = "Film",
+  ui_upload_imdb = "IMDb id or link",
+  ui_upload_find = "🔍 Find",
+  ui_upload_auto = "Automatic",
+  ui_upload_translation = "Translated",
+  ui_upload_by_person = "By a person",
+  ui_upload_by_machine = "By machine translation",
+  ui_upload_by_ai = "By AI",
+  ui_upload_release = "Release name",
+  ui_upload_comment = "Comment",
+  ui_upload_check = "✔ Check",
+  ui_upload_no_files = "(no subtitle file next to the video)",
+  ui_upload_login_first = "Log in to upload: enter username and password in Config, then Save.",
+  ui_upload_choose_file = "Choose a subtitle file, or enter its full path.",
+  ui_upload_cannot_read = "The file cannot be read: %s",
+  ui_upload_too_small = "The file is too small to be a subtitle (at least 100 bytes).",
+  ui_upload_too_large = "The file is too large to upload from VLC (%s kB; at most %s kB).",
+  ui_upload_film_year = "%s (%s)",
+  ui_upload_film_unknown = "Not known yet - enter its IMDb id or link and press Find.",
+  ui_upload_film_new = "%s is not on OpenSubtitles yet - uploading will add it.",
+  ui_upload_film_not_on_imdb = "No film with that id on IMDb or TMDb.",
+  ui_upload_film_needed = "Which film is it? Enter its IMDb id or link and press Find.",
+  ui_upload_language_needed = "Choose the language of the subtitles.",
+  ui_upload_ok_to_upload = "Ready: this subtitle can be uploaded (%s uploads left today).",
+  ui_upload_already = "This subtitle is already on OpenSubtitles - nothing to upload.",
+  ui_upload_would_be_rejected = "The upload would be refused: %s",
+  ui_upload_would_be_reviewed = "Ready - a moderator will check it before it appears.",
+  ui_upload_done = "Uploaded: %s - thank you!",
+  ui_upload_done_review = "Uploaded: %s - it appears once a moderator has checked it. Thank you!",
+  ui_upload_failed = "Upload failed: %s",
+  ui_upload_working = "Uploading...",
+  ui_upload_checking = "Checking...",
   ui_ai_show_credits = "🤖 AI credits: balance / buy",
   ui_ai_credits_balance = "AI credits: %s",
   ui_ai_credits_login_first = "Log in to see your AI credits: enter username and password, then Save.",
@@ -1987,6 +2026,9 @@ function interface_main()
     strings.ui_link, open_subtitle_link, 2, 11, 1, 1)
 
   dlg:add_button(
+    strings.ui_upload, show_upload, 3, 11, 1, 1)
+
+  dlg:add_button(
     strings.ui_config, show_conf, 5, 11, 1, 1)
   dlg:add_button(
     strings.ui_help,
@@ -2215,6 +2257,11 @@ function trigger_menu(dlg_id)
     dlg = new_dialog(
       openSub.conf.useragent..': '..strings.ui_filters)
     interface_filters()
+  elseif dlg_id == 5 then
+    close_dlg()
+    dlg = new_dialog(
+      openSub.conf.useragent..': '..strings.ui_upload_title)
+    interface_upload()
   end
   collectgarbage() --~ !important
 end
@@ -5352,6 +5399,591 @@ local function fetch_subtitle(link)
     return report_failure(strings.ui_empty_subtitle_content_downloaded)
   end
   return res.body
+end
+
+            --[[ Upload: MD5, base64, deflate container ]]--
+
+-- The upload API wants the file's MD5 and the file itself as base64 of a
+-- deflate stream. VLC's Lua has none of the three, and on Lua 5.1 (VLC for
+-- macOS) not even bit operations. Everything below is plain Lua; nothing
+-- runs until an upload is made.
+
+-- 32-bit AND / OR / XOR: the language's own operators where they exist
+-- (compiled from text, so that this file still parses on Lua 5.1),
+-- bit32 on Lua 5.2, else byte tables built on first use.
+local bit_ops_cache
+local function bit_ops()
+  if bit_ops_cache then
+    return bit_ops_cache
+  end
+  local compile = loadstring or load
+  local native = compile and compile(
+    "return function(a, b) return a & b end, function(a, b) return a | b end, function(a, b) return a ~ b end")
+  if native then
+    local band, bor, bxor = native()
+    bit_ops_cache = { band = band, bor = bor, bxor = bxor }
+  elseif type(bit32) == "table" then
+    bit_ops_cache = { band = bit32.band, bor = bit32.bor, bxor = bit32.bxor }
+  else
+    -- 256 x 256 tables of the byte-wise result, then four look-ups per word
+    local and_t, or_t, xor_t = {}, {}, {}
+    for a = 0, 255 do
+      for b = 0, 255 do
+        local r_and, r_or, r_xor, x, y, m = 0, 0, 0, a, b, 1
+        for _ = 1, 8 do
+          local p, q = x % 2, y % 2
+          if p == 1 and q == 1 then r_and = r_and + m end
+          if p == 1 or q == 1 then r_or = r_or + m end
+          if p ~= q then r_xor = r_xor + m end
+          x, y, m = (x - p) / 2, (y - q) / 2, m * 2
+        end
+        local i = a * 256 + b
+        and_t[i], or_t[i], xor_t[i] = r_and, r_or, r_xor
+      end
+    end
+    local function by_bytes(t)
+      return function(a, b)
+        local r, m = 0, 1
+        for _ = 1, 4 do
+          local x, y = a % 256, b % 256
+          r = r + t[x * 256 + y] * m
+          a, b, m = (a - x) / 256, (b - y) / 256, m * 256
+        end
+        return r
+      end
+    end
+    bit_ops_cache = { band = by_bytes(and_t), bor = by_bytes(or_t), bxor = by_bytes(xor_t) }
+  end
+  return bit_ops_cache
+end
+
+local MD5_K = {
+  0xd76aa478, 0xe8c7b756, 0x242070db, 0xc1bdceee, 0xf57c0faf, 0x4787c62a, 0xa8304613, 0xfd469501,
+  0x698098d8, 0x8b44f7af, 0xffff5bb1, 0x895cd7be, 0x6b901122, 0xfd987193, 0xa679438e, 0x49b40821,
+  0xf61e2562, 0xc040b340, 0x265e5a51, 0xe9b6c7aa, 0xd62f105d, 0x02441453, 0xd8a1e681, 0xe7d3fbc8,
+  0x21e1cde6, 0xc33707d6, 0xf4d50d87, 0x455a14ed, 0xa9e3e905, 0xfcefa3f8, 0x676f02d9, 0x8d2a4c8a,
+  0xfffa3942, 0x8771f681, 0x6d9d6122, 0xfde5380c, 0xa4beea44, 0x4bdecfa9, 0xf6bb4b60, 0xbebfbc70,
+  0x289b7ec6, 0xeaa127fa, 0xd4ef3085, 0x04881d05, 0xd9d4d039, 0xe6db99e5, 0x1fa27cf8, 0xc4ac5665,
+  0xf4292244, 0x432aff97, 0xab9423a7, 0xfc93a039, 0x655b59c3, 0x8f0ccc92, 0xffeff47d, 0x85845dd1,
+  0x6fa87e4f, 0xfe2ce6e0, 0xa3014314, 0x4e0811a1, 0xf7537e82, 0xbd3af235, 0x2ad7d2bb, 0xeb86d391,
+}
+local MD5_S = {
+  7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22,
+  5, 9, 14, 20, 5, 9, 14, 20, 5, 9, 14, 20, 5, 9, 14, 20,
+  4, 11, 16, 23, 4, 11, 16, 23, 4, 11, 16, 23, 4, 11, 16, 23,
+  6, 10, 15, 21, 6, 10, 15, 21, 6, 10, 15, 21, 6, 10, 15, 21,
+}
+
+-- MD5 of a string, as 32 lowercase hex digits (RFC 1321)
+local function md5_hex(message)
+  local ops = bit_ops()
+  local band, bor, bxor = ops.band, ops.bor, ops.bxor
+  local floor = math.floor
+  local TWO32 = 4294967296
+  local MASK = 4294967295
+
+  local length = #message
+  local padding = 56 - (length + 1) % 64
+  if padding < 0 then
+    padding = padding + 64
+  end
+  local bits = length * 8
+  local tail = {}
+  for i = 1, 8 do
+    tail[i] = string.char(bits % 256)
+    bits = floor(bits / 256)
+  end
+  message = message .. "\128" .. string.rep("\0", padding) .. table.concat(tail)
+
+  local a0, b0, c0, d0 = 0x67452301, 0xefcdab89, 0x98badcfe, 0x10325476
+  local X = {}
+  for block = 1, #message, 64 do
+    for i = 0, 15 do
+      local p = block + i * 4
+      local w1, w2, w3, w4 = string.byte(message, p, p + 3)
+      X[i] = w1 + w2 * 256 + w3 * 65536 + w4 * 16777216
+    end
+    local a, b, c, d = a0, b0, c0, d0
+    for i = 0, 63 do
+      local f, g
+      if i < 16 then
+        f = bxor(d, band(b, bxor(c, d)))
+        g = i
+      elseif i < 32 then
+        f = bxor(c, band(d, bxor(b, c)))
+        g = (5 * i + 1) % 16
+      elseif i < 48 then
+        f = bxor(bxor(b, c), d)
+        g = (3 * i + 5) % 16
+      else
+        f = bxor(c, bor(b, MASK - d))
+        g = (7 * i) % 16
+      end
+      local sum = (a + f + MD5_K[i + 1] + X[g]) % TWO32
+      local s = MD5_S[i + 1]
+      local rotated = (sum * 2 ^ s) % TWO32 + floor(sum / 2 ^ (32 - s))
+      a, d, c = d, c, b
+      b = (b + rotated) % TWO32
+    end
+    a0, b0 = (a0 + a) % TWO32, (b0 + b) % TWO32
+    c0, d0 = (c0 + c) % TWO32, (d0 + d) % TWO32
+  end
+
+  local hex = {}
+  for _, word in ipairs({ a0, b0, c0, d0 }) do
+    for _ = 1, 4 do
+      local byte = word % 256
+      hex[#hex + 1] = string.format("%02x", byte)
+      word = (word - byte) / 256
+    end
+  end
+  return table.concat(hex)
+end
+
+local BASE64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+
+local function base64_encode(data)
+  local out = {}
+  for i = 1, #data, 3 do
+    local x, y, z = string.byte(data, i, i + 2)
+    local n = x * 65536 + (y or 0) * 256 + (z or 0)
+    local c1 = math.floor(n / 262144) % 64
+    local c2 = math.floor(n / 4096) % 64
+    local c3 = math.floor(n / 64) % 64
+    local c4 = n % 64
+    out[#out + 1] = string.sub(BASE64, c1 + 1, c1 + 1) .. string.sub(BASE64, c2 + 1, c2 + 1)
+      .. (y and string.sub(BASE64, c3 + 1, c3 + 1) or "=")
+      .. (z and string.sub(BASE64, c4 + 1, c4 + 1) or "=")
+  end
+  return table.concat(out)
+end
+
+-- A raw deflate stream (RFC 1951) made of "stored" blocks: the data as it
+-- is, in pieces of up to 65535 bytes, each with a 5-byte header. No
+-- compression - the API accepts raw deflate, and this needs no compressor.
+local function deflate_stored(data)
+  local out, position, length = {}, 1, #data
+  repeat
+    local piece = string.sub(data, position, position + 65534)
+    position = position + #piece
+    local final = (position > length) and 1 or 0
+    local n = #piece
+    local inverted = 65535 - n
+    out[#out + 1] = string.char(final, n % 256, math.floor(n / 256), inverted % 256, math.floor(inverted / 256))
+    out[#out + 1] = piece
+  until position > length
+  return table.concat(out)
+end
+
+            --[[ Upload: window and requests ]]--
+
+-- Decided by the owner (2026-11-22): a button in the main window opens an
+-- Upload window; the file is one of the subtitle files next to the playing
+-- video, or any file by its full path; a film the site does not have can
+-- be registered from its IMDb / TMDb id; flags and a comment can be set.
+-- The playing video's hash is NOT sent with the upload.
+
+local UPLOAD_EXTENSIONS = { srt = true, sub = true, ass = true, ssa = true, vtt = true, smi = true, txt = true, mpl = true }
+-- the request body must stay under about 500 kB; base64 adds a third
+local UPLOAD_MAX_BYTES = 350000
+
+local upload_state = {}
+
+local function upload_basename(path)
+  return string.match(path, "([^/\\]+)$") or path
+end
+
+-- Subtitle files in the video's folder whose name starts like the video's
+local function upload_candidates()
+  local list = {}
+  local dir, name = openSub.file.dir, openSub.file.name
+  if not (openSub.file.hasInput and dir and name and name ~= "") then
+    return list
+  end
+  local reader = (vlc.io and vlc.io.readdir) or (vlc.net and vlc.net.opendir)
+  local ok, entries = pcall(reader, dir)
+  if not ok or type(entries) ~= "table" then
+    return list
+  end
+  local prefix = string.lower(name)
+  for _, entry in ipairs(entries) do
+    local extension = string.match(entry, "%.(%w+)$")
+    if extension and UPLOAD_EXTENSIONS[string.lower(extension)]
+       and string.sub(string.lower(entry), 1, #prefix) == prefix then
+      list[#list + 1] = { name = entry, path = dir .. entry }
+    end
+  end
+  table.sort(list, function(a, b) return a.name < b.name end)
+  return list
+end
+
+-- The language a file name ends with, if it is a known subtitle language
+-- ("Film.2020.sk.srt" -> "sk")
+local function upload_language_from_name(file_name)
+  local tag = string.match(string.lower(file_name or ""), "[%._%-]([%a%-]+)%.%w+$")
+  for _, language in ipairs(openSub.conf.languages or {}) do
+    if language[1] == tag then
+      return tag
+    end
+  end
+  return nil
+end
+
+-- One request to the upload API. Returns the HTTP status (or nil) and the
+-- decoded answer (a table, possibly empty).
+local function upload_request(method, path, body, timeout)
+  local client = Curl.new()
+  client:add_header("Api-Key", api_key())
+  local auth_header = openSub.getAuthHeader()
+  if auth_header then
+    client:add_header("Authorization", auth_header)
+  end
+  client:add_header("Accept", "application/json")
+  client:set_timeout(timeout or 20)
+  client:set_deadline(timeout or 20)
+  client:set_retries(0) -- an upload is never sent twice by itself
+  local res
+  if method == "GET" then
+    res = client:get(api_url(path))
+  else
+    client:add_header("Content-Type", "application/json")
+    res = client:post(api_url(path), json.encode(body or {}))
+  end
+  if not res then
+    return nil, {}
+  end
+  local ok, answer = decode_object(res.body or "")
+  return res.status, ok and answer or {}
+end
+
+-- The server's own explanation of a refusal, or the HTTP status
+local function upload_error_text(status, answer)
+  if type(answer.message) == "string" and answer.message ~= "" then
+    return answer.message
+  end
+  if type(answer.error_code) == "string" then
+    return answer.error_code
+  end
+  return status and ("HTTP " .. tostring(status)) or strings.ui_no_response_from_download_server
+end
+
+local function film_text(film)
+  if not film then
+    return strings.ui_upload_film_unknown
+  end
+  local year = tonumber(film.year)
+  if year and year > 0 then
+    return tr("ui_upload_film_year", tostring(film.title or "?"), tostring(year))
+  end
+  return tostring(film.title or "?")
+end
+
+-- Which film: from an IMDb / TMDb id or link if one is given, else guessed
+-- from a file name. Fills upload_state.film (known here) or
+-- upload_state.new_film (on IMDb / TMDb, not here yet). Returns the text
+-- for the "Film" line.
+local function upload_find_film(id_text, file_name)
+  upload_state.film, upload_state.new_film = nil, nil
+  id_text = trim(id_text or "")
+  if id_text ~= "" then
+    local body = {}
+    if string.find(id_text, "themoviedb", 1, true) then
+      body.tmdb_id = id_text
+    else
+      body.imdb_id = id_text
+    end
+    local status, answer = upload_request("POST", "/subtitles/upload/features/from_id", body)
+    if status == 200 and answer.exists_in_db and answer.feature_id then
+      upload_state.film = answer
+      return film_text(answer)
+    elseif status == 200 and answer.found then
+      upload_state.new_film = answer
+      return tr("ui_upload_film_new", film_text(answer))
+    elseif status == 404 then
+      return strings.ui_upload_film_not_on_imdb
+    end
+    return tr("ui_upload_failed", upload_error_text(status, answer))
+  end
+  if file_name and file_name ~= "" then
+    local status, answer = upload_request("POST", "/subtitles/upload/guess", { filename = file_name })
+    if status == 200 and type(answer.best_guess) == "table" and answer.best_guess.feature_id then
+      upload_state.film = answer.best_guess
+      return film_text(answer.best_guess)
+    elseif status and status ~= 200 then
+      return tr("ui_upload_failed", upload_error_text(status, answer))
+    end
+  end
+  return strings.ui_upload_film_unknown
+end
+
+local function has_login()
+  local username, password = openSub.option.os_username, openSub.option.os_password
+  return type(username) == "string" and username ~= "" and type(password) == "string" and password ~= ""
+end
+
+-- Main window button
+function show_upload()
+  if not has_login() or not openSub.checkSession() or not openSub.getAuthHeader() then
+    setMessage(error_tag(strings.ui_upload_login_first))
+    return
+  end
+  openSub.getFileInfo()
+  upload_state = { candidates = upload_candidates() }
+  setMessage(loading_tag(strings.ui_upload_checking))
+  -- the film first, so that the window is built with it
+  local video_file = openSub.file.name and openSub.file.name ~= "" and openSub.file.path
+    and upload_basename(openSub.file.path) or nil
+  local imdb = openSub.movie.imdbId
+  local first = upload_state.candidates[1]
+  upload_state.film_line = upload_find_film(imdb and imdb ~= "" and ("tt" .. imdb) or "",
+    video_file or (first and first.name))
+  upload_state.imdb = imdb and imdb ~= "" and ("tt" .. imdb) or ""
+  trigger_menu(5)
+end
+
+local CHOICE_AUTO = { { nil, "ui_upload_auto" }, { true, "int_bool_true" }, { false, "int_bool_false" } }
+local CHOICE_TRANSLATION = {
+  { "person", "ui_upload_by_person" }, { "machine", "ui_upload_by_machine" }, { "ai", "ui_upload_by_ai" } }
+
+local function add_choices(dropdown, choices)
+  for id, choice in ipairs(choices) do
+    dropdown:add_value(strings[choice[2]], id)
+  end
+end
+
+function interface_upload()
+  local candidates = upload_state.candidates or {}
+  local row = 0
+  local function next_row() row = row + 1 return row end
+
+  dlg:add_label(strings.ui_upload_file .. ":", 1, next_row(), 1, 1)
+  input_table["upload_file"] = dlg:add_dropdown(2, row, 3, 1)
+  for id, candidate in ipairs(candidates) do
+    input_table["upload_file"]:add_value(candidate.name, id)
+  end
+  input_table["upload_file"]:add_value(#candidates == 0 and strings.ui_upload_no_files or strings.ui_none, 0)
+
+  dlg:add_label(strings.ui_upload_other_path .. ":", 1, next_row(), 1, 1)
+  input_table["upload_path"] = dlg:add_text_input("", 2, row, 3, 1)
+
+  dlg:add_label(strings.ui_upload_language .. ":", 1, next_row(), 1, 1)
+  input_table["upload_language"] = dlg:add_dropdown(2, row, 2, 1)
+  local wanted = upload_language_from_name(candidates[1] and candidates[1].name) or openSub.option.language
+  local languages = openSub.conf.languages or {}
+  for id, language in ipairs(languages) do
+    if language[1] == wanted then
+      input_table["upload_language"]:add_value(language[2], id)
+    end
+  end
+  for id, language in ipairs(languages) do
+    if language[1] ~= wanted then
+      input_table["upload_language"]:add_value(language[2], id)
+    end
+  end
+
+  dlg:add_label(strings.ui_upload_film .. ":", 1, next_row(), 1, 1)
+  input_table["upload_film"] = dlg:add_label(upload_state.film_line or strings.ui_upload_film_unknown, 2, row, 3, 1)
+
+  dlg:add_label(strings.ui_upload_imdb .. ":", 1, next_row(), 1, 1)
+  input_table["upload_imdb"] = dlg:add_text_input(upload_state.imdb or "", 2, row, 2, 1)
+  dlg:add_button(strings.ui_upload_find, upload_find_clicked, 4, row, 1, 1)
+
+  dlg:add_label(strings.ui_filter_hearing_impaired .. ":", 1, next_row(), 1, 1)
+  input_table["upload_hi"] = dlg:add_dropdown(2, row, 1, 1)
+  add_choices(input_table["upload_hi"], CHOICE_AUTO)
+
+  dlg:add_label(strings.ui_filter_foreign_parts .. ":", 1, next_row(), 1, 1)
+  input_table["upload_foreign"] = dlg:add_dropdown(2, row, 1, 1)
+  add_choices(input_table["upload_foreign"], CHOICE_AUTO)
+
+  dlg:add_label(strings.ui_upload_translation .. ":", 1, next_row(), 1, 1)
+  input_table["upload_translation"] = dlg:add_dropdown(2, row, 2, 1)
+  add_choices(input_table["upload_translation"], CHOICE_TRANSLATION)
+
+  dlg:add_label(strings.ui_upload_release .. ":", 1, next_row(), 1, 1)
+  input_table["upload_release"] = dlg:add_text_input(openSub.file.name or "", 2, row, 3, 1)
+
+  dlg:add_label(strings.ui_upload_comment .. ":", 1, next_row(), 1, 1)
+  input_table["upload_comment"] = dlg:add_text_input("", 2, row, 3, 1)
+
+  -- macOS does not grow a window for a longer message: keep three lines
+  local three_empty_lines = "&nbsp;<br>&nbsp;<br>&nbsp;"
+  input_table["message"] = dlg:add_label(on_macos() and three_empty_lines or "", 1, next_row(), 4, 1)
+
+  next_row()
+  dlg:add_button(strings.ui_upload_check, upload_check_clicked, 1, row, 1, 1)
+  dlg:add_button(strings.ui_upload, upload_send_clicked, 2, row, 1, 1)
+  dlg:add_button(strings.ui_back, show_main, 4, row, 1, 1)
+end
+
+-- The chosen file: the typed path wins over the list
+local function upload_chosen_file()
+  local typed = trim(input_table["upload_path"] and input_table["upload_path"]:get_text() or "")
+  if typed ~= "" then
+    return typed, upload_basename(typed)
+  end
+  local id = input_table["upload_file"] and input_table["upload_file"]:get_value() or 0
+  local candidate = (upload_state.candidates or {})[id]
+  if candidate then
+    return candidate.path, candidate.name
+  end
+  return nil
+end
+
+function upload_find_clicked()
+  local _, name = upload_chosen_file()
+  setMessage(loading_tag(strings.ui_upload_checking))
+  local text = upload_find_film(input_table["upload_imdb"]:get_text(), name)
+  upload_state.film_line = text
+  input_table["upload_film"]:set_text(text)
+  setMessage("")
+end
+
+-- Everything an upload or a check sends, without the file itself; or nil
+-- and the reason. `with_file` also returns the file's bytes.
+local function upload_fields()
+  local path, name = upload_chosen_file()
+  if not path then
+    return nil, strings.ui_upload_choose_file
+  end
+  local file = io.open(path, "rb")
+  local data = file and file:read("*a")
+  if file then
+    file:close()
+  end
+  if not data then
+    return nil, tr("ui_upload_cannot_read", name)
+  end
+  if #data < 100 then
+    return nil, strings.ui_upload_too_small
+  end
+  if #data > UPLOAD_MAX_BYTES then
+    return nil, tr("ui_upload_too_large", tostring(math.floor(#data / 1024)),
+      tostring(math.floor(UPLOAD_MAX_BYTES / 1024)))
+  end
+  local language = openSub.conf.languages[input_table["upload_language"]:get_value()]
+  if not language then
+    return nil, strings.ui_upload_language_needed
+  end
+  if not upload_state.film and not upload_state.new_film then
+    return nil, strings.ui_upload_film_needed
+  end
+
+  local fields = {
+    subhash = md5_hex(data),
+    subfilename = name,
+    sublanguageid = language[1],
+  }
+  if upload_state.film then
+    fields.feature_id = tonumber(upload_state.film.feature_id)
+  end
+  local hi = CHOICE_AUTO[input_table["upload_hi"]:get_value()]
+  if hi and hi[1] ~= nil then
+    fields.hearing_impaired = hi[1]
+  end
+  local foreign = CHOICE_AUTO[input_table["upload_foreign"]:get_value()]
+  if foreign and foreign[1] ~= nil then
+    fields.foreign_parts_only = foreign[1]
+  end
+  local translation = CHOICE_TRANSLATION[input_table["upload_translation"]:get_value()]
+  if translation and translation[1] == "machine" then
+    fields.machine_translated = true
+  elseif translation and translation[1] == "ai" then
+    fields.automatic_translation = true
+  end
+  local release = trim(input_table["upload_release"]:get_text() or "")
+  if release ~= "" then
+    fields.release_name = release
+  end
+  local comment = trim(input_table["upload_comment"]:get_text() or "")
+  if comment ~= "" then
+    fields.author_comments = comment
+  end
+  return fields, nil, data
+end
+
+function upload_check_clicked()
+  setMessage(loading_tag(strings.ui_upload_checking))
+  local fields, problem = upload_fields()
+  if not fields then
+    setMessage(error_tag(problem))
+    return
+  end
+  local status, answer = upload_request("POST", "/subtitles/upload/check", fields)
+  if status ~= 200 then
+    setMessage(error_tag(tr("ui_upload_failed", upload_error_text(status, answer))))
+    return
+  end
+  if answer.already_in_db then
+    setMessage(error_tag(strings.ui_upload_already))
+    return
+  end
+  local reasons = {}
+  for _, reason in ipairs(type(answer.rejection_reasons) == "table" and answer.rejection_reasons or {}) do
+    -- a film that is registered on upload is not "missing"
+    if not (upload_state.new_film and string.find(tostring(reason), "^feature_")) then
+      reasons[#reasons + 1] = tostring(reason)
+    end
+  end
+  if #reasons > 0 then
+    setMessage(error_tag(tr("ui_upload_would_be_rejected", table.concat(reasons, ", "))))
+  elseif answer.would_be_flagged then
+    setMessage(success_tag(strings.ui_upload_would_be_reviewed))
+  else
+    local left = type(answer.quota) == "table" and answer.quota.remaining
+    setMessage(success_tag(tr("ui_upload_ok_to_upload", tostring(left or "?"))))
+  end
+end
+
+-- Register the film that is on IMDb / TMDb but not here; its feature_id
+local function upload_register_film()
+  local new = upload_state.new_film
+  local body = {
+    title = new.title, year = tonumber(new.year), type = new.type,
+    source = new.imdb_id and "imdb" or "tmdb", imdb_id = new.imdb_id, tmdb_id = tonumber(new.tmdb_id),
+  }
+  local status, answer = upload_request("POST", "/subtitles/upload/features/stub", body, 60)
+  if status == 201 and answer.feature_id then
+    return answer.feature_id
+  elseif status == 409 and type(answer.details) == "table" and answer.details.feature_id then
+    return answer.details.feature_id -- registered meanwhile
+  end
+  return nil, upload_error_text(status, answer)
+end
+
+function upload_send_clicked()
+  setMessage(loading_tag(strings.ui_upload_working))
+  local fields, problem, data = upload_fields()
+  if not fields then
+    setMessage(error_tag(problem))
+    return
+  end
+  if not fields.feature_id and upload_state.new_film then
+    local feature_id, failure = upload_register_film()
+    if not feature_id then
+      setMessage(error_tag(tr("ui_upload_failed", failure)))
+      return
+    end
+    upload_state.film = { feature_id = feature_id, title = upload_state.new_film.title, year = upload_state.new_film.year }
+    upload_state.new_film = nil
+    fields.feature_id = tonumber(feature_id)
+    input_table["upload_film"]:set_text(film_text(upload_state.film))
+  end
+  fields.subcontent = base64_encode(deflate_stored(data))
+  local status, answer = upload_request("POST", "/subtitles/upload", fields, 90)
+  if status == 201 then
+    local release = tostring(answer.release_name or fields.subfilename)
+    if answer.subtitle_status == "pending" then
+      setMessage(success_tag(tr("ui_upload_done_review", release)))
+    else
+      setMessage(success_tag(tr("ui_upload_done", release)))
+    end
+    vlc.msg.info("[VLSub] Uploaded subtitle " .. tostring(answer.subtitle_id))
+  elseif status == 409 then
+    setMessage(error_tag(strings.ui_upload_already))
+  else
+    setMessage(error_tag(tr("ui_upload_failed", upload_error_text(status, answer))))
+  end
 end
 
 -- AI credits of the logged-in account (GET /ai/credits), or nil when they

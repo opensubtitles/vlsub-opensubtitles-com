@@ -222,6 +222,8 @@ local function new_dialog(vlc, title)
       local args = { ... }
       local w = new_widget(kind, self)
       for i, name in ipairs(names) do w[name] = args[i] end
+      -- VLC reads the text with luaL_optstring: a number is taken as its text
+      if type(w.text) == "number" then w.text = tostring(w.text) end
       if w.text ~= nil and type(w.text) ~= "string" then
         error("add_" .. kind .. "(): text must be a string, got " .. type(w.text), 2)
       end

@@ -1,0 +1,5 @@
+HTTP/1.1 409 Conflict
+Content-Type: application/json; charset=utf-8
+Connection: close
+
+{"error_code":"duplicate","message":"A feature with that IMDb id already exists","details":{"feature_id":180494,"exists_in_db":true}}

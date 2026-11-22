@@ -1,0 +1,5 @@
+HTTP/1.1 403 Forbidden
+Content-Type: application/json; charset=utf-8
+Connection: close
+
+{"error_code":"upload_rank_not_allowed","message":"Your account's rank does not allow uploading. Uploading is open to Trusted, Gold and Platinum members, translators and staff.","details":{"quota":{"allowed":false,"rank":"none","limit":0,"remaining":0,"next_slot_at":null,"resets_at":null,"windows":{"day":{"seconds":86400,"limit":50,"used":0,"remaining":50,"next_slot_at":null},"week":{"seconds":604800,"limit":200,"used":0,"remaining":200,"next_slot_at":null}}}}}

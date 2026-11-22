@@ -19,7 +19,9 @@ codes = true
 allow_defined_top = true
 
 -- Injected by VLC
-read_globals = { "vlc" }
+read_globals = { "vlc",
+  -- only where they exist, checked when used (the MD5 of an upload)
+  "loadstring", "bit32" }
 
 -- Globals that are first assigned inside a function (check_config and the
 -- translation loader) instead of at the top level.

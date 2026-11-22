@@ -112,3 +112,38 @@ Lua can: raw deflate in stored blocks (no compression), base64**:
 
 The stored-deflate packing is accepted: VLSub needs no compressor, only MD5
 and base64 in Lua. The answers are fixtures (`tests/fixtures/raw/upload_*.http`).
+
+## Built (2026-11-22, branch `dev`)
+
+Decided by the owner: "Upload" button in the main window; the file is one
+of the subtitle files next to the video (same name start) or any file by its
+full path; a film the site does not have is registered from its IMDb / TMDb
+id; hearing impaired / foreign parts (Automatic / Yes / No), translated by a
+person / machine / AI, release name and comment can be set. The video's
+hash is not sent.
+
+- MD5 (RFC 1321), base64 and a stored-block deflate stream in plain Lua.
+  32-bit operations: the language's own where it has them, `bit32` on 5.2,
+  byte tables on Lua 5.1 (VLC for macOS): 300 kB in 0.46 s there.
+- Upload window: file, path, language (from the file name, else the first
+  subtitle language), film (guessed when the window opens; Find with an
+  IMDb id or link), flags, release name, comment; Check and Upload.
+- A film on IMDb / TMDb but not here: Upload registers it
+  (`features/stub`, `source: imdb`) and uploads to the new `feature_id`;
+  a 409 from the stub (registered meanwhile) uses its `feature_id`.
+- Limits checked before sending: at least 100 bytes, at most 350 kB.
+- Tests replay recorded answers only (`tests/fixtures/raw/upload_*.http`)
+  and check what was sent: the MD5 against `md5sum`, the packed file
+  inflated back byte for byte.
+- Real VLC 3.0.16 through `tools/devproxy.py` to the development API:
+  Find (The Matrix), Check ("Ready: 49 uploads left today"), Upload
+  ("Uploaded: upload-test.en") - then withdrawn.
+
+Found on the way, for the API team:
+
+- `features/stub` with `source: "imdb"` answered `provisional: true` and
+  "A moderator will review it shortly", although the documentation says a
+  title from IMDb / TMDb is visible at once.
+- An upload with only `idmovieimdb` of a film that is on IMDb but not in
+  the database is refused (`feature_not_found`); the server could register
+  it itself, as `stub` does, and save every client two calls.

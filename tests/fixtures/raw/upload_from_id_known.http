@@ -1,0 +1,5 @@
+HTTP/1.1 200 OK
+Content-Type: application/json; charset=utf-8
+Connection: close
+
+{"found":true,"exists_in_db":true,"feature_id":180494,"imdb_id":"tt1254207","tmdb_id":10378,"title":"Big Buck Bunny","year":2008,"type":"movie"}

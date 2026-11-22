@@ -1,0 +1,5 @@
+HTTP/1.1 201 Created
+Content-Type: application/json; charset=utf-8
+Connection: close
+
+{"feature_id":180494,"type":"Movie","title":"Big Buck Bunny","year":2008,"imdbid":1254207,"tmdbid":10378,"source":"imdb","provisional":true,"message":"Provisional feature created. A moderator will review it shortly."}

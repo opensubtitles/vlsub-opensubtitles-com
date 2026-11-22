@@ -87,7 +87,8 @@ EXCEPTIONS[7] = {
      .. "the message after Save (one request to /ai/credits); a 'Search filters' "
      .. "row and window, whose settings change nothing while at their defaults; the help window "
      .. "rewritten (shorter, with an AI section, and with the 'Check Updates' button "
-     .. "that used to be in the configuration window); entries the API "
+     .. "that used to be in the configuration window); an 'Upload' button in the main window; "
+     .. "entries the API "
      .. "offers only to 2.x User-Agents are marked and paid with credits. Nothing else "
      .. "may change: the row is left out of the comparison.",
 }
@@ -239,6 +240,9 @@ local function snapshot(env, norm, cursor)
       -- the "Check Updates" button moved from the configuration window to the
       -- help window in 2.0 (exception 7): it is left out of the comparison
       local moved_button = is_config and x.kind == "button" and (x.text or ""):find("Check Updates", 1, true)
+      -- the main window's "Upload" button is new in 2.0 (exception 7)
+      local new_button = x.kind == "button" and (x.text or ""):find("Upload", 1, true) ~= nil
+      moved_button = moved_button or new_button
       if not (is_config and skip[x.row]) and not is_help and not moved_button then
         local row = is_config and row_number[x.row] or x.row
         local col = (is_config and x.kind == "dropdown") and "*" or tostring(x.col) -- exception 6
