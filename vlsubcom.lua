@@ -593,12 +593,12 @@ local strings = {
   ui_upload_too_large = "The file is too large to upload from VLC (%s kB; at most %s kB).",
   ui_upload_film_year = "%s (%s)",
   ui_upload_film_unknown = "Not known yet - enter its IMDb id, link or title and press Find.",
-  ui_upload_film_new = "%s is not on OpenSubtitles yet - uploading will add it.",
   ui_upload_film_not_on_imdb = "No film with that id on IMDb or TMDb.",
   ui_upload_film_needed = "Which film is it? Enter its IMDb id, link or title and press Find.",
   ui_upload_language_needed = "Choose the language of the subtitles.",
   ui_upload_ok_to_upload = "Ready: this subtitle can be uploaded (%s uploads left today).",
   ui_upload_already = "This subtitle is already on OpenSubtitles - nothing to upload.",
+  ui_upload_already_at = "This subtitle is already on OpenSubtitles: %s - nothing to upload.",
   ui_upload_would_be_rejected = "The upload would be refused: %s",
   ui_upload_would_be_reviewed = "Ready - a moderator will check it before it appears.",
   ui_upload_done = "Uploaded: %s - thank you!",
@@ -5846,8 +5846,10 @@ local function upload_find_film(id_text, file_name)
       upload_state.film = answer
       return film_text(answer)
     elseif status == 200 and answer.found then
+      -- not on the site yet: Upload adds it first (upload_register_film);
+      -- nothing the user has to know or do
       upload_state.new_film = answer
-      return tr("ui_upload_film_new", film_text(answer))
+      return film_text(answer)
     elseif status == 404 then
       return strings.ui_upload_film_not_on_imdb
     end
@@ -6199,6 +6201,44 @@ local function upload_fields()
   return fields, nil, data
 end
 
+-- "<a href='url'>text</a>" for a plain https address of a page on the site,
+-- otherwise the text alone
+local function page_link(url, text)
+  text = string.gsub(tostring(text or ""), "[<>&]", "")
+  if type(url) == "string" and string.match(url, "^https://[%w%.%-]+/[%w%-%._~/%%]*$") then
+    return "<a href='" .. url .. "'>" .. text .. "</a>"
+  end
+  return text
+end
+
+-- "Already on OpenSubtitles", with a link to that subtitle's page when it
+-- can be found. The API gives only its id (duplicate_of); its page address
+-- comes with the film's subtitles in that language (/subtitles?id= is the
+-- film's feature id). One request, first page only.
+local function upload_already_text(duplicate_of, feature_id, language)
+  duplicate_of, feature_id = tonumber(duplicate_of), tonumber(feature_id)
+  if duplicate_of and feature_id and language then
+    local client = Curl.new()
+    client:add_header("Api-Key", api_key())
+    client:set_timeout(15)
+    client:set_deadline(15)
+    client:set_retries(0)
+    local res = client:get(build_sorted_url(api_url("/subtitles"),
+      { id = tostring(feature_id), languages = tostring(language) }))
+    local ok, answer = decode_object(res and res.status == 200 and res.body or "")
+    for _, row in ipairs(ok and type(answer.data) == "table" and answer.data or {}) do
+      local a = type(row) == "table" and row.attributes
+      if type(a) == "table" and tonumber(row.id or a.subtitle_id) == duplicate_of then
+        local link = page_link(a.url, a.release ~= "" and a.release or tostring(duplicate_of))
+        if string.find(link, "<a ", 1, true) then
+          return tr("ui_upload_already_at", link)
+        end
+      end
+    end
+  end
+  return strings.ui_upload_already
+end
+
 function upload_check_clicked()
   setMessage(loading_tag(strings.ui_upload_checking))
   local fields, problem = upload_fields()
@@ -6212,7 +6252,8 @@ function upload_check_clicked()
     return
   end
   if answer.already_in_db then
-    setMessage(error_tag(strings.ui_upload_already))
+    local feature = type(answer.feature) == "table" and answer.feature.feature_id or fields.feature_id
+    setMessage(error_tag(upload_already_text(answer.duplicate_of, feature, fields.sublanguageid)))
     return
   end
   local reasons = {}
@@ -6270,14 +6311,8 @@ function upload_send_clicked()
   fields.subcontent = base64_encode(deflate_stored(data))
   local status, answer = upload_request("POST", "/subtitles/upload", fields, 90)
   if status == 201 then
-    local release = tostring(answer.release_name or fields.subfilename)
-    release = string.gsub(release, "[<>&]", "")
-    -- the subtitle's page on the site, clickable (only a plain https
-    -- address of the API's site is made a link)
-    local url = answer.download_url
-    if type(url) == "string" and string.match(url, "^https://[%w%.%-]+/[%w%-%._~/%%]*$") then
-      release = "<a href='" .. url .. "'>" .. release .. "</a>"
-    end
+    -- the subtitle's page on the site, clickable
+    local release = page_link(answer.download_url, answer.release_name or fields.subfilename)
     if answer.subtitle_status == "pending" then
       setMessage(success_tag(tr("ui_upload_done_review", release)))
     else
@@ -6285,7 +6320,7 @@ function upload_send_clicked()
     end
     vlc.msg.info("[VLSub] Uploaded subtitle " .. tostring(answer.subtitle_id))
   elseif status == 409 then
-    setMessage(error_tag(strings.ui_upload_already))
+    setMessage(error_tag(upload_already_text(answer.duplicate_of, fields.feature_id, fields.sublanguageid)))
   else
     setMessage(error_tag(tr("ui_upload_failed", upload_error_text(status, answer))))
   end

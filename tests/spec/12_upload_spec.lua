@@ -228,13 +228,32 @@ describe("upload: the window", function()
     eq(last(env, "/upload/check").body.subfilename, "Other.Film.2001.srt")
   end)
 
-  it("already on the site: Check and Upload both say so (recorded 200 already_in_db / 409 duplicate)", function()
+  it("already on the site: Check and Upload both say so, with a link to that subtitle", function()
+    -- recorded: check 200 already_in_db / upload 409, both duplicate_of
+    -- 1193045; the film's English subtitles list it with its page
     local env = setup({ check = "upload_check_known", upload = "upload_upload_duplicate" })
+    env.server:on("GET " .. API .. "/subtitles", function(req)
+      env.sent[#env.sent + 1] = { key = "GET /subtitles", query = req.query }
+      return api.fixture("upload_duplicate_search")
+    end)
+    local w = upload_window(env)
+    local DUPLICATE = "already on OpenSubtitles: <a href='https://rb-dev.ngrok.dev/en/subtitles/"
+      .. "upload-test-6df82c8b-7bfd-4ee7-a38a-23bd7b18290e'>upload-test</a> - nothing to upload"
+    w.check:_click()
+    has(env.message(), DUPLICATE)
+    eq(last(env, "GET /subtitles").query, { id = "163533", languages = "en" })
+    w.send:_click()
+    has(env.message(), DUPLICATE)
+  end)
+
+  it("already on the site, its page not found: said without a link", function()
+    -- the film's subtitles do not list it (withdrawn, on a later page ...)
+    local env = setup({ check = "upload_check_known", upload = "upload_upload_duplicate" })
+    env.server:on("GET " .. API .. "/subtitles", function() return api.fixture("upload_features_none") end)
     local w = upload_window(env)
     w.check:_click()
-    has(env.message(), "already on OpenSubtitles")
-    w.send:_click()
-    has(env.message(), "already on OpenSubtitles")
+    has(env.message(), "This subtitle is already on OpenSubtitles - nothing to upload.")
+    lacks(env.message(), "<a ")
   end)
 
   it("an account without upload rank gets the server's own explanation (recorded 403)", function()
@@ -265,7 +284,7 @@ describe("upload: a film the site does not have", function()
     w.imdb:set_text("tt1254207")
     w.find:_click()
     eq(last(env, "/features/from_id").body, { imdb_id = "tt1254207" })
-    has(w.film.text, BUNNY_LINK .. " is not on OpenSubtitles yet")
+    eq(w.film.text, BUNNY_LINK, "not on the site yet: nothing said, Upload adds it")
     w.send:_click()
     local stub = last(env, "/features/stub").body
     eq(stub.source, "imdb")
@@ -422,7 +441,6 @@ describe("upload: finding the film of the playing video", function()
     return r and r.path
   end
   local RELOADED_NEW = "<a href='https://www.imdb.com/title/tt0234215/'>The Matrix Reloaded (2003)</a>"
-    .. " is not on OpenSubtitles yet"
 
   it("a typed title the site does not have is found on IMDb and looked up by its id", function()
     local env = setup({ guess = "upload_guess_none", imdb = "imdb_query_matrix_reloaded",
@@ -432,7 +450,7 @@ describe("upload: finding the film of the playing video", function()
     w.find:_click()
     eq(imdb_asked(env), "/search/query-matrix+reloaded")
     eq(last(env, "/features/from_id").body, { imdb_id = "tt0234215" })
-    has(w.film.text, RELOADED_NEW)
+    eq(w.film.text, RELOADED_NEW)
     eq(w.imdb:get_text(), "tt0234215")
     eq(env.errors(), {})
   end)
@@ -445,7 +463,7 @@ describe("upload: finding the film of the playing video", function()
     w.find:_click()
     eq(last(env, "/features").query.year, "2003")
     eq(imdb_asked(env), "/search/query-Matrix+Reloaded+2003")
-    has(w.film.text, RELOADED_NEW)
+    eq(w.film.text, RELOADED_NEW)
   end)
 
   it("the site's own film with that title wins: IMDb is not asked", function()

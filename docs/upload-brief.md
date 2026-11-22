@@ -135,6 +135,14 @@ the video goes with the video's hash, size and name; a file by path does not.
   film's title and year (a release group, source, quality - GuessIt's answer
   for the file counts); "Send.Help.2026" leaves the field empty.
 - After the upload: "Uploaded: <release>" linked to the subtitle's page.
+- Film not on the site yet: the Film line shows only the film; Upload adds
+  it first without saying so (nothing the user has to know).
+- Already on the site (check `already_in_db` / upload 409): the message
+  links to that subtitle. The API gives only `duplicate_of` (a
+  subtitle_id); the page address comes from `/subtitles?id=<feature_id>&
+  languages=<lang>` (`id` there is the FILM's feature id), the row with
+  that id. First page only; not found -> the message without a link.
+  Wanted from the API: the duplicate's `url` in both answers.
 - A film on IMDb / TMDb but not here: Upload registers it
   (`features/stub`, `source: imdb`) and uploads to the new `feature_id`;
   a 409 from the stub (registered meanwhile) uses its `feature_id`.
@@ -179,7 +187,7 @@ with `from_id` as if typed. Code: `upload_search_imdb` in `vlsubcom.lua`
   302 redirect) - not used.
 - A side service: its host failing does not hold back the API's requests;
   after no answer it is left alone for a minute.
-- Real VLC through the proxy: "matrix reloaded" -> tt0234215, "not on
-  OpenSubtitles yet - uploading will add it".
+- Real VLC through the proxy: "matrix reloaded" -> tt0234215; the Film
+  line shows only the film - that Upload adds it to the site is not said.
 
 Replace with the API call when it exists, and drop the fixtures.

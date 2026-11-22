@@ -215,6 +215,8 @@ downloading are worth showing; typing with a remote is rare.
 - Upload: find a film the site does not have yet by its title (+ year) -
   `guess` or `from_id` answering as `from_id` does for an id. Clients now
   have to ask imdb.opensubtitles.org for the IMDb id first.
+- Upload check / 409 duplicate: the existing subtitle's page `url` next to
+  `duplicate_of`, so a client can link to it without searching the film.
 
 ## 4. Rules for all of them
 

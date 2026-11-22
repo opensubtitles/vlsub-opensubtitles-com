@@ -10,6 +10,7 @@ lists "my uploads" and WITHDRAWS the upload again. Every answer is written
 to the given folder (token masked) - that is where tests/fixtures/raw/
 upload_*.http came from. Never point it at the production API.
 """
+import base64, hashlib, http.client, json, os, re, struct, sys, time
 env = dict(l.strip().split('=', 1) for l in open(os.path.expanduser('~/.vlsub-test.env')) if '=' in l)
 KEY, HOST = env['VLSUB_DEV_API_KEY'], 'rb-dev.ngrok.dev'
 UA = 'VLSub OpenSubtitles.com v2.0.0'
@@ -52,11 +53,14 @@ call('guess', 'POST', '/subtitles/upload/guess', {'filename': 'The.Matrix.1999.1
 fields = {'subhash': md5, 'subfilename': 'The.Matrix.1999.1080p.BluRay.x264.en.srt', 'sublanguageid': 'en', 'feature_id': 163533,
           'moviefilename': 'The.Matrix.1999.1080p.BluRay.x264.mkv', 'moviebytesize': 123456789, 'moviehash': '0123456789abcdef'}
 call('check_new', 'POST', '/subtitles/upload/check', fields)
-up = dict(fields, subcontent=packed, author_comments='VLSub API test - withdrawn right after')
+up = dict(fields, subcontent=packed, release_name='upload-test', author_comments='VLSub API test - withdrawn right after')
 st, j = call('upload', 'POST', '/subtitles/upload', up)
 sid = j and j.get('subtitle_id')
 call('check_known', 'POST', '/subtitles/upload/check', fields)
 call('upload_duplicate', 'POST', '/subtitles/upload', up)
+# the duplicate's page: search the film in that language, the row with the
+# duplicate's id carries its url (/subtitles?id= is a FEATURE id)
+call('duplicate_search', 'GET', '/subtitles?id=163533&languages=en')
 call('my_uploads', 'GET', '/my/uploads')
 if sid:
     call('withdraw', 'DELETE', '/my/uploads/%s' % sid)
