@@ -143,6 +143,11 @@ the video goes with the video's hash, size and name; a file by path does not.
   `from_id` answers with the show and `preselected`; that episode is used
   and shown as "Show S01E02 - Title". Real VLC: series without episode is
   refused locally, with 1 / 2 Check says Ready.
+- A file name typed into the IMDb field ("how.i.met.your.mother.s01.e06",
+  "The.Matrix.1999"): sent to `/subtitles/upload/guess` first (it finds
+  episodes by name); else its title is searched and season / episode go in
+  their row. The playing video: GuessIt's answer for that file (title,
+  year, season, episode) is used, not the main window's search fields.
 - Film not on the site yet: the Film line shows only the film; Upload adds
   it first without saying so (nothing the user has to know).
 - Already on the site (check `already_in_db` / upload 409): the message

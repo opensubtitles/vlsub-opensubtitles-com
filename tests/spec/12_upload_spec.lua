@@ -398,10 +398,51 @@ describe("upload: TV series", function()
     eq(body.season_number, nil, "the episode's own id needs no numbers")
   end)
 
+  local SLUTTY_PUMPKIN = "<a href='https://www.imdb.com/title/tt0606116/'>"
+    .. "How I Met Your Mother S01E06 - The Slutty Pumpkin (2005)</a>"
+  local HIMYM = "<a href='https://www.imdb.com/title/tt0460649/'>How I Met Your Mother (2005)</a>"
+
+  it("a file name typed into the field: the site's guess finds the episode (recorded)", function()
+    local env = setup({ guess = "upload_guess_none" })
+    local w = upload_window(env)
+    env.server:on("POST " .. API .. "/subtitles/upload/guess", function()
+      return api.fixture("upload_guess_typed_episode")
+    end)
+    w.imdb:set_text("how.i.met.your.mother.s01.e06")
+    w.find:_click()
+    eq(w.film.text, SLUTTY_PUMPKIN)
+    eq({ w.season:get_text(), w.episode:get_text() }, { "1", "6" })
+    eq(w.imdb:get_text(), "tt0606116")
+  end)
+
+  it("a file name the guess does not know: its title is searched, season and episode filled in", function()
+    local env = setup({ guess = "upload_guess_none", features = "upload_features_himym" })
+    local w = upload_window(env)
+    w.imdb:set_text("how.i.met.your.mother.s01.e06")
+    w.find:_click()
+    eq(last(env, "/features").query.query, "how i met your mother")
+    eq(w.film.text, HIMYM)
+    eq({ w.season:get_text(), w.episode:get_text() }, { "1", "6" })
+    w.check:_click()
+    local body = last(env, "/upload/check").body
+    eq({ body.feature_id, body.season_number, body.episode_number }, { 180497, 1, 6 })
+  end)
+
+  it("the playing video: GuessIt's title finds the series, its season and episode are filled in", function()
+    local env = setup({ guess = "upload_guess_none", features = "upload_features_himym" })
+    openSub.file.completeName = "how.i.met.your.mother.s01e06.mkv"
+    openSub.file.last_guessit_filename = openSub.file.completeName
+    openSub.file.guessit_data = { title = "How I Met Your Mother", season = 1, episode = 6, type = "episode" }
+    openSub.getFileInfo = function() end -- keep the playing file above
+    local w = upload_window(env)
+    eq(w.film.text, HIMYM)
+    eq({ w.season:get_text(), w.episode:get_text() }, { "1", "6" })
+  end)
+
   it("names: S01E02, s1e2, 1x02, S01.E02 are read; a year or resolution is not", function()
     H.launch({ activate = false })
     local read = H.find_local("episode_from_name")
-    local function both(name) return { read(name) } end
+    local function both(name) local s, e = read(name) return { s, e } end
     eq(both("Show.S01E02.720p.srt"), { 1, 2 })
     eq(both("show s1e2"), { 1, 2 })
     eq(both("Show - 1x02 - Title"), { 1, 2 })

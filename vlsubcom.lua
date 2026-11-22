@@ -5736,14 +5736,48 @@ local function is_series(film)
     or string.find(kind, "tv", 1, true)) ~= nil
 end
 
--- Season and episode written in a file name: S01E02, s1e2, 1x02
+-- Season and episode written in a file name: S01E02, s1e2, S01.E02, 1x02;
+-- also where in the name they start
 local function episode_from_name(name)
   name = tostring(name or "")
-  local season, episode = string.match(name, "[Ss](%d%d?)[%s%._%-]*[Ee](%d%d?%d?)%f[%D]")
-  if not season then
-    season, episode = string.match(name, "%f[%d](%d%d?)[xX](%d%d%d?)%f[%D]")
+  local at, _, season, episode = string.find(name, "[Ss](%d%d?)[%s%._%-]*[Ee](%d%d?%d?)%f[%D]")
+  if not at then
+    at, _, season, episode = string.find(name, "%f[%d](%d%d?)[xX](%d%d%d?)%f[%D]")
   end
-  return tonumber(season), tonumber(episode)
+  return tonumber(season), tonumber(episode), at
+end
+
+-- Season and episode into the window (and what Check / Upload send)
+local function set_upload_episode(season, episode)
+  season, episode = tonumber(season), tonumber(episode)
+  if not (season and episode) then
+    return
+  end
+  upload_state.season, upload_state.episode = tostring(season), tostring(episode)
+  if input_table["upload_season"] then
+    input_table["upload_season"]:set_text(upload_state.season)
+    input_table["upload_episode"]:set_text(upload_state.episode)
+  end
+end
+
+-- What GuessIt read from the playing video's file name: title, year,
+-- season, episode (season / episode also from the name itself)
+local function playing_guess()
+  local guess = openSub.file.completeName and openSub.file.last_guessit_filename == openSub.file.completeName
+    and openSub.file.guessit_data
+  if type(guess) ~= "table" then
+    guess = {}
+  end
+  local title = type(guess.title) == "string" and guess.title or tostring(openSub.movie.title or "")
+  local year = tonumber(guess.year) or tonumber(openSub.movie.year)
+  local season, episode = tonumber(guess.season), tonumber(guess.episode)
+  if not (season and episode) then
+    season, episode = episode_from_name(openSub.file.name)
+  end
+  if not (season and episode) then
+    season, episode = tonumber(openSub.movie.seasonNumber), tonumber(openSub.movie.episodeNumber)
+  end
+  return trim(title), year, season, episode
 end
 
 -- The Film line: "Title (year)", a link to the film's IMDb page when known
@@ -5905,7 +5939,28 @@ local function upload_find_film(id_text, file_name)
   upload_state.film, upload_state.new_film = nil, nil
   id_text = trim(id_text or "")
   if id_text ~= "" and not looks_like_id(id_text) then
-    local title, year = split_year(id_text)
+    -- a title, or a file name ("how.i.met.your.mother.s01.e06"): the site's
+    -- guess knows its films and episodes by name; else the title alone, with
+    -- season and episode put in their row
+    local season, episode, at = episode_from_name(id_text)
+    local file_like = at or not string.find(id_text, " ", 1, true) and string.find(id_text, "[%._]")
+    if file_like then
+      local status, answer = upload_request("POST", "/subtitles/upload/guess", { filename = id_text })
+      local best = status == 200 and type(answer.best_guess) == "table" and answer.best_guess
+      if best and best.feature_id then
+        upload_state.film = best
+        set_upload_episode(best.season_number or season, best.episode_number or episode)
+        return film_text(best)
+      end
+    end
+    set_upload_episode(season, episode)
+    local title = at and string.sub(id_text, 1, at - 1) or id_text
+    if file_like then
+      title = string.gsub(title, "[%._]+", " ")
+    end
+    title = string.gsub(trim(title), "[%s%-%(%[]+$", "")
+    local year
+    title, year = split_year(title)
     return upload_find_title(title, year, false) or strings.ui_upload_film_unknown
   end
   if id_text ~= "" then
@@ -5919,12 +5974,7 @@ local function upload_find_film(id_text, file_name)
     -- an episode's id: the answer describes its show and adds the episode
     local pick = status == 200 and type(answer.preselected) == "table" and answer.preselected
     if pick then
-      upload_state.season = tostring(tonumber(pick.season_number) or "")
-      upload_state.episode = tostring(tonumber(pick.episode_number) or "")
-      if input_table["upload_season"] then
-        input_table["upload_season"]:set_text(upload_state.season)
-        input_table["upload_episode"]:set_text(upload_state.episode)
-      end
+      set_upload_episode(pick.season_number, pick.episode_number)
     end
     if pick and answer.exists_in_db and tonumber(pick.feature_id) then
       upload_state.film = { feature_id = tonumber(pick.feature_id), title = pick.title, imdb_id = pick.imdb_id,
@@ -6036,15 +6086,11 @@ local function upload_detect_film()
   if imdb and imdb ~= "" then
     return upload_find_film("tt" .. imdb, nil)
   end
-  -- the title and year GuessIt read from the file name (the name search
-  -- has them), searched in the site's films
-  local episode = tostring(openSub.movie.seasonNumber or "") ~= "" or tostring(openSub.movie.episodeNumber or "") ~= ""
-  local found
-  if episode then -- IMDb would give the series, not the episode
-    found = upload_search_features(openSub.movie.title, openSub.movie.year)
-  else
-    found = upload_find_title(trim(openSub.movie.title or ""), tonumber(openSub.movie.year), true)
-  end
+  -- the title and year GuessIt read from the video's file name: the site's
+  -- films, then IMDb (exact title only). An episode: its series is found,
+  -- season and episode go in their row.
+  local title, year = playing_guess()
+  local found = title ~= "" and upload_find_title(title, year, true)
   if found then
     return found
   end
@@ -6120,10 +6166,7 @@ function show_upload()
   local first = upload_state.candidates[1]
   local season, episode = episode_from_name(first and first.name)
   if not season then
-    season, episode = episode_from_name(openSub.file.name)
-  end
-  if not season then
-    season, episode = tonumber(openSub.movie.seasonNumber), tonumber(openSub.movie.episodeNumber)
+    season, episode = select(3, playing_guess())
   end
   local film = upload_state.film or upload_state.new_film
   if not season and film then
