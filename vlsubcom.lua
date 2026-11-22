@@ -4387,8 +4387,51 @@ function progressBarContent(pct)
   return content
 end
 
+-- Breaks a message into lines of at most `width` visible characters at
+-- spaces (tags take no room, an entity one). A label shows a long message
+-- as one line, cut at the window's edge.
+local function wrap_message(text, width)
+  local out, line_length, last_space = {}, 0, nil
+  local i, n = 1, #text
+  while i <= n do
+    local c = string.sub(text, i, i)
+    local piece
+    if c == "<" then
+      piece = string.match(text, "^<[^>]*>", i) or c
+      if string.lower(piece) == "<br>" then line_length, last_space = 0, nil end
+    elseif c == "&" then
+      piece = string.match(text, "^&#?%w+;", i) or c
+      line_length = line_length + 1
+    else
+      piece = string.match(text, "^[\1-\127\194-\244][\128-\191]*", i) or c
+      if piece == " " then
+        last_space = #out + 1
+      end
+      line_length = line_length + 1
+    end
+    out[#out + 1] = piece
+    if line_length > width and last_space then
+      out[last_space] = "<br>"
+      -- what is after that space now starts the line
+      line_length = 0
+      for k = last_space + 1, #out do
+        if string.sub(out[k], 1, 1) ~= "<" then line_length = line_length + 1 end
+      end
+      last_space = nil
+    end
+    i = i + #piece
+  end
+  return table.concat(out)
+end
+
+-- in the upload window the server's own explanations can be long
+local MESSAGE_WIDTH = { [5] = 90 }
+
 function setMessage(str)
   if input_table["message"] then
+    if MESSAGE_WIDTH[current_window_id] and type(str) == "string" then
+      str = wrap_message(str, MESSAGE_WIDTH[current_window_id])
+    end
     input_table["message"]:set_text(str)
     dlg:update()
   end

@@ -316,6 +316,44 @@ describe("upload: a film the site does not have", function()
   end)
 end)
 
+describe("upload: long messages", function()
+  local function visible_lines(text)
+    local lines = {}
+    for line in (text .. "<br>"):gmatch("(.-)<br>") do
+      lines[#lines + 1] = line:gsub("<[^>]*>", ""):gsub("&#?%w+;", "x")
+    end
+    return lines
+  end
+
+  it("are broken into lines at spaces; tags take no room and are never cut", function()
+    H.launch({ activate = false })
+    local wrap = H.find_local("wrap_message")
+    eq(wrap("short text", 90), "short text")
+    eq(wrap("aaa bbb ccc", 7), "aaa bbb<br>ccc")
+    eq(wrap("<b>aaa</b> bbb ccc", 7), "<b>aaa</b> bbb<br>ccc")
+    eq(wrap("x <a href='https://example.org/a b'>one two</a> three", 9),
+       "x <a href='https://example.org/a b'>one two</a><br>three", "the space inside the tag is not a break")
+    eq(wrap("H&#318;ada&#357; aaa", 8), "H&#318;ada&#357;<br>aaa")
+    eq(wrap("\197\161\197\161\197\161 \197\161\197\161", 4), "\197\161\197\161\197\161<br>\197\161\197\161")
+    eq(wrap("one<br>two three four", 9), "one<br>two three<br>four")
+    eq(wrap("averyveryverylongword next", 5), "averyveryverylongword<br>next", "no space to break at")
+  end)
+
+  it("the server's long explanation in the upload window: lines of at most 90 characters", function()
+    -- recorded 403: "Your account's rank does not allow uploading. Uploading is
+    -- open to Trusted, Gold and Platinum members, translators and staff."
+    local env = setup({ check = "upload_rank_refused" })
+    local w = upload_window(env)
+    w.check:_click()
+    local lines = visible_lines(env.message())
+    ok(#lines >= 2 and #lines <= 3, "2 or 3 lines: " .. env.message())
+    for _, line in ipairs(lines) do
+      ok(#line <= 90, "line of " .. #line .. ": " .. line)
+    end
+    has(env.message():gsub("<br>", " "), "Uploading is open to Trusted, Gold and Platinum members, translators and staff.")
+  end)
+end)
+
 describe("upload: the Film line", function()
   it("links to IMDb when the id is known; a title is escaped only inside the link", function()
     H.launch({ activate = false })
