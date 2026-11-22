@@ -5,13 +5,16 @@
 -- Decided by the owner: an "Upload" button in the main window; the file is
 -- one of the subtitle files next to the video, or any file by its path; a
 -- missing film is registered from its IMDb id; flags and a comment can be
--- set; the video's hash is not sent.
+-- set; the video's hash goes with a file that sits next to the video.
 local H = ...
 local describe, it, eq, ok, has, lacks = H.describe, H.it, H.eq, H.ok, H.has, H.lacks
 local api, json = H.fake_api, H.json
 
 local API = "api.opensubtitles.com/api/v1"
 local VIDEO = "The.Matrix.1999.1080p.BluRay.x264"
+-- the Film line links to the film's IMDb page
+local MATRIX_LINK = "<a href='https://www.imdb.com/title/tt0133093/'>The Matrix (1999)</a>"
+local BUNNY_LINK = "<a href='https://www.imdb.com/title/tt1254207/'>Big Buck Bunny (2008)</a>"
 -- a subtitle of the size the API accepts (at least 100 bytes)
 local SRT = "1\r\n00:00:01,000 --> 00:00:04,000\r\nThere is no spoon.\r\n\r\n"
   .. "2\r\n00:00:05,000 --> 00:00:08,000\r\nThen you will see that it is not the spoon that bends.\r\n"
@@ -155,7 +158,7 @@ describe("upload: the window", function()
     has(w.dialog.title, "Upload subtitles")
     eq(w.file:_texts(), { VIDEO .. ".en.srt", VIDEO .. ".sk.srt", "None" })
     eq(w.language:_texts()[1], "English")
-    eq(w.film.text, "The Matrix (1999)")
+    eq(w.film.text, MATRIX_LINK)
     eq(w.release:get_text(), VIDEO)
     eq(last(env, "/upload/guess").body, { filename = VIDEO .. ".mkv" })
     ok(last(env, "/upload/guess").auth, "logged in")
@@ -260,7 +263,7 @@ describe("upload: a film the site does not have", function()
     w.imdb:set_text("tt1254207")
     w.find:_click()
     eq(last(env, "/features/from_id").body, { imdb_id = "tt1254207" })
-    has(w.film.text, "Big Buck Bunny (2008) is not on OpenSubtitles yet")
+    has(w.film.text, BUNNY_LINK .. " is not on OpenSubtitles yet")
     w.send:_click()
     local stub = last(env, "/features/stub").body
     eq(stub.source, "imdb")
@@ -268,7 +271,7 @@ describe("upload: a film the site does not have", function()
     eq(stub.tmdb_id, 10378)
     eq(stub.title, "Big Buck Bunny")
     eq(last(env, "/subtitles/upload").body.feature_id, 180494, "uploaded to the registered film")
-    eq(w.film.text, "Big Buck Bunny (2008)")
+    eq(w.film.text, BUNNY_LINK)
   end)
 
   it("registered meanwhile (recorded 409 duplicate): its feature_id is used", function()
@@ -292,6 +295,60 @@ describe("upload: a film the site does not have", function()
   end)
 end)
 
+describe("upload: the Film line", function()
+  it("links to IMDb when the id is known; a title is escaped only inside the link", function()
+    H.launch({ activate = false })
+    local film_text = H.find_local("film_text")
+    eq(film_text({ title = "Fast & Furious", year = 2009, imdb_id = 1013752 }),
+       "<a href='https://www.imdb.com/title/tt1013752/'>Fast &amp; Furious (2009)</a>")
+    eq(film_text({ title = "Fast & Furious", year = 2009 }), "Fast & Furious (2009)")
+  end)
+end)
+
+describe("upload: the suggested release name", function()
+  -- The video's name, only when it tells more than the film's title and year
+  local function suggested(name, film, guess)
+    H.launch({ activate = false })
+    local default = H.find_local("upload_release_default")
+    openSub.file.name, openSub.file.completeName = name, name .. ".mkv"
+    openSub.file.last_guessit_filename = guess and openSub.file.completeName or nil
+    openSub.file.guessit_data = guess
+    return default(film)
+  end
+  local SEND_HELP = { title = "Send Help", year = 2026 }
+
+  it("empty when the name only repeats the film", function()
+    eq(suggested("Send.Help.2026", SEND_HELP), "")
+    eq(suggested("send help (2026)", SEND_HELP), "")
+    eq(suggested("Send_Help-2026", nil, { title = "Send Help", year = 2026, type = "movie" }), "")
+    eq(suggested("Breaking.Bad.S02E05", { title = "Breaking Bad" }), "")
+    eq(suggested("Breaking Bad 2x05", { title = "Breaking Bad" }), "")
+    eq(suggested("", SEND_HELP), "")
+  end)
+
+  it("the name when it adds a group, source or quality", function()
+    eq(suggested("Send.Help.2026.1080p.WEB-DL", SEND_HELP), "Send.Help.2026.1080p.WEB-DL")
+    eq(suggested("Send.Help.2026-GROUP", SEND_HELP), "Send.Help.2026-GROUP")
+    eq(suggested(VIDEO, { title = "The Matrix" }), VIDEO)
+    eq(suggested("Send.Help.2026", nil), "Send.Help.2026", "film unknown: every word is extra")
+  end)
+
+  it("GuessIt's answer for this file counts: a release group it read keeps the name", function()
+    -- recorded GuessIt answer (tests/fixtures/raw/guessit.http): release_group DEMAND
+    local guess = { title = "Breaking Bad", season = 2, episode = 5, release_group = "DEMAND", type = "episode" }
+    eq(suggested("Breaking.Bad.S02E05.DEMAND", { title = "Breaking Bad" }, guess), "Breaking.Bad.S02E05.DEMAND")
+  end)
+
+  it("in the window: Send.Help.2026 leaves the field empty; the field is sent only when filled", function()
+    local env = setup()
+    local w = upload_window(env)
+    eq(w.release:get_text(), VIDEO, "1080p BluRay x264: kept")
+    w.release:set_text("")
+    w.send:_click()
+    eq(last(env, "/subtitles/upload").body.release_name, nil)
+  end)
+end)
+
 describe("upload: finding the film of the playing video", function()
   local function film_window(env)
     local d = env.ui()
@@ -306,7 +363,7 @@ describe("upload: finding the film of the playing video", function()
     for i = #env.sent, 1, -1 do env.sent[i] = nil end
     env.ui():_button("Upload$"):_click()
     local film, imdb = film_window(env)
-    eq(film, "Big Buck Bunny (2008)")
+    eq(film, BUNNY_LINK)
     eq(imdb, "tt1254207")
     eq(last(env, "/upload/guess"), nil, "nothing to ask")
     env.ui():_button("Check$"):_click()
@@ -329,7 +386,7 @@ describe("upload: finding the film of the playing video", function()
     local body = last(env, "/upload/guess").body
     eq(body.filename, VIDEO .. ".mkv")
     ok(body.moviehash and #body.moviehash == 16, "movie hash sent with the guess")
-    eq(w.film.text, "The Matrix (1999)")
+    eq(w.film.text, MATRIX_LINK)
     eq(w.imdb:get_text(), "tt0133093", "the IMDb field is filled in")
   end)
 
@@ -337,7 +394,7 @@ describe("upload: finding the film of the playing video", function()
     local env = setup({ guess = "upload_guess_none", features = "upload_features_matrix_1999" })
     openSub.movie.title, openSub.movie.year = "The Matrix", "1999"
     local w = upload_window(env)
-    eq(w.film.text, "The Matrix (1999)")
+    eq(w.film.text, MATRIX_LINK)
     eq(w.imdb:get_text(), "tt0133093")
     local req = env.server:last("GET " .. API .. "/features")
     eq(req.query.query, "the matrix")
@@ -351,7 +408,7 @@ describe("upload: finding the film of the playing video", function()
     local w = upload_window(env)
     w.imdb:set_text("Matrix")
     w.find:_click()
-    eq(w.film.text, "The Matrix (1999)")
+    eq(w.film.text, MATRIX_LINK)
     eq(w.imdb:get_text(), "tt0133093")
     eq(last(env, "/features/from_id"), nil)
   end)

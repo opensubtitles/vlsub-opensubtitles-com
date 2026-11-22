@@ -119,15 +119,22 @@ Decided by the owner: "Upload" button in the main window; the file is one
 of the subtitle files next to the video (same name start) or any file by its
 full path; a film the site does not have is registered from its IMDb / TMDb
 id; hearing impaired / foreign parts (Automatic / Yes / No), translated by a
-person / machine / AI, release name and comment can be set. The video's
-hash is not sent.
+person / machine / AI, release name and comment can be set. A file next to
+the video goes with the video's hash, size and name; a file by path does not.
 
 - MD5 (RFC 1321), base64 and a stored-block deflate stream in plain Lua.
   32-bit operations: the language's own where it has them, `bit32` on 5.2,
   byte tables on Lua 5.1 (VLC for macOS): 300 kB in 0.46 s there.
 - Upload window: file, path, language (from the file name, else the first
-  subtitle language), film (guessed when the window opens; Find with an
-  IMDb id or link), flags, release name, comment; Check and Upload.
+  subtitle language), film (found when the window opens: the search just
+  made for this video, the API's guess from name + hash, the searched IMDb
+  id, `/features` with GuessIt's title and year; Find with an IMDb id, link
+  or title), flags, release name, comment; Check and Upload.
+- The Film line links to the film's IMDb page.
+- Release name: the video's file name only when it tells more than the
+  film's title and year (a release group, source, quality - GuessIt's answer
+  for the file counts); "Send.Help.2026" leaves the field empty.
+- After the upload: "Uploaded: <release>" linked to the subtitle's page.
 - A film on IMDb / TMDb but not here: Upload registers it
   (`features/stub`, `source: imdb`) and uploads to the new `feature_id`;
   a 409 from the stub (registered meanwhile) uses its `feature_id`.

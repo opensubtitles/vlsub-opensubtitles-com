@@ -5673,15 +5673,27 @@ local function upload_error_text(status, answer)
   return status and ("HTTP " .. tostring(status)) or strings.ui_no_response_from_download_server
 end
 
+local function imdb_number(film)
+  return film and tonumber(film.imdbid or film.imdb_id and string.match(tostring(film.imdb_id), "%d+"))
+end
+
+-- The Film line: "Title (year)", a link to the film's IMDb page when known
 local function film_text(film)
   if not film then
     return strings.ui_upload_film_unknown
   end
+  local title = tostring(film.title or "?")
   local year = tonumber(film.year)
   if year and year > 0 then
-    return tr("ui_upload_film_year", tostring(film.title or "?"), tostring(year))
+    title = tr("ui_upload_film_year", title, tostring(year))
   end
-  return tostring(film.title or "?")
+  local imdb = imdb_number(film)
+  if imdb and imdb > 0 then
+    -- a link makes the label HTML: escape the title ("Fast & Furious")
+    title = string.gsub(title, "[<>&]", { ["<"] = "&lt;", [">"] = "&gt;", ["&"] = "&amp;" })
+    return string.format("<a href='https://www.imdb.com/title/tt%07d/'>%s</a>", imdb, title)
+  end
+  return title
 end
 
 -- Full-text search of the site's films (GET /features): the best match for
@@ -5843,8 +5855,52 @@ end
 
 -- "tt0133093" for the IMDb field
 local function imdb_text(film)
-  local number = film and tonumber(film.imdbid or film.imdb_id and string.match(tostring(film.imdb_id), "%d+"))
+  local number = imdb_number(film)
   return number and string.format("tt%07d", number) or ""
+end
+
+-- Words that only repeat what the film already says: its title, the year,
+-- season / episode numbers.
+local RELEASE_PLAIN = { s = true, e = true, ep = true, season = true, episode = true, part = true }
+-- GuessIt keys that tell something the film does not: who made the video,
+-- from which source, in which quality
+local RELEASE_EXTRA = { "release_group", "source", "screen_size", "video_codec", "audio_codec",
+  "streaming_service", "edition", "other", "video_profile", "audio_channels", "audio_profile" }
+
+-- The release name to suggest: the video's file name when it tells more
+-- than the film's title and year (a release group, source, quality ...),
+-- otherwise empty - "Send.Help.2026" would only repeat the film.
+local function upload_release_default(film)
+  local name = openSub.file.name
+  if type(name) ~= "string" or name == "" then
+    return ""
+  end
+  local guess = openSub.file.last_guessit_filename == openSub.file.completeName and openSub.file.guessit_data
+  if type(guess) == "table" then
+    for _, key in ipairs(RELEASE_EXTRA) do
+      local value = guess[key]
+      if value ~= nil and value ~= "" and not (type(value) == "table" and next(value) == nil) then
+        return name
+      end
+    end
+  end
+  local known = {}
+  local titles = { film and film.title or "", film and film.original_title or "",
+                   type(guess) == "table" and guess.title or "" }
+  for _, text in ipairs(titles) do
+    for word in string.gmatch(string.lower(tostring(text)), "[%w']+") do
+      known[word] = true
+    end
+  end
+  for word in string.gmatch(string.lower(name), "[^%s%._%-%(%)%[%]{},:;!?]+") do
+    local plain = known[word] or known[(string.gsub(word, "'", ""))] or RELEASE_PLAIN[word]
+      or string.match(word, "^%d+$") or string.match(word, "^s%d+e%d+$") or string.match(word, "^s%d+$")
+      or string.match(word, "^e%d+$") or string.match(word, "^%d+x%d+$")
+    if not plain then
+      return name
+    end
+  end
+  return ""
 end
 
 -- Main window button
@@ -5859,6 +5915,7 @@ function show_upload()
   -- the film first, so that the window is built with it
   upload_state.film_line = upload_detect_film()
   upload_state.imdb = imdb_text(upload_state.film or upload_state.new_film)
+  upload_state.release = upload_release_default(upload_state.film or upload_state.new_film)
   trigger_menu(5)
 end
 
@@ -5922,7 +5979,7 @@ function interface_upload()
   add_choices(input_table["upload_translation"], CHOICE_TRANSLATION)
 
   dlg:add_label(strings.ui_upload_release .. ":", 1, next_row(), 1, 1)
-  input_table["upload_release"] = dlg:add_text_input(openSub.file.name or "", 2, row, 3, 1)
+  input_table["upload_release"] = dlg:add_text_input(upload_state.release or "", 2, row, 3, 1)
 
   dlg:add_label(strings.ui_upload_comment .. ":", 1, next_row(), 1, 1)
   input_table["upload_comment"] = dlg:add_text_input("", 2, row, 3, 1)
@@ -6098,7 +6155,8 @@ function upload_send_clicked()
       setMessage(error_tag(tr("ui_upload_failed", failure)))
       return
     end
-    upload_state.film = { feature_id = feature_id, title = upload_state.new_film.title, year = upload_state.new_film.year }
+    upload_state.film = { feature_id = feature_id, title = upload_state.new_film.title, year = upload_state.new_film.year,
+                          imdb_id = upload_state.new_film.imdb_id, imdbid = upload_state.new_film.imdbid }
     upload_state.new_film = nil
     fields.feature_id = tonumber(feature_id)
     input_table["upload_film"]:set_text(film_text(upload_state.film))
