@@ -158,8 +158,17 @@ case "${1:-help}" in
       esac
     done
     if [ "$DEV_API" = 1 ]; then
-      [ -f "$HOME/.vlsub-dev.env" ] && . "$HOME/.vlsub-dev.env"
-      [ -n "${VLSUB_DEV_API_KEY:-}" ] || { echo "--dev-api needs VLSUB_DEV_API_KEY (environment, or a line in ~/.vlsub-dev.env)" >&2; exit 2; }
+      # read KEY=value lines; the file is never run as a script
+      if [ -z "${VLSUB_DEV_API_KEY:-}" ] && [ -f "$HOME/.vlsub-dev.env" ]; then
+        VLSUB_DEV_API_KEY="$(sed -n 's/^[[:space:]]*VLSUB_DEV_API_KEY[[:space:]]*=[[:space:]]*//p' "$HOME/.vlsub-dev.env" | head -1 | tr -d "\"' \r")"
+        VLSUB_DEV_API="${VLSUB_DEV_API:-$(sed -n 's/^[[:space:]]*VLSUB_DEV_API[[:space:]]*=[[:space:]]*//p' "$HOME/.vlsub-dev.env" | head -1 | tr -d "\"' \r")}"
+      fi
+      case "${VLSUB_DEV_API_KEY:-}" in
+        ""|*"<"*|*">"*)
+          echo "--dev-api needs the development API key: put it in ~/.vlsub-dev.env as" >&2
+          echo "  VLSUB_DEV_API_KEY=abc123...   (the key itself, without < >)" >&2
+          exit 2 ;;
+      esac
       command -v python3 >/dev/null 2>&1 || { echo "--dev-api needs python3 (macOS: xcode-select --install)" >&2; exit 2; }
       UPSTREAM="${VLSUB_DEV_API:-https://rb-dev.ngrok.dev}"
       UPSTREAM="${UPSTREAM%/api/v1}"
