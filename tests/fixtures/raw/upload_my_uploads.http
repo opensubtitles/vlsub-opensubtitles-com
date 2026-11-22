@@ -1,0 +1,5 @@
+HTTP/1.1 200 OK
+Content-Type: application/json; charset=utf-8
+Connection: close
+
+{"data":[{"subtitle_id":1193037,"feature_id":163533,"language_code":"en","release_name":"The.Matrix.1999.1080p.BluRay.x264.en","format":"srt","hearing_impaired":false,"hd":true,"foreign_parts_only":false,"machine_translated":false,"download_count":0,"enabled":true,"upload_date":"2026-11-22T08:07:04Z","status":"live"}],"meta":{"total_count":1,"page":1,"per_page":20,"total_pages":1}}

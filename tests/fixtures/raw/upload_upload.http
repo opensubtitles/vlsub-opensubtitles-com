@@ -1,0 +1,5 @@
+HTTP/1.1 201 Created
+Content-Type: application/json; charset=utf-8
+Connection: close
+
+{"subtitle_id":1193037,"feature_id":163533,"subfile_id":1109384,"release_name":"The.Matrix.1999.1080p.BluRay.x264.en","format":"srt","download_url":"https://rb-dev.ngrok.dev/subtitles/the-matrix-1999-1080p-bluray-x264-en","status":"created","subtitle_status":"live","flags_applied":["high_definition"],"warnings":[],"quota":{"allowed":true,"rank":"limited","limit":50,"remaining":49,"next_slot_at":null,"resets_at":null,"windows":{"day":{"seconds":86400,"limit":50,"used":1,"remaining":49,"next_slot_at":null},"week":{"seconds":604800,"limit":200,"used":1,"remaining":199,"next_slot_at":null}}}}

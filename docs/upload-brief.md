@@ -93,3 +93,22 @@ Bunny, on IMDb/TMDb, not in the database) answers
 the film has to be registered first (`features/from_id`, then
 `features/stub` with `source: "imdb"`), then uploaded to the new
 `feature_id`.
+
+## First round trip (development API, 2026-11-22)
+
+`tools/upload_roundtrip.py`, account `3ge` (Trusted member on dev), a
+211-byte test subtitle for The Matrix (feature 163533), **packed as plain
+Lua can: raw deflate in stored blocks (no compression), base64**:
+
+| step | answer |
+|---|---|
+| `upload/guess` "The.Matrix.1999.1080p.BluRay.x264.mkv" | 200, The Matrix, feature 163533 |
+| `upload/check` | 200, not in db, would not be rejected, quota 50/day |
+| `upload` | **201**, subtitle 1193037, `subtitle_status: live`, flag `high_definition` inferred from "1080p", 0.6 s |
+| `upload/check` again | `already_in_db: true`, `duplicate_of: 1193037` |
+| `upload` again | 409 `duplicate` |
+| `GET /my/uploads` | the upload, enabled |
+| `DELETE /my/uploads/1193037` | 200 `deleted`; listed afterwards with `enabled: false` |
+
+The stored-deflate packing is accepted: VLSub needs no compressor, only MD5
+and base64 in Lua. The answers are fixtures (`tests/fixtures/raw/upload_*.http`).

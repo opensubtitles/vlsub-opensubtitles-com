@@ -1,0 +1,5 @@
+HTTP/1.1 200 OK
+Content-Type: application/json; charset=utf-8
+Connection: close
+
+{"already_in_db":false,"duplicate_of":null,"similar_to":null,"feature":{"feature_id":163533,"imdbid":133093,"tmdbid":603,"title":"The Matrix","year":1999,"type":"Movie","provisional":false},"would_be_rejected":false,"rejection_reasons":[],"would_be_flagged":false,"review_reasons":[],"release_name_suggested":"The.Matrix.1999.1080p.BluRay.x264.en","flags_suggested":{"hearing_impaired":false,"high_definition":true,"foreign_parts_only":false},"quota":{"allowed":true,"rank":"limited","limit":50,"remaining":50,"next_slot_at":null,"resets_at":null,"windows":{"day":{"seconds":86400,"limit":50,"used":0,"remaining":50,"next_slot_at":null},"week":{"seconds":604800,"limit":200,"used":0,"remaining":200,"next_slot_at":null}}}}
