@@ -212,6 +212,9 @@ downloading are worth showing; typing with a remote is rare.
 - `files[]` in search rows and the `/download` answer: `sha1`.
 - AI on-demand rows: `price` (credits), so a client can say what it will
   cost before the click.
+- Upload: find a film the site does not have yet by its title (+ year) -
+  `guess` or `from_id` answering as `from_id` does for an id. Clients now
+  have to ask imdb.opensubtitles.org for the IMDb id first.
 
 ## 4. Rules for all of them
 

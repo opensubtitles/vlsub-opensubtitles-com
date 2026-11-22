@@ -75,7 +75,7 @@ local function setup(o)
   local sent = {}
   local function route(key, fixture)
     server:on(key, function(req)
-      sent[#sent + 1] = { key = key, body = req.body and json.decode(req.body) or nil, raw = req.body,
+      sent[#sent + 1] = { key = key, path = req.path, query = req.query, body = req.body and json.decode(req.body) or nil, raw = req.body,
                           auth = req.headers["authorization"], api_key = req.headers["api-key"] }
       return api.fixture(type(fixture) == "function" and fixture(req) or fixture)
     end)
@@ -86,6 +86,8 @@ local function setup(o)
   route("POST " .. API .. "/subtitles/upload/features/from_id", o.from_id or "upload_from_id_known")
   route("POST " .. API .. "/subtitles/upload/features/stub", o.stub or "upload_stub")
   route("GET " .. API .. "/features", o.features or "upload_features_none")
+  -- titles the site does not have: imdb.opensubtitles.org (recorded answers)
+  route("GET imdb.opensubtitles.org/search/query-*", o.imdb or "imdb_query_none")
   if o.video then H.video(dir, VIDEO .. ".mkv", 300000) end
   local env = H.launch({ server = server, media = "file://" .. dir .. "/" .. VIDEO .. ".mkv", config = o.config })
   env.sent, env.dir_video = sent, dir
@@ -410,6 +412,91 @@ describe("upload: finding the film of the playing video", function()
     w.find:_click()
     eq(w.film.text, MATRIX_LINK)
     eq(w.imdb:get_text(), "tt0133093")
+    eq(last(env, "/features/from_id"), nil)
+  end)
+
+  -- imdb.opensubtitles.org: titles the site does not have yet (until the API
+  -- can find a film by its title itself)
+  local function imdb_asked(env)
+    local r = last(env, "query-*")
+    return r and r.path
+  end
+  local RELOADED_NEW = "<a href='https://www.imdb.com/title/tt0234215/'>The Matrix Reloaded (2003)</a>"
+    .. " is not on OpenSubtitles yet"
+
+  it("a typed title the site does not have is found on IMDb and looked up by its id", function()
+    local env = setup({ guess = "upload_guess_none", imdb = "imdb_query_matrix_reloaded",
+                        from_id = "upload_from_id_reloaded" })
+    local w = upload_window(env)
+    w.imdb:set_text("matrix reloaded")
+    w.find:_click()
+    eq(imdb_asked(env), "/search/query-matrix+reloaded")
+    eq(last(env, "/features/from_id").body, { imdb_id = "tt0234215" })
+    has(w.film.text, RELOADED_NEW)
+    eq(w.imdb:get_text(), "tt0234215")
+    eq(env.errors(), {})
+  end)
+
+  it("a year typed after the title goes to both searches", function()
+    local env = setup({ guess = "upload_guess_none", imdb = "imdb_query_matrix_reloaded",
+                        from_id = "upload_from_id_reloaded" })
+    local w = upload_window(env)
+    w.imdb:set_text("Matrix Reloaded (2003)")
+    w.find:_click()
+    eq(last(env, "/features").query.year, "2003")
+    eq(imdb_asked(env), "/search/query-Matrix+Reloaded+2003")
+    has(w.film.text, RELOADED_NEW)
+  end)
+
+  it("the site's own film with that title wins: IMDb is not asked", function()
+    local env = setup({ guess = "upload_guess_none", features = "upload_features_matrix",
+                        imdb = "imdb_query_the_matrix_1999" })
+    local w = upload_window(env)
+    w.imdb:set_text("the matrix")
+    w.find:_click()
+    eq(w.film.text, MATRIX_LINK)
+    eq(imdb_asked(env), nil)
+  end)
+
+  it("punctuation is left out of the IMDb query, other letters are encoded", function()
+    local env = setup({ guess = "upload_guess_none" })
+    local w = upload_window(env)
+    w.imdb:set_text("Fast & Furious")
+    w.find:_click()
+    eq(imdb_asked(env), "/search/query-Fast+Furious") -- "&" made the service redirect
+    w.imdb:set_text("Am\195\169lie")
+    w.find:_click()
+    eq(imdb_asked(env), "/search/query-Am%C3%A9lie")
+    has(w.film.text, "IMDb id, link or title")
+  end)
+
+  it("the IMDb service down: the field asks for an id, nothing breaks", function()
+    local env = setup({ guess = "upload_guess_none" })
+    env.server.down["imdb.opensubtitles.org"] = true
+    local w = upload_window(env)
+    w.imdb:set_text("matrix reloaded")
+    w.find:_click()
+    has(w.film.text, "IMDb id, link or title")
+    eq(env.errors(), { "[VLSub] Request to imdb.opensubtitles.org:80 failed: connect (attempt 1)" })
+    -- a side service down is not the network down: the API is still asked
+    w.imdb:set_text("tt1254207")
+    w.find:_click()
+    ok(last(env, "/features/from_id"), "the API was asked")
+    has(w.film.text, "Big Buck Bunny (2008)")
+  end)
+
+  it("found without asking: IMDb counts only for the exact title and year", function()
+    -- GuessIt read "The Matrix", 1999 from the video's name; the site has nothing
+    local env = setup({ guess = "upload_guess_none", imdb = "imdb_query_the_matrix_1999",
+                        from_id = "upload_from_id_matrix" })
+    local film, imdb = (function() local w = upload_window(env) return w.film.text, w.imdb:get_text() end)()
+    eq(imdb_asked(env), "/search/query-The+Matrix+1999")
+    eq(film, MATRIX_LINK)
+    eq(imdb, "tt0133093")
+    -- only near titles on IMDb ("The Matrix Reloaded" ...): not taken
+    env = setup({ guess = "upload_guess_none", imdb = "imdb_query_matrix_reloaded" })
+    local w = upload_window(env)
+    has(w.film.text, "IMDb id, link or title")
     eq(last(env, "/features/from_id"), nil)
   end)
 

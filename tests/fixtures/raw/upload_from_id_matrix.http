@@ -1,0 +1,5 @@
+HTTP/1.1 200 OK
+Content-Type: application/json; charset=utf-8
+Connection: close
+
+{"found":true,"exists_in_db":true,"feature_id":163533,"imdb_id":"tt0133093","tmdb_id":603,"title":"The Matrix","year":1999,"type":"movie"}

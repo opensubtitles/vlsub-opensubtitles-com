@@ -154,3 +154,32 @@ Found on the way, for the API team:
 - An upload with only `idmovieimdb` of a film that is on IMDb but not in
   the database is refused (`feature_not_found`); the server could register
   it itself, as `stub` does, and save every client two calls.
+- A film the site does not have yet cannot be found by its title through
+  the API: `/features` knows only the site's films, `from_id` takes only
+  ids, `guess` with `The.Matrix.Reloaded.2003.mkv` answers `best_guess:
+  null`. Wanted: a title (+ year) in `guess` or `from_id`, answered like
+  `from_id` answers for an id (`found`, `exists_in_db`, `imdb_id`).
+
+## TODO: title search on imdb.opensubtitles.org (temporary)
+
+Until the API can do the above, VLSub finds such a film by its title on
+`http://imdb.opensubtitles.org/search/query-<words>` (plain HTTP, no key,
+JSON list of up to 20 `{id, title, year, kind}`), then looks the IMDb id up
+with `from_id` as if typed. Code: `upload_search_imdb` in `vlsubcom.lua`
+(marked `TODO(api)`); tests: `imdb_query_*.http`.
+
+- Order for a typed title: the site's film with that exact title, IMDb's
+  exact title, the site's best match, IMDb's best match. A year typed after
+  the title goes to both. Films and series before episodes.
+- Found without asking (GuessIt's title from the video's name): IMDb only
+  for the exact title and year; not for episodes (IMDb would give the
+  series).
+- Punctuation is left out of the query (`&` makes the service redirect).
+  `/search/imdbid-<8 digits>` gives one title with details (fewer digits:
+  302 redirect) - not used.
+- A side service: its host failing does not hold back the API's requests;
+  after no answer it is left alone for a minute.
+- Real VLC through the proxy: "matrix reloaded" -> tt0234215, "not on
+  OpenSubtitles yet - uploading will add it".
+
+Replace with the API call when it exists, and drop the fixtures.

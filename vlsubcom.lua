@@ -5736,6 +5736,85 @@ local function upload_search_features(title, year)
   return film_text(upload_state.film)
 end
 
+-- Titles compared without case, punctuation or a leading article:
+-- "The Matrix Reloaded" == "matrix reloaded"
+local function plain_title(text)
+  local t = string.lower(tostring(text or ""))
+  t = string.gsub(t, "&", " and ")
+  t = string.gsub(t, "[%c%p%s]+", " ")
+  t = string.gsub(t, "^%s*(.-)%s*$", "%1")
+  t = string.gsub(t, "^the ", "")
+  t = string.gsub(t, "^an? ", "")
+  return t
+end
+
+-- "matrix reloaded 2003" -> "matrix reloaded", 2003
+local function split_year(text)
+  local title, year = string.match(text, "^(.-)[%s%(%[%.,]+((%d%d%d%d))[%)%]]?%s*$")
+  year = tonumber(year)
+  if title and title ~= "" and year and year >= 1880 and year <= 2100 then
+    return title, year
+  end
+  return text, nil
+end
+
+-- TODO(api): a film the site does not have yet can be found by its title
+-- only on imdb.opensubtitles.org (plain HTTP, no key; the API's /features
+-- knows only the site's films, from_id takes only ids). Move to the API once
+-- it can do this itself (asked for: a title in /subtitles/upload/guess or
+-- from_id answering like from_id does for an id). See docs/upload-brief.md.
+local IMDB_TITLE_SEARCH = "http://imdb.opensubtitles.org/search/query-"
+-- after no answer at all, left alone for a minute: a dead host costs
+-- seconds of frozen window each time
+local imdb_search_down_until = 0
+
+-- The IMDb number (a string of digits) for a title, and whether its title
+-- is exactly the one asked for. strict: only an exact title (and year when
+-- one is known) counts - for what is found without the user asking.
+local function upload_search_imdb(text, year, strict)
+  local words = string.gsub(string.gsub(tostring(text or ""), "[%c%p%s]+", " "), "^%s*(.-)%s*$", "%1")
+  if words == "" or os.time() < imdb_search_down_until then
+    return nil
+  end
+  local query = string.gsub(words, "[^%w ]", function(c) return string.format("%%%02X", string.byte(c)) end)
+  query = string.gsub(query, " ", "+")
+  if year then
+    query = query .. "+" .. tostring(year)
+  end
+  local client = Curl.new()
+  client:set_timeout(10)
+  client:set_deadline(10)
+  client:set_retries(0)
+  client:set_side_service()
+  local res = client:get(IMDB_TITLE_SEARCH .. query)
+  if not res or not res.status then
+    imdb_search_down_until = os.time() + 60
+  end
+  local ok, rows = decode_object(res and res.status == 200 and res.body or "")
+  if not ok then
+    return nil
+  end
+  local wanted = plain_title(text)
+  local best, best_score, best_exact
+  for _, row in ipairs(rows) do
+    if type(row) == "table" and string.match(tostring(row.id or ""), "^%d+$") then
+      local exact = plain_title(row.title) == wanted
+      local same_year = year and tonumber(row.year) == year
+      -- films and series before single episodes, games ...; IMDb's own
+      -- order (the better known first) decides the rest
+      local kind = tostring(row.kind or "")
+      local score = (exact and 4 or 0) + (same_year and 2 or 0)
+        + ((kind == "movie" or string.find(kind, "series", 1, true)) and 1 or 0)
+      if (not strict or (exact and (not year or same_year))) and (not best or score > best_score) then
+        best, best_score, best_exact = row, score, exact
+      end
+    end
+  end
+  if best then
+    return best.id, best_exact
+  end
+end
+
 -- Something typed that is not an IMDb / TMDb id or link is a title
 local function looks_like_id(text)
   return string.match(text, "^[Tt][Tt]%d+$") or string.match(text, "^%d+$")
@@ -5746,11 +5825,14 @@ end
 -- from a file name. Fills upload_state.film (known here) or
 -- upload_state.new_film (on IMDb / TMDb, not here yet). Returns the text
 -- for the "Film" line.
+local upload_find_title -- below: it looks ids up with upload_find_film
+
 local function upload_find_film(id_text, file_name)
   upload_state.film, upload_state.new_film = nil, nil
   id_text = trim(id_text or "")
   if id_text ~= "" and not looks_like_id(id_text) then
-    return upload_search_features(id_text) or strings.ui_upload_film_unknown
+    local title, year = split_year(id_text)
+    return upload_find_title(title, year, false) or strings.ui_upload_film_unknown
   end
   if id_text ~= "" then
     local body = {}
@@ -5781,6 +5863,24 @@ local function upload_find_film(id_text, file_name)
     end
   end
   return strings.ui_upload_film_unknown
+end
+
+-- A title: the site's own films first, then IMDb (a film found there is
+-- looked up by its id, and added on upload when the site lacks it).
+-- Order: the site's exact title, IMDb's exact title, the site's best match,
+-- IMDb's best match. strict: exact titles only on IMDb.
+upload_find_title = function(title, year, strict)
+  local site = upload_search_features(title, year)
+  local site_film = upload_state.film
+  if site and plain_title(site_film.title) == plain_title(title) then
+    return site
+  end
+  local imdb_id, exact = upload_search_imdb(title, year, strict)
+  if imdb_id and (exact or not site) then
+    return upload_find_film("tt" .. imdb_id, nil)
+  end
+  upload_state.film = site_film
+  return site
 end
 
 local function has_login()
@@ -5845,7 +5945,13 @@ local function upload_detect_film()
   end
   -- the title and year GuessIt read from the file name (the name search
   -- has them), searched in the site's films
-  local found = upload_search_features(openSub.movie.title, openSub.movie.year)
+  local episode = tostring(openSub.movie.seasonNumber or "") ~= "" or tostring(openSub.movie.episodeNumber or "") ~= ""
+  local found
+  if episode then -- IMDb would give the series, not the episode
+    found = upload_search_features(openSub.movie.title, openSub.movie.year)
+  else
+    found = upload_find_title(trim(openSub.movie.title or ""), tonumber(openSub.movie.year), true)
+  end
   if found then
     return found
   end
@@ -7754,6 +7860,14 @@ function VLCHttpClient:set_deadline(seconds)
     return self
 end
 
+-- A side service (not the API): its host failing to connect says nothing
+-- about the network, so it does not hold back the next requests
+-- (network_down_until)
+function VLCHttpClient:set_side_service()
+    self.side_service = true
+    return self
+end
+
 -- fn(seconds) is called about once a second while an answer is awaited
 function VLCHttpClient:set_on_wait(fn)
     self.on_wait = fn
@@ -8568,7 +8682,9 @@ function VLCHttpClient:_make_request_tcp(method, url, data)
                 return nil
             end
             if failure == "connect" then
-                network_down_until = os.time() + NETWORK_DOWN_SECONDS
+                if not self.side_service then
+                    network_down_until = os.time() + NETWORK_DOWN_SECONDS
+                end
                 return nil
             end
         elseif response_data == "" then
