@@ -35,6 +35,32 @@ describe("startup", function()
     H.has(env.ui().title, "Configuration")
     ok(H.exists(env.dir .. "/vlsub_conf.json"), "config file created")
   end)
+
+  -- Searching needs only the API key, not an account: a user who leaves
+  -- username and password empty still gets subtitles listed.
+  it("first run without an account: Save with empty login, Close -> the video is searched", function()
+    local dir = H.tmpdir()
+    local env = H.launch({ first_run = true, config = { os_username = "", os_password = "" },
+                           media = "file://" .. H.video(dir, "Big.Buck.Bunny.2008.1080p.mkv", 200000) })
+    H.has(env.ui().title, "Configuration")
+    eq(#env.server:seen("GET api.opensubtitles.com/api/v1/subtitles"), 0, "nothing searched before Close")
+    env.ui():_button("Save$"):_click()
+    env.ui():_button("Close$"):_click()
+    local searches = env.server:seen("GET api.opensubtitles.com/api/v1/subtitles")
+    ok(#searches >= 1, "searched after Close")
+    eq(searches[1].query.moviehash, "e6ed0e283146465f")
+    eq(#env.results().values, 50, "results listed")
+    eq(env.errors(), {})
+  end)
+
+  it("first run without an account: Close without Save also searches", function()
+    local dir = H.tmpdir()
+    local env = H.launch({ first_run = true, config = { os_username = "", os_password = "" },
+                           media = "file://" .. H.video(dir, "Big.Buck.Bunny.2008.1080p.mkv", 200000) })
+    env.ui():_button("Close$"):_click()
+    ok(#env.server:seen("GET api.opensubtitles.com/api/v1/subtitles") >= 1, "searched after Close")
+  end)
+
 end)
 
 

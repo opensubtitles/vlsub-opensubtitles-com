@@ -2407,11 +2407,8 @@ function should_auto_search()
     return false
   end
 
-  -- Check if we have authentication (required for searching)
-  if not is_authenticated then
-    dbg("No authentication - skipping auto-search")
-    return false
-  end
+  -- (no login needed: searching takes only the API key; a login is
+  -- needed for downloading, and the download button says so)
 
   -- Check if GuessIt returned useful data
   local has_useful_guessit_data = false
