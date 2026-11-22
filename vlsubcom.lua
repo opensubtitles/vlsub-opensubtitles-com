@@ -575,7 +575,7 @@ local strings = {
   ui_upload_other_path = "Or full path of the file",
   ui_upload_language = "Language",
   ui_upload_film = "Film",
-  ui_upload_imdb = "IMDb id or link",
+  ui_upload_imdb = "IMDb id, link or title",
   ui_upload_find = "🔍 Find",
   ui_upload_auto = "Automatic",
   ui_upload_translation = "Translated",
@@ -592,10 +592,10 @@ local strings = {
   ui_upload_too_small = "The file is too small to be a subtitle (at least 100 bytes).",
   ui_upload_too_large = "The file is too large to upload from VLC (%s kB; at most %s kB).",
   ui_upload_film_year = "%s (%s)",
-  ui_upload_film_unknown = "Not known yet - enter its IMDb id or link and press Find.",
+  ui_upload_film_unknown = "Not known yet - enter its IMDb id, link or title and press Find.",
   ui_upload_film_new = "%s is not on OpenSubtitles yet - uploading will add it.",
   ui_upload_film_not_on_imdb = "No film with that id on IMDb or TMDb.",
-  ui_upload_film_needed = "Which film is it? Enter its IMDb id or link and press Find.",
+  ui_upload_film_needed = "Which film is it? Enter its IMDb id, link or title and press Find.",
   ui_upload_language_needed = "Choose the language of the subtitles.",
   ui_upload_ok_to_upload = "Ready: this subtitle can be uploaded (%s uploads left today).",
   ui_upload_already = "This subtitle is already on OpenSubtitles - nothing to upload.",
@@ -4719,6 +4719,11 @@ openSub.convertNewAPIResponse = function(newData)
         convertedItem.MovieName = details.movie_name or details.title or ""
         convertedItem.MovieYear = tostring(details.year or "")
         convertedItem.MovieImdbID = tostring(details.imdb_id or "")
+        -- the film this subtitle belongs to (an upload for the same video
+        -- goes there too)
+        convertedItem.FeatureID = tonumber(details.feature_id)
+        convertedItem.FeatureTitle = details.title or details.movie_name
+        convertedItem.FeatureYear = tonumber(details.year)
         convertedItem.SeriesSeason = tostring(details.season_number or "")
         convertedItem.SeriesEpisode = tostring(details.episode_number or "")
         convertedItem.SeriesIMDBParent = tostring(details.parent_imdb_id or "")
@@ -5581,7 +5586,8 @@ end
 -- Upload window; the file is one of the subtitle files next to the playing
 -- video, or any file by its full path; a film the site does not have can
 -- be registered from its IMDb / TMDb id; flags and a comment can be set.
--- The playing video's hash is NOT sent with the upload.
+-- The playing video's hash goes with a file that sits next to the video
+-- (owner, 2026-11-22: "detect as much as possible"; hash may be sent).
 
 local UPLOAD_EXTENSIONS = { srt = true, sub = true, ass = true, ssa = true, vtt = true, smi = true, txt = true, mpl = true }
 -- the request body must stay under about 500 kB; base64 adds a third
@@ -5678,6 +5684,52 @@ local function film_text(film)
   return tostring(film.title or "?")
 end
 
+-- Full-text search of the site's films (GET /features): the best match for
+-- a title, the year when known. Fills upload_state.film; returns the text
+-- of the Film line, or nil when nothing was found.
+local function upload_search_features(title, year)
+  title = trim(title or "")
+  if title == "" then
+    return nil
+  end
+  local params = { query = title }
+  if tonumber(year) then
+    params.year = tostring(tonumber(year))
+  end
+  local client = Curl.new()
+  client:add_header("Api-Key", api_key())
+  client:set_timeout(15)
+  client:set_deadline(15)
+  client:set_retries(0)
+  local res = client:get(build_sorted_url(api_url("/features"), params))
+  local ok, answer = decode_object(res and res.status == 200 and res.body or "")
+  local rows = ok and type(answer.data) == "table" and answer.data or {}
+  local wanted = string.lower(title)
+  local best
+  for _, row in ipairs(rows) do
+    local a = type(row) == "table" and row.attributes
+    if type(a) == "table" and a.feature_id then
+      local name = string.lower(tostring(a.original_title or a.title or ""))
+      -- the first row, unless a later one has exactly the title asked for
+      if not best or (name == wanted and string.lower(tostring(best.original_title or best.title or "")) ~= wanted) then
+        best = a
+      end
+    end
+  end
+  if not best then
+    return nil
+  end
+  upload_state.film = { feature_id = tonumber(best.feature_id), title = best.original_title or best.title,
+    year = tonumber(best.year), imdbid = tonumber(best.imdb_id) }
+  return film_text(upload_state.film)
+end
+
+-- Something typed that is not an IMDb / TMDb id or link is a title
+local function looks_like_id(text)
+  return string.match(text, "^[Tt][Tt]%d+$") or string.match(text, "^%d+$")
+    or string.find(text, "imdb.com", 1, true) or string.find(text, "themoviedb", 1, true)
+end
+
 -- Which film: from an IMDb / TMDb id or link if one is given, else guessed
 -- from a file name. Fills upload_state.film (known here) or
 -- upload_state.new_film (on IMDb / TMDb, not here yet). Returns the text
@@ -5685,6 +5737,9 @@ end
 local function upload_find_film(id_text, file_name)
   upload_state.film, upload_state.new_film = nil, nil
   id_text = trim(id_text or "")
+  if id_text ~= "" and not looks_like_id(id_text) then
+    return upload_search_features(id_text) or strings.ui_upload_film_unknown
+  end
   if id_text ~= "" then
     local body = {}
     if string.find(id_text, "themoviedb", 1, true) then
@@ -5721,6 +5776,77 @@ local function has_login()
   return type(username) == "string" and username ~= "" and type(password) == "string" and password ~= ""
 end
 
+-- The film of the playing video, without asking the user if at all
+-- possible. In this order:
+--   1. the search just made for this video: its results name their film
+--      (after a hash search, the subtitles made for this very file);
+--   2. the API's guess from the video's file name and movie hash;
+--   3. an IMDb id the user searched for.
+-- Fills upload_state.film / .new_film; returns the text of the Film line.
+local function upload_detect_film()
+  local items = openSub.itemStore
+  if type(items) == "table" and #items > 0 and openSub.file.uri and openSub.lastSearchUri == openSub.file.uri then
+    local pool = {}
+    for _, item in ipairs(items) do
+      if item.FeatureID and item.MoviehashMatch then pool[#pool + 1] = item end
+    end
+    if #pool == 0 then
+      for _, item in ipairs(items) do
+        if item.FeatureID then pool[#pool + 1] = item end
+      end
+    end
+    local count, best = {}, nil
+    for _, item in ipairs(pool) do
+      count[item.FeatureID] = (count[item.FeatureID] or 0) + 1
+      if not best or count[item.FeatureID] > count[best.FeatureID] then
+        best = item
+      end
+    end
+    -- only a clear majority counts: a name search can list several films,
+    -- and the same hash is sometimes recorded for more than one
+    if best and count[best.FeatureID] * 2 > #pool then
+      upload_state.film = { feature_id = best.FeatureID, title = best.FeatureTitle,
+        year = best.FeatureYear, imdbid = tonumber(best.MovieImdbID) }
+      return film_text(upload_state.film)
+    end
+  end
+
+  local video = openSub.file.hasInput and openSub.file.path and upload_basename(openSub.file.path) or nil
+  if video then
+    if not openSub.file.hash or openSub.file.hash == "" then
+      pcall(openSub.getMovieHash)
+    end
+    local body = { filename = video }
+    if openSub.file.hash and openSub.file.hash ~= "" then
+      body.moviehash = openSub.file.hash
+    end
+    local status, answer = upload_request("POST", "/subtitles/upload/guess", body)
+    if status == 200 and type(answer.best_guess) == "table" and answer.best_guess.feature_id then
+      upload_state.film = answer.best_guess
+      return film_text(answer.best_guess)
+    end
+  end
+
+  local imdb = openSub.movie.imdbId
+  if imdb and imdb ~= "" then
+    return upload_find_film("tt" .. imdb, nil)
+  end
+  -- the title and year GuessIt read from the file name (the name search
+  -- has them), searched in the site's films
+  local found = upload_search_features(openSub.movie.title, openSub.movie.year)
+  if found then
+    return found
+  end
+  local first = (upload_state.candidates or {})[1]
+  return upload_find_film("", first and first.name)
+end
+
+-- "tt0133093" for the IMDb field
+local function imdb_text(film)
+  local number = film and tonumber(film.imdbid or film.imdb_id and string.match(tostring(film.imdb_id), "%d+"))
+  return number and string.format("tt%07d", number) or ""
+end
+
 -- Main window button
 function show_upload()
   if not has_login() or not openSub.checkSession() or not openSub.getAuthHeader() then
@@ -5731,13 +5857,8 @@ function show_upload()
   upload_state = { candidates = upload_candidates() }
   setMessage(loading_tag(strings.ui_upload_checking))
   -- the film first, so that the window is built with it
-  local video_file = openSub.file.name and openSub.file.name ~= "" and openSub.file.path
-    and upload_basename(openSub.file.path) or nil
-  local imdb = openSub.movie.imdbId
-  local first = upload_state.candidates[1]
-  upload_state.film_line = upload_find_film(imdb and imdb ~= "" and ("tt" .. imdb) or "",
-    video_file or (first and first.name))
-  upload_state.imdb = imdb and imdb ~= "" and ("tt" .. imdb) or ""
+  upload_state.film_line = upload_detect_film()
+  upload_state.imdb = imdb_text(upload_state.film or upload_state.new_film)
   trigger_menu(5)
 end
 
@@ -5817,15 +5938,16 @@ function interface_upload()
 end
 
 -- The chosen file: the typed path wins over the list
+-- The third value is true for a file next to the video: one made for it.
 local function upload_chosen_file()
   local typed = trim(input_table["upload_path"] and input_table["upload_path"]:get_text() or "")
   if typed ~= "" then
-    return typed, upload_basename(typed)
+    return typed, upload_basename(typed), false
   end
   local id = input_table["upload_file"] and input_table["upload_file"]:get_value() or 0
   local candidate = (upload_state.candidates or {})[id]
   if candidate then
-    return candidate.path, candidate.name
+    return candidate.path, candidate.name, true
   end
   return nil
 end
@@ -5836,13 +5958,17 @@ function upload_find_clicked()
   local text = upload_find_film(input_table["upload_imdb"]:get_text(), name)
   upload_state.film_line = text
   input_table["upload_film"]:set_text(text)
+  local found = imdb_text(upload_state.film or upload_state.new_film)
+  if found ~= "" then
+    input_table["upload_imdb"]:set_text(found)
+  end
   setMessage("")
 end
 
 -- Everything an upload or a check sends, without the file itself; or nil
 -- and the reason. `with_file` also returns the file's bytes.
 local function upload_fields()
-  local path, name = upload_chosen_file()
+  local path, name, beside_video = upload_chosen_file()
   if not path then
     return nil, strings.ui_upload_choose_file
   end
@@ -5876,6 +6002,14 @@ local function upload_fields()
   }
   if upload_state.film then
     fields.feature_id = tonumber(upload_state.film.feature_id)
+  end
+  -- A subtitle that sits next to the video is taken to be made for it: the
+  -- video's hash goes with it, so that the next person with this file finds
+  -- it by hash search.
+  if beside_video and openSub.file.hash and openSub.file.hash ~= "" then
+    fields.moviehash = openSub.file.hash
+    fields.moviebytesize = tonumber(openSub.file.bytesize)
+    fields.moviefilename = openSub.file.path and upload_basename(openSub.file.path) or nil
   end
   local hi = CHOICE_AUTO[input_table["upload_hi"]:get_value()]
   if hi and hi[1] ~= nil then
@@ -5973,6 +6107,13 @@ function upload_send_clicked()
   local status, answer = upload_request("POST", "/subtitles/upload", fields, 90)
   if status == 201 then
     local release = tostring(answer.release_name or fields.subfilename)
+    release = string.gsub(release, "[<>&]", "")
+    -- the subtitle's page on the site, clickable (only a plain https
+    -- address of the API's site is made a link)
+    local url = answer.download_url
+    if type(url) == "string" and string.match(url, "^https://[%w%.%-]+/[%w%-%._~/%%]*$") then
+      release = "<a href='" .. url .. "'>" .. release .. "</a>"
+    end
     if answer.subtitle_status == "pending" then
       setMessage(success_tag(tr("ui_upload_done_review", release)))
     else
@@ -7660,6 +7801,8 @@ end
 
 -- First steps of every search. Returns false when no session could be set up.
 local function search_begin()
+  -- which video the coming results are for (the upload window uses them)
+  openSub.lastSearchUri = openSub.file.uri
   openSub.actionLabel = lang["action_search"]
   setMessage(openSub.actionLabel..": "..progressBarContent(0))
   applySubtitleSortingSelection()

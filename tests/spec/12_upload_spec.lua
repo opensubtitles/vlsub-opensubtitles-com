@@ -82,6 +82,8 @@ local function setup(o)
   route("POST " .. API .. "/subtitles/upload", o.upload or "upload_upload")
   route("POST " .. API .. "/subtitles/upload/features/from_id", o.from_id or "upload_from_id_known")
   route("POST " .. API .. "/subtitles/upload/features/stub", o.stub or "upload_stub")
+  route("GET " .. API .. "/features", o.features or "upload_features_none")
+  if o.video then H.video(dir, VIDEO .. ".mkv", 300000) end
   local env = H.launch({ server = server, media = "file://" .. dir .. "/" .. VIDEO .. ".mkv", config = o.config })
   env.sent, env.dir_video = sent, dir
   return env
@@ -187,7 +189,9 @@ describe("upload: the window", function()
     eq(up.body.author_comments, "synced to the BluRay")
     eq(up.body.release_name, VIDEO)
     eq(up.body.hearing_impaired, nil, "Automatic: left to the server")
-    has(env.message(), "Uploaded: The.Matrix.1999.1080p.BluRay.x264.en - thank you!")
+    -- (recorded answer: download_url of the new subtitle's page, a link)
+    has(env.message(), "Uploaded: <a href='https://rb-dev.ngrok.dev/subtitles/the-matrix-1999-1080p-bluray-x264-en'>"
+      .. "The.Matrix.1999.1080p.BluRay.x264.en</a> - thank you!")
     for _, line in ipairs(env.vlc._messages()) do
       ok(not line:find(up.body.subcontent:sub(1, 40), 1, true), "file content in the log")
     end
@@ -285,6 +289,93 @@ describe("upload: a film the site does not have", function()
     w.send:_click()
     has(env.message(), "Which film is it?")
     eq(last(env, "/subtitles/upload"), nil)
+  end)
+end)
+
+describe("upload: finding the film of the playing video", function()
+  local function film_window(env)
+    local d = env.ui()
+    return d:_at(2, 4, "label").text, d:_at(2, 5, "text_input"):get_text()
+  end
+
+  it("1. from the search just made for this video (a clear majority of its results)", function()
+    local env = setup()
+    trigger_menu(1)
+    env.ui():_at(4, 3, "text_input"):set_text("1254207") -- recorded: Big Buck Bunny, feature 548792
+    env.ui():_button("Search$"):_click()
+    for i = #env.sent, 1, -1 do env.sent[i] = nil end
+    env.ui():_button("Upload$"):_click()
+    local film, imdb = film_window(env)
+    eq(film, "Big Buck Bunny (2008)")
+    eq(imdb, "tt1254207")
+    eq(last(env, "/upload/guess"), nil, "nothing to ask")
+    env.ui():_button("Check$"):_click()
+    eq(last(env, "/upload/check").body.feature_id, 548792)
+  end)
+
+  it("results of a search for another video are not used", function()
+    local env = setup()
+    trigger_menu(1)
+    env.ui():_at(4, 3, "text_input"):set_text("1254207")
+    env.ui():_button("Search$"):_click()
+    env.play("file://" .. env.dir_video .. "/Another.Film.2010.mkv")
+    env.ui():_button("Upload$"):_click()
+    ok(last(env, "/upload/guess"), "the guess was asked instead")
+  end)
+
+  it("2. the API's guess, from the video's name and movie hash", function()
+    local env = setup({ video = true })
+    local w = upload_window(env)
+    local body = last(env, "/upload/guess").body
+    eq(body.filename, VIDEO .. ".mkv")
+    ok(body.moviehash and #body.moviehash == 16, "movie hash sent with the guess")
+    eq(w.film.text, "The Matrix (1999)")
+    eq(w.imdb:get_text(), "tt0133093", "the IMDb field is filled in")
+  end)
+
+  it("3. nothing guessed: the site's films searched with GuessIt's title and year (recorded /features)", function()
+    local env = setup({ guess = "upload_guess_none", features = "upload_features_matrix_1999" })
+    openSub.movie.title, openSub.movie.year = "The Matrix", "1999"
+    local w = upload_window(env)
+    eq(w.film.text, "The Matrix (1999)")
+    eq(w.imdb:get_text(), "tt0133093")
+    local req = env.server:last("GET " .. API .. "/features")
+    eq(req.query.query, "the matrix")
+    eq(req.query.year, "1999")
+    w.check:_click()
+    eq(last(env, "/upload/check").body.feature_id, 163533)
+  end)
+
+  it("a title typed into the field is searched (Find), an id is looked up", function()
+    local env = setup({ guess = "upload_guess_none", features = "upload_features_matrix" })
+    local w = upload_window(env)
+    w.imdb:set_text("Matrix")
+    w.find:_click()
+    eq(w.film.text, "The Matrix (1999)")
+    eq(w.imdb:get_text(), "tt0133093")
+    eq(last(env, "/features/from_id"), nil)
+  end)
+
+  it("nothing found anywhere: the field asks for an IMDb id, link or title", function()
+    local env = setup({ guess = "upload_guess_none", features = "upload_features_none" })
+    local w = upload_window(env)
+    has(w.film.text, "IMDb id, link or title")
+    eq(w.imdb:get_text(), "")
+  end)
+
+  it("a file next to the video goes with the video's hash; a file by path does not", function()
+    local env = setup({ video = true })
+    local w = upload_window(env)
+    w.check:_click()
+    local body = last(env, "/upload/check").body
+    ok(body.moviehash and #body.moviehash == 16, "hash sent")
+    eq(body.moviebytesize, 300000)
+    eq(body.moviefilename, VIDEO .. ".mkv")
+    w.path:set_text(env.dir_video .. "/Other.Film.2001.srt")
+    w.check:_click()
+    body = last(env, "/upload/check").body
+    eq(body.moviehash, nil)
+    eq(body.moviebytesize, nil)
   end)
 end)
 

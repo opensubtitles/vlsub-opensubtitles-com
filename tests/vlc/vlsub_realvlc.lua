@@ -42,7 +42,8 @@ local AI_IMDB = os.getenv("VLSUB_AI_IMDB") or "1254207"
 local AI_LANGUAGE = os.getenv("VLSUB_AI_LANGUAGE") or "Hungarian"
 -- VLSUB_UPLOAD=dev: upload a small test subtitle to The Matrix. Only with
 -- VLSUB_API_URL set (the development API through tools/devproxy.py), never
--- against production. The subtitle id is printed: withdraw it afterwards.
+-- against production. Withdraw it afterwards - only it: its release name
+-- starts with "upload-test" (tools/upload_roundtrip.py does the same).
 local UPLOAD = os.getenv("VLSUB_UPLOAD") == "dev" and (os.getenv("VLSUB_API_URL") or "") ~= ""
 if AI ~= "credits" and AI ~= "nocredits" then AI = nil end
 local VERBOSE = tonumber(os.getenv("VLSUB_VERBOSE") or "0") or 0

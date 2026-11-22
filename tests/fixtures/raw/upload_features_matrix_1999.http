@@ -1,0 +1,5 @@
+HTTP/1.1 200 OK
+Content-Type: application/json; charset=utf-8
+Connection: close
+
+{"data":[{"id":"163533","type":"feature","attributes":{"title":"the matrix","original_title":"The Matrix","year":"1999","subtitles_count":1292,"seasons_count":0,"subtitles_counts":{},"ai_subtitles_counts":{},"parent_title":"","season_number":0,"episode_number":null,"imdb_id":133093,"tmdb_id":603,"parent_imdb_id":null,"feature_id":"163533","title_aka":["الماتريكس","Matris","Матрыца","Матрицата","Matrix","The Matrix","ماتریکس","La matrice","מטריקס","महाशक्तिमान","Mátrix","マトリックス","მატრიცა","매트릭스","Matrica","Matrikss","Матрица","Матрикс","เดอะ เมทริกซ์: เพาะพันธุ์มนุษย์เหนือโลก 2199","Матриця","Matritsa","Ma Trận","22世紀殺人網絡"],"feature_type":"Movie","url":"https://www.opensubtitles.com/en/movies/1999-the-matrix","img_url":"https://rb-dev.ngrok.dev/features/3/3/5/163533.jpg","seasons":[]}}]}
