@@ -334,6 +334,7 @@
   "ui_upload_language":"Language",
   "ui_upload_language_needed":"Choose the language of the subtitles.",
   "ui_upload_login_first":"Log in to upload: enter username and password in Config, then Save.",
+  "ui_download_login_first":"Log in to download: enter username and password in Config, then Save.",
   "ui_upload_no_files":"(no subtitle file next to the video)",
   "ui_upload_ok_to_upload":"Ready: this subtitle can be uploaded (%s uploads left today).",
   "ui_upload_other_path":"Or full path of the file",

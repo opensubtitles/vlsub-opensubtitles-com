@@ -98,6 +98,16 @@ EXCEPTIONS[8] = {
      .. "be timed out; on a bad connection VLC offered to kill the extension. The requests of "
      .. "the network test (google.com, httpbin.org, the API's root) are not compared.",
 }
+EXCEPTIONS[9] = {
+  name = "messages reworded to say what to do",
+  why = "asked for by the user: 'Authentication required for download' did not say that "
+     .. "the username and password are set in the configuration window. Each new wording "
+     .. "is mapped back to the old one; the message must still appear in the same place.",
+  reworded = {
+    ["Log in to download: enter username and password in Config, then Save."] =
+      "Authentication required for download",
+  },
+}
 local DROP_CONFIG_KEYS = EXCEPTIONS[2].drop_config_keys
 DROP_CONFIG_KEYS.interfaceLanguage = true
 DROP_CONFIG_KEYS.detectedLanguage = true
@@ -157,6 +167,10 @@ local function make_normaliser(env)
   local home_index = env.home:match("(%d+)$")
   return function(text)
     if type(text) ~= "string" then return text end
+    for new_text, old_text in pairs(EXCEPTIONS[9].reworded) do -- exception 9
+      local at = text:find(new_text, 1, true)
+      if at then text = text:sub(1, at - 1) .. old_text .. text:sub(at + #new_text) end
+    end
     -- sandbox directories are numbered per launch
     text = text:gsub(root .. "/(%d+)", function(n)
       return n == home_index and "<HOME>" or "<DIR>"
@@ -445,5 +459,5 @@ print(string.format("\n%d sessions, %d steps compared on %s: %d identical, %d di
 -- comparing against an older script (CANDIDATE / baseline swapped by hand).
 print("baseline: v" .. tostring((H.read_file(BASELINE) or ""):match('local app_version = "([^"]+)"'))
   .. "   agreed exceptions: " .. EXCEPTIONS[1].name .. "; " .. EXCEPTIONS[7].name
-  .. "; " .. EXCEPTIONS[8].name)
+  .. "; " .. EXCEPTIONS[8].name .. "; " .. EXCEPTIONS[9].name)
 os.exit(failed == 0 and 0 or 1)

@@ -158,12 +158,11 @@ describe("download", function()
 end)
 
 describe("download: failures", function()
-  it("not logged in: explains that an account is needed, no download request", function()
+  it("not logged in: says where to log in (Config), no download request", function()
     local env = searched({ login = false })
     download(env, 1)
     eq(#env.server:seen(DOWNLOAD), 0)
-    ok(env.message():lower():find("authenticat") or env.message():lower():find("credential"),
-       "message: " .. env.message())
+    has(env.message(), "Log in to download: enter username and password in Config, then Save.")
   end)
 
   for status, expected in pairs({ [403] = "403", [404] = "404",

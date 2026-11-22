@@ -587,6 +587,7 @@ local strings = {
   ui_upload_check = "✔ Check",
   ui_upload_no_files = "(no subtitle file next to the video)",
   ui_upload_login_first = "Log in to upload: enter username and password in Config, then Save.",
+  ui_download_login_first = "Log in to download: enter username and password in Config, then Save.",
   ui_upload_choose_file = "Choose a subtitle file, or enter its full path.",
   ui_upload_cannot_read = "The file cannot be read: %s",
   ui_upload_too_small = "The file is too small to be a subtitle (at least 100 bytes).",
@@ -6438,7 +6439,7 @@ openSub.downloadFromNewAPI = function(item, is_retry)
 
   local auth_header = openSub.getAuthHeader()
   if not auth_header then
-    return report_failure(strings.ui_authentication_required_for_download)
+    return report_failure(strings.ui_download_login_first)
   end
 
   local client = Curl.new()
