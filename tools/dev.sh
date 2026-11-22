@@ -10,6 +10,9 @@
 #                            Stored interface translations are dropped first, so the
 #                            current ones of this branch are fetched (--keep-locale: not).
 #                            --first-run: as on a fresh installation (see reset all)
+#                            --dev-api: talk to the development API (https-only) through
+#                            a local proxy, tools/devproxy.py; needs VLSUB_DEV_API_KEY
+#                            (and optionally VLSUB_DEV_API, default https://rb-dev.ngrok.dev)
 #   tools/dev.sh reset locale  forget the stored interface translations
 #   tools/dev.sh reset all     back to a fresh installation: settings, login, caches and
 #                            translations are moved to a backup folder (printed), VLSub
@@ -144,15 +147,34 @@ case "${1:-help}" in
     : "${VLSUB_LOCALE_URL:=$BRANCH_URL}"
     export VLSUB_LOCALE_URL
     echo "Translations from: $VLSUB_LOCALE_URL"
-    VERBOSE_RUN=0; KEEP_LOCALE=0; FIRST_RUN=0
+    VERBOSE_RUN=0; KEEP_LOCALE=0; FIRST_RUN=0; DEV_API=0
     while :; do
       case "${1:-}" in
         -v) VERBOSE_RUN=1; shift ;;
         --keep-locale) KEEP_LOCALE=1; shift ;;
         --first-run) FIRST_RUN=1; shift ;;
+        --dev-api) DEV_API=1; shift ;;
         *) break ;;
       esac
     done
+    if [ "$DEV_API" = 1 ]; then
+      [ -f "$HOME/.vlsub-dev.env" ] && . "$HOME/.vlsub-dev.env"
+      [ -n "${VLSUB_DEV_API_KEY:-}" ] || { echo "--dev-api needs VLSUB_DEV_API_KEY (environment, or a line in ~/.vlsub-dev.env)" >&2; exit 2; }
+      command -v python3 >/dev/null 2>&1 || { echo "--dev-api needs python3 (macOS: xcode-select --install)" >&2; exit 2; }
+      UPSTREAM="${VLSUB_DEV_API:-https://rb-dev.ngrok.dev}"
+      UPSTREAM="${UPSTREAM%/api/v1}"
+      PORT_FILE="$(mktemp)"
+      python3 "$ROOT/tools/devproxy.py" "$UPSTREAM" --port-file "$PORT_FILE" &
+      PROXY_PID=$!
+      i=0; while [ ! -s "$PORT_FILE" ] && [ $i -lt 50 ]; do sleep 0.1; i=$((i + 1)); done
+      [ -s "$PORT_FILE" ] || { echo "the proxy did not start" >&2; kill $PROXY_PID 2>/dev/null; exit 2; }
+      export VLSUB_API_URL="http://127.0.0.1:$(cat "$PORT_FILE")/api/v1"
+      export VLSUB_API_KEY="$VLSUB_DEV_API_KEY"
+      rm -f "$PORT_FILE"
+      echo "Development API: $UPSTREAM, through $VLSUB_API_URL (requests are listed below)"
+      # VLC must not replace this shell: the proxy is stopped when VLC ends
+      trap 'kill $PROXY_PID 2>/dev/null; pkill -f "tail -f $LOG" 2>/dev/null' EXIT INT TERM
+    fi
     if [ "$FIRST_RUN" = 1 ]; then
       reset_data all
     elif [ "$KEEP_LOCALE" = 0 ]; then
@@ -165,11 +187,15 @@ case "${1:-help}" in
       # followers left over from earlier runs would print every line again
       pkill -f "tail -f $LOG" 2>/dev/null || true
       ( tail -f "$LOG" 2>/dev/null | grep --line-buffered -E "\[VLSub\]|lua (warning|error)|[Dd]ialog" ) &
-      trap 'pkill -f "tail -f $LOG" 2>/dev/null' EXIT INT TERM
+      trap 'pkill -f "tail -f $LOG" 2>/dev/null; [ -n "${PROXY_PID:-}" ] && kill $PROXY_PID 2>/dev/null' EXIT INT TERM
       "$VLC" --verbose=2 --file-logging --logfile="$LOG" "$@" || echo "VLC ended with exit code $?"
       sleep 1
       echo "== VLC has ended. Last lines of the log:"
       tail -5 "$LOG" | cut -c1-240
+      exit 0
+    fi
+    if [ "$DEV_API" = 1 ]; then
+      "$VLC" --verbose=2 --file-logging --logfile="$LOG" "$@" || true
       exit 0
     fi
     exec "$VLC" --verbose=2 --file-logging --logfile="$LOG" "$@"
@@ -284,6 +310,6 @@ case "${1:-help}" in
     exec "$ROOT/tests/vlc/run.sh" "$@"
     ;;
   *)
-    sed -n '2,24p' "$0" | sed 's/^# \{0,1\}//'
+    sed -n '2,27p' "$0" | sed 's/^# \{0,1\}//'
     ;;
 esac

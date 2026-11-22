@@ -67,3 +67,29 @@ Never automatic: an upload is a public act under the user's name.
   itself; for one the user opened by hand VLC's Lua gives no path - the user
   would pick it by typing / pasting the path, or it is found next to the
   video by name.
+
+## Talking to the development API from real VLC (2026-11-22)
+
+The development API (`https://rb-dev.ngrok.dev/api/v1`) is https only;
+VLSub sends headers only over plain HTTP. `tools/devproxy.py` (Python
+standard library) listens on 127.0.0.1 and forwards to it; VLSub is pointed
+at the proxy with two developer switches, read when used and absent in
+normal use:
+
+- `VLSUB_API_URL` - API base (default `http://api.opensubtitles.com/api/v1`)
+- `VLSUB_API_KEY` - API key (default: VLSub's own)
+
+`tools/dev.sh run --dev-api` starts the proxy and sets both (key from
+`VLSUB_DEV_API_KEY` or `~/.vlsub-dev.env`). Measured with real VLC 3.0.16
+on the dev box: login, search by name, IMDb id and in two languages all
+worked through it. The dev database is a subset (no Breaking Bad, no Big
+Buck Bunny) and has no `/ai/credits` (404).
+
+## Uploading to a film the site does not have (measured)
+
+`upload/check` with `idmovieimdb: tt1254207` or `tmdbid: 10378` (Big Buck
+Bunny, on IMDb/TMDb, not in the database) answers
+`rejection_reasons: ["feature_not_found"]`. An IMDb id alone is not enough:
+the film has to be registered first (`features/from_id`, then
+`features/stub` with `source: "imdb"`), then uploaded to the new
+`feature_id`.

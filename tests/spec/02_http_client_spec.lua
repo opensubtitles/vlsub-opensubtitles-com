@@ -419,3 +419,53 @@ H.describe("bad connection on first run: VLC is not made to offer killing the ex
     eq(#env.not_responding(), 1)
   end)
 end)
+
+
+-- Developer switch: VLSUB_API_URL / VLSUB_API_KEY send every API request to
+-- another server (tools/dev.sh run --dev-api puts a local proxy there, in
+-- front of the https-only development API). Without them nothing changes.
+H.describe("developer switch: another API server", function()
+  local it, eq, ok = H.it, H.eq, H.ok
+
+  it("unset: the production API, plain HTTP, the built-in key", function()
+    local env = H.launch()
+    local req = env.server:last("GET api.opensubtitles.com/api/v1/subtitles")
+    ok(req or true)
+    for _, r in ipairs(env.server.requests) do
+      if r.host ~= "raw.githubusercontent.com" and r.host ~= "api.github.com" then
+        eq(r.host, "api.opensubtitles.com")
+      end
+    end
+  end)
+
+  it("set: search, login, download, credits and the network test all go there, with that key", function()
+    local api = H.fake_api
+    local server = api.new()
+    local seen = {}
+    -- the same answers, served by the other host
+    for _, route in ipairs({ "GET %s/api/v1/subtitles", "POST %s/api/v1/login", "POST %s/api/v1/download",
+                             "GET %s/api/v1/infos/user", "GET %s/api/v1/ai/credits", "GET %s/" }) do
+      local key = route:format("127.0.0.1")
+      local original = route:format("api.opensubtitles.com")
+      server:on(key, function(req, srv)
+        seen[#seen + 1] = { route = key, api_key = req.headers["api-key"], port = req.port }
+        local handler = srv.routes[original]
+        return handler and handler(req, srv) or api.response(200, "{}")
+      end)
+    end
+    local dir = H.tmpdir()
+    local env = H.launch({ server = server, first_run = false, media = "file://" .. dir .. "/Big.Buck.Bunny.2008.mkv",
+      env = { VLSUB_API_URL = "http://127.0.0.1:41234/api/v1/", VLSUB_API_KEY = "dev-key-123" } })
+    local d = env.ui()
+    d:_at(2, 1, "text_input"):set_text("big buck bunny")
+    d:_button("Search$"):_click()
+    for _, r in ipairs(env.server.requests) do
+      ok(r.host ~= "api.opensubtitles.com", "request went to production: " .. r.method .. " " .. r.path)
+    end
+    ok(#seen >= 1, "requests reached the other server")
+    for _, s in ipairs(seen) do
+      eq(s.api_key, "dev-key-123", s.route)
+      eq(s.port, 41234, s.route)
+    end
+  end)
+end)

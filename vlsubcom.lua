@@ -130,12 +130,36 @@ local app_useragent = app_name.." v"..app_version;
 local config = {
   api_key = "d3Sba6j6VYnty3ir5T8GXYoAuiLSBf0S",
   cache_languages_duration_seconds = 30 * 24 * 60 * 60, -- 30 days in seconds
-  api_languages_url = "http://api.opensubtitles.com/api/v1/infos/languages",
   token_cache_duration_seconds = 24 * 60 * 60, -- 24 hours in seconds
-  login_api_url = "http://api.opensubtitles.com/api/v1/login",
-  guessit_api_url = "http://api.opensubtitles.com/api/v1/utilities/guessit",
   cache_guessit_duration_seconds = 7 * 24 * 60 * 60 -- 7 days in seconds (filenames don't change often)
 }
+
+-- Where the API is. Developers can point the extension at a test server
+-- (tools/dev.sh run --dev-api: a local proxy in front of the https-only
+-- development API) with VLSUB_API_URL and VLSUB_API_KEY. Read when used,
+-- never at load time; without them nothing changes.
+local API_DEFAULT = "http://api.opensubtitles.com/api/v1"
+
+local function api_url(path)
+  local base = os.getenv("VLSUB_API_URL")
+  if not base or base == "" then
+    base = API_DEFAULT
+  end
+  return (string.gsub(base, "/+$", "")) .. (path or "")
+end
+
+-- "http://host[:port]", for the paths the API hands out in redirects
+local function api_root()
+  return string.match(api_url(""), "^(https?://[^/]+)")
+end
+
+local function api_key()
+  local key = os.getenv("VLSUB_API_KEY")
+  if key and key ~= "" then
+    return key
+  end
+  return config.api_key
+end
 
 -- Auto-update configuration
 local update_config = {
@@ -1773,9 +1797,9 @@ function initialize_languages()
 
   local client = Curl.new()
   client:set_aggressive_timeouts()
-  client:add_header("Api-Key", config.api_key)
+  client:add_header("Api-Key", api_key())
 
-  local res = client:get(config.api_languages_url)
+  local res = client:get(api_url("/infos/languages"))
 
   if res and res.status == 200 and res.body then
     local ok, parsed_data = decode_object(res.body)
@@ -4219,11 +4243,11 @@ openSub.callGuessIt = function(filename)
   end
 
   -- Prepare the GuessIt request
-  local guessit_url = config.guessit_api_url .. "?filename=" .. vlc.strings.encode_uri_component(filename)
+  local guessit_url = api_url("/utilities/guessit") .. "?filename=" .. vlc.strings.encode_uri_component(filename)
 
   -- Make the API request
   local client = Curl.new()
-  client:add_header("Api-Key", config.api_key)
+  client:add_header("Api-Key", api_key())
 
   -- Add Authorization header if user is logged in
   if openSub.session.token and openSub.session.token ~= "" then
@@ -4379,7 +4403,8 @@ function parse_url(url)
 	return url_parsed["host"],
 		url_parsed["path"],
 		url_parsed["option"],
-		url_parsed["scheme"] or url_parsed["protocol"]
+		url_parsed["scheme"] or url_parsed["protocol"],
+		tonumber(url_parsed["port"]) -- 0 (or nil) when the URL names none
 end
 
 
@@ -4654,7 +4679,7 @@ openSub.convertNewAPIResponse = function(newData)
 
       -- For the new API, we need to construct download URLs
       -- The download will be handled differently in the download function
-      convertedItem.ZipDownloadLink = "http://api.opensubtitles.com/api/v1/download"
+      convertedItem.ZipDownloadLink = api_url("/download")
       convertedItem.SubDownloadLink = convertedItem.ZipDownloadLink
 
       table.insert(convertedData, convertedItem)
@@ -4697,10 +4722,10 @@ openSub.loginWithRestAPI = function()
   -- Use aggressive timeouts for login
   local client = Curl.new()
   client:set_aggressive_timeouts()
-  client:add_header("Api-Key", config.api_key)
+  client:add_header("Api-Key", api_key())
   client:add_header("Content-Type", "application/json")
 
-  local res = client:post(config.login_api_url, request_body)
+  local res = client:post(api_url("/login"), request_body)
 
   if not res then
     vlc.msg.err("[VLSub] Login request failed - network timeout")
@@ -5338,11 +5363,11 @@ function ai_credits()
     return nil
   end
   local client = Curl.new()
-  client:add_header("Api-Key", config.api_key)
+  client:add_header("Api-Key", api_key())
   client:add_header("Authorization", auth_header)
   client:set_timeout(10)
   client:set_retries(0)
-  local res = client:get("http://api.opensubtitles.com/api/v1/ai/credits")
+  local res = client:get(api_url("/ai/credits"))
   if not res or res.status ~= 200 then
     return nil
   end
@@ -5362,11 +5387,11 @@ local function ai_buy_links()
     return ""
   end
   local client = Curl.new()
-  client:add_header("Api-Key", config.api_key)
+  client:add_header("Api-Key", api_key())
   client:add_header("Authorization", auth_header)
   client:set_timeout(10)
   client:set_retries(0)
-  local res = client:get("http://api.opensubtitles.com/api/v1/ai/credits/buy")
+  local res = client:get(api_url("/ai/credits/buy"))
   local ok, answer = decode_object(res and res.status == 200 and res.body or "")
   if not ok or type(answer.data) ~= "table" then
     return ""
@@ -5445,7 +5470,7 @@ openSub.downloadFromNewAPI = function(item, is_retry)
   end
 
   local client = Curl.new()
-  client:add_header("Api-Key", config.api_key)
+  client:add_header("Api-Key", api_key())
   client:add_header("Content-Type", "application/json")
   client:add_header("Authorization", auth_header)
   client:set_timeout(30)
@@ -5512,7 +5537,9 @@ openSub.downloadFromNewAPI = function(item, is_retry)
     local started = os.time()
     while answer and answer.status >= 301 and answer.status <= 308 do
       local location = answer.headers and answer.headers["location"]
+      local root = string.gsub(api_root(), "%p", "%%%0")
       local path = location and (string.match(location, "^https?://api%.opensubtitles%.com(/.*)$")
+        or string.match(location, "^" .. root .. "(/.*)$")
         or string.match(location, "^(/.*)$"))
       if not path then
         break
@@ -5525,7 +5552,7 @@ openSub.downloadFromNewAPI = function(item, is_retry)
       end
       -- a redirect that came back at once: do not hammer the server
       local asked = os.time()
-      answer = traced("GET " .. path, client:get("http://api.opensubtitles.com" .. path))
+      answer = traced("GET " .. path, client:get(api_root() .. path))
       if answer and answer.status >= 301 and answer.status <= 308 then
         while os.time() - asked < 3 do end
       end
@@ -5533,7 +5560,7 @@ openSub.downloadFromNewAPI = function(item, is_retry)
     return answer
   end
 
-  local res = traced("POST /download", client:post("http://api.opensubtitles.com/api/v1/download", request_body))
+  local res = traced("POST /download", client:post(api_url("/download"), request_body))
   if item.OnDemand and res then
     res = follow_waiting(res)
     if res == false then
@@ -5602,7 +5629,7 @@ openSub.downloadFromNewAPI = function(item, is_retry)
         if extra ~= "" then
           path = path .. "&" .. extra
         end
-        local direct = follow_waiting(traced("GET " .. path, client:get("http://api.opensubtitles.com" .. path)))
+        local direct = follow_waiting(traced("GET " .. path, client:get(api_root() .. path)))
         if direct and direct.status == 200 and direct.body and direct.body ~= ""
            and not decode_object(direct.body) then
           subtitle_content = direct.body
@@ -5761,12 +5788,12 @@ openSub.checkLoginAndUserInfo = function()
     return fail(strings.ui_no_authentication_token_available)
   end
   local client = Curl.new()
-  client:add_header("Api-Key", config.api_key)
+  client:add_header("Api-Key", api_key())
   client:add_header("Authorization", auth_header)
   client:set_timeout(30)
   client:set_retries(2)
 
-  local res = client:get("http://api.opensubtitles.com/api/v1/infos/user")
+  local res = client:get(api_url("/infos/user"))
   if not res then
     return fail(strings.ui_no_response_from_user_info_api)
   end
@@ -6755,7 +6782,7 @@ networkSlow = false
 function test_network_connectivity()
   update_debug_network(strings.ui_testing_network_connectivity)
 
-  local url = "http://api.opensubtitles.com"
+  local url = api_root()
   update_debug_network(tr("ui_testing_connection_n_of", "1", "1"))
   append_debug_log(tr("ui_testing", url))
 
@@ -6998,7 +7025,6 @@ end
 -- Enhanced _build_url_params method that decodes existing URL params and rebuilds with sorting
             --[[ Subtitle search ]]--
 
-local SUBTITLES_URL = "http://api.opensubtitles.com/api/v1/subtitles"
 
 -- First steps of every search. Returns false when no session could be set up.
 local function search_begin()
@@ -7031,10 +7057,10 @@ local function search_get(params, protected)
   -- AI uploads)
   filter_params(params)
 
-  local url = build_sorted_url(SUBTITLES_URL, params)
+  local url = build_sorted_url(api_url("/subtitles"), params)
 
   local client = Curl.new()
-  client:add_header("Api-Key", config.api_key)
+  client:add_header("Api-Key", api_key())
   local auth_header = openSub.getAuthHeader()
   if auth_header then
     client:add_header("Authorization", auth_header)
@@ -7645,8 +7671,12 @@ end
 
 -- Use vlc.net.connect_tcp for HTTP requests
 function VLCHttpClient:_make_request_tcp(method, url, data)
-    local host, path, option, protocol = parse_url(url)
+    local host, path, option, protocol, named_port = parse_url(url)
     local port = (protocol == "https") and 443 or 80
+    -- a port in the URL (only a developer's test server has one)
+    if named_port and named_port > 0 then
+        port = named_port
+    end
     if not protocol or not host then
         vlc.msg.err("[VLSub] Invalid URL: " .. url)
         return nil
@@ -7663,7 +7693,7 @@ function VLCHttpClient:_make_request_tcp(method, url, data)
     -- Build HTTP request
     local request_lines = {}
     table.insert(request_lines, method .. " " .. full_path .. " HTTP/1.1")
-    table.insert(request_lines, "Host: " .. host)
+    table.insert(request_lines, "Host: " .. host .. ((port ~= 80 and port ~= 443) and (":" .. port) or ""))
     table.insert(request_lines, "User-Agent: " .. app_useragent)
     table.insert(request_lines, "Accept: */*")
     table.insert(request_lines, "Connection: close")

@@ -119,9 +119,8 @@ describe("VLC environment", function()
     for url in src:gmatch('"(https://api%.opensubtitles%.com[^"]*)"') do
       error("API URL uses https, which goes through vlc.stream (GET only, no Api-Key): " .. url)
     end
-    for _, name in ipairs({ "api_languages_url", "login_api_url", "guessit_api_url" }) do
-      ok(src:find(name .. ' = "http://api%.opensubtitles%.com/'), name .. " is plain http")
-    end
+    ok(src:find('local API_DEFAULT = "http://api%.opensubtitles%.com/api/v1"'), "the API base is plain http")
+    ok(not src:find("https://api%.opensubtitles%.com/api"), "no https API address anywhere")
   end)
 end)
 
