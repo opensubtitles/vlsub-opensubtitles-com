@@ -103,9 +103,10 @@ local function upload_window(env)
   return {
     dialog = d, file = d:_at(2, 1, "dropdown"), path = d:_at(2, 2, "text_input"),
     language = d:_at(2, 3, "dropdown"), film = d:_at(2, 4, "label"), imdb = d:_at(2, 5, "text_input"),
-    hi = d:_at(2, 6, "dropdown"), foreign = d:_at(2, 7, "dropdown"), translation = d:_at(2, 8, "dropdown"),
-    release = d:_at(2, 9, "text_input"), comment = d:_at(2, 10, "text_input"),
-    check = d:_button("Check$"), send = d:_at(2, 12, "button"), find = d:_button("Find$"),
+    season = d:_at(2, 6, "text_input"), episode = d:_at(3, 6, "text_input"),
+    hi = d:_at(2, 7, "dropdown"), foreign = d:_at(2, 8, "dropdown"), translation = d:_at(2, 9, "dropdown"),
+    release = d:_at(2, 10, "text_input"), comment = d:_at(2, 11, "text_input"),
+    check = d:_button("Check$"), send = d:_at(2, 13, "button"), find = d:_button("Find$"),
   }
 end
 
@@ -313,6 +314,101 @@ describe("upload: a film the site does not have", function()
     w.send:_click()
     has(env.message(), "Which film is it?")
     eq(last(env, "/subtitles/upload"), nil)
+  end)
+end)
+
+describe("upload: TV series", function()
+  -- Recorded on the development API: How I Met Your Mother (tt0460649,
+  -- feature 180497, "tvshow"); its S01E02 "Purple Giraffe" is feature 180499.
+  local SERIES_LINK = "<a href='https://www.imdb.com/title/tt0460649/'>How I Met Your Mother (2005)</a>"
+
+  it("a series id: Check without season and episode asks for them, nothing sent", function()
+    local env = setup({ guess = "upload_guess_none", from_id = "upload_from_id_series" })
+    local w = upload_window(env)
+    eq(w.season:get_text(), "", "nothing in the names: empty")
+    w.imdb:set_text("tt0460649")
+    w.find:_click()
+    eq(w.film.text, SERIES_LINK)
+    w.check:_click()
+    has(env.message(), "Which episode is it? Enter season and episode.")
+    eq(last(env, "/upload/check"), nil)
+    w.send:_click()
+    has(env.message(), "Which episode is it?")
+    eq(last(env, "/subtitles/upload"), nil)
+  end)
+
+  it("a series id with season and episode: both sent, the server attaches it to the episode", function()
+    local env = setup({ guess = "upload_guess_none", from_id = "upload_from_id_series",
+                        check = "upload_check_episode" })
+    local w = upload_window(env)
+    w.imdb:set_text("tt0460649")
+    w.find:_click()
+    w.season:set_text("1")
+    w.episode:set_text(" 02 ")
+    w.check:_click()
+    local body = last(env, "/upload/check").body
+    eq({ body.feature_id, body.season_number, body.episode_number }, { 180497, 1, 2 })
+    has(env.message(), "Ready")
+  end)
+
+  it("a film (not a series): season and episode are not sent", function()
+    local env = setup()
+    local w = upload_window(env)
+    w.season:set_text("1")
+    w.episode:set_text("2")
+    w.check:_click()
+    local body = last(env, "/upload/check").body
+    eq(body.season_number, nil)
+    eq(body.episode_number, nil)
+  end)
+
+  it("the server's episode_required (recorded) is said in plain words", function()
+    -- the film's kind unknown to VLSub: the check answers episode_required
+    local env = setup({ guess = "upload_guess_none", features = "upload_features_matrix",
+                        check = "upload_check_episode_required" })
+    local w = upload_window(env)
+    w.imdb:set_text("the matrix")
+    w.find:_click()
+    w.check:_click()
+    has(env.message(), "Which episode is it? Enter season and episode.")
+    lacks(env.message(), "episode_required")
+  end)
+
+  it("season and episode come from the subtitle's name; the episode found is named with its show", function()
+    local env = setup({ guess = "upload_guess_episode" })
+    H.write_file(env.dir_video .. "/" .. VIDEO .. ".S01E02.cs.srt", SRT)
+    local w = upload_window(env)
+    eq({ w.season:get_text(), w.episode:get_text() }, { "1", "2" })
+    -- recorded guess for How.I.Met.Your.Mother.S01E02: the episode itself
+    eq(w.film.text, "<a href='https://www.imdb.com/title/tt0606111/'>How I Met Your Mother S01E02 - Purple Giraffe (2005)</a>")
+  end)
+
+  it("an episode's own IMDb id: that episode, season and episode filled in", function()
+    -- recorded from_id for tt0606111: the show, with "preselected" episode 180499
+    local env = setup({ guess = "upload_guess_none", from_id = "upload_from_id_episode",
+                        check = "upload_check_episode" })
+    local w = upload_window(env)
+    w.imdb:set_text("https://www.imdb.com/title/tt0606111/")
+    w.find:_click()
+    eq(w.film.text, "<a href='https://www.imdb.com/title/tt0606111/'>How I Met Your Mother S01E02 - Purple Giraffe (2005)</a>")
+    eq({ w.season:get_text(), w.episode:get_text() }, { "1", "2" })
+    w.check:_click()
+    local body = last(env, "/upload/check").body
+    eq(body.feature_id, 180499)
+    eq(body.season_number, nil, "the episode's own id needs no numbers")
+  end)
+
+  it("names: S01E02, s1e2, 1x02, S01.E02 are read; a year or resolution is not", function()
+    H.launch({ activate = false })
+    local read = H.find_local("episode_from_name")
+    local function both(name) return { read(name) } end
+    eq(both("Show.S01E02.720p.srt"), { 1, 2 })
+    eq(both("show s1e2"), { 1, 2 })
+    eq(both("Show - 1x02 - Title"), { 1, 2 })
+    eq(both("Show.S01.E02"), { 1, 2 })
+    eq(both("Show.S10E120"), { 10, 120 })
+    eq(both("Send.Help.2026.1080p"), {})
+    eq(both("Film.1920x1080"), {})
   end)
 end)
 

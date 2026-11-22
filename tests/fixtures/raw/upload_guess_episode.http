@@ -1,0 +1,5 @@
+HTTP/1.1 200 OK
+Content-Type: application/json; charset=utf-8
+Connection: close
+
+{"best_guess":{"feature_id":180499,"imdbid":606111,"tmdbid":62757,"title":"Purple Giraffe","year":2005,"type":"Episode","provisional":false,"season_number":1,"episode_number":2,"parent_title":"How I Met Your Mother","parent_imdb_id":460649,"parent_year":2005},"candidates":[{"feature_id":180499,"imdbid":606111,"tmdbid":62757,"title":"Purple Giraffe","year":2005,"type":"Episode","provisional":false,"season_number":1,"episode_number":2,"parent_title":"How I Met Your Mother","parent_imdb_id":460649,"parent_year":2005},{"feature_id":180497,"imdbid":460649,"tmdbid":1100,"title":"How I Met Your Mother","year":2005,"type":"Tvshow","provisional":true}],"source":"title"}

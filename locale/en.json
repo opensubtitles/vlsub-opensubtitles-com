@@ -331,6 +331,8 @@
   "ui_upload_film_year":"%s (%s)",
   "ui_upload_find":"🔍 Find",
   "ui_upload_imdb":"IMDb id, link or title",
+  "ui_upload_episode":"Season / episode",
+  "ui_upload_episode_needed":"Which episode is it? Enter season and episode.",
   "ui_upload_language":"Language",
   "ui_upload_language_needed":"Choose the language of the subtitles.",
   "ui_upload_login_first":"Log in to upload: enter username and password in Config, then Save.",

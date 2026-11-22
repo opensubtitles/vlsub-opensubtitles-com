@@ -1,0 +1,5 @@
+HTTP/1.1 200 OK
+Content-Type: application/json; charset=utf-8
+Connection: close
+
+{"already_in_db":false,"duplicate_of":null,"similar_to":null,"feature":{"feature_id":180499,"imdbid":606111,"tmdbid":62757,"title":null,"year":2005,"type":"Episode","provisional":false},"would_be_rejected":false,"rejection_reasons":[],"would_be_flagged":false,"review_reasons":[],"release_name_suggested":"How.I.Met.Your.Mother.S01E02.cs","flags_suggested":{"hearing_impaired":false,"high_definition":false,"foreign_parts_only":false},"quota":{"allowed":true,"rank":"limited","limit":50,"remaining":41,"next_slot_at":null,"resets_at":null,"windows":{"day":{"seconds":86400,"limit":50,"used":9,"remaining":41,"next_slot_at":null},"week":{"seconds":604800,"limit":200,"used":9,"remaining":191,"next_slot_at":null}}}}

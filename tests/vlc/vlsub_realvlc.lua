@@ -337,13 +337,28 @@ if UPLOAD and USER and PASS then
     check(ui().title:find("Upload"), "the upload window did not open: " .. message())
     ui():_at(2, 2, "text_input"):set_text(path)
     ui():_at(2, 3, "dropdown"):_choose_text("^English$")
-    ui():_at(2, 9, "text_input"):set_text("upload-test") -- what the cleanup withdraws
+    ui():_at(2, 10, "text_input"):set_text("upload-test") -- what the cleanup withdraws
     -- a title the development site does not have: found on IMDb
     -- (imdb.opensubtitles.org over plain HTTP), then looked up by its id
     ui():_at(2, 5, "text_input"):set_text("matrix reloaded")
     ui():_button("Find$"):_click()
     line("     title: " .. ui():_at(2, 4, "label"):get_text() .. "  " .. ui():_at(2, 5, "text_input"):get_text())
     check(ui():_at(2, 5, "text_input"):get_text() == "tt0234215", "title not found on IMDb")
+    -- a TV series: Check asks for the episode, then accepts season + episode
+    ui():_at(2, 5, "text_input"):set_text("tt0460649")
+    ui():_button("Find$"):_click()
+    ui():_at(2, 6, "text_input"):set_text("")
+    ui():_at(3, 6, "text_input"):set_text("")
+    ui():_button("Check$"):_click()
+    line("     series, no episode: " .. message():gsub("<[^>]+>", " "))
+    check(message():find("Which episode"), "no question for the episode")
+    ui():_at(2, 6, "text_input"):set_text("1")
+    ui():_at(3, 6, "text_input"):set_text("2")
+    ui():_button("Check$"):_click()
+    line("     series S01E02: " .. message():gsub("<[^>]+>", " "))
+    check(message():find("Ready"), "series episode not accepted")
+    ui():_at(2, 6, "text_input"):set_text("")
+    ui():_at(3, 6, "text_input"):set_text("")
     ui():_at(2, 5, "text_input"):set_text("tt0133093")
     ui():_button("Find$"):_click()
     line("     film: " .. ui():_at(2, 4, "label"):get_text())
@@ -351,7 +366,7 @@ if UPLOAD and USER and PASS then
     ui():_button("Check$"):_click()
     line("     check: " .. message():gsub("<[^>]+>", ""))
     check(message():find("Ready"), "check did not say ready")
-    ui():_at(2, 12, "button"):_click()
+    ui():_at(2, 13, "button"):_click()
     line("     upload: " .. message():gsub("<[^>]+>", ""))
     check(message():find("Uploaded"), "upload failed")
   end)

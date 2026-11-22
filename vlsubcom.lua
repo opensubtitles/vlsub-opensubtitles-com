@@ -576,6 +576,8 @@ local strings = {
   ui_upload_language = "Language",
   ui_upload_film = "Film",
   ui_upload_imdb = "IMDb id, link or title",
+  ui_upload_episode = "Season / episode",
+  ui_upload_episode_needed = "Which episode is it? Enter season and episode.",
   ui_upload_find = "🔍 Find",
   ui_upload_auto = "Automatic",
   ui_upload_translation = "Translated",
@@ -4768,6 +4770,8 @@ openSub.convertNewAPIResponse = function(newData)
         convertedItem.SeriesSeason = tostring(details.season_number or "")
         convertedItem.SeriesEpisode = tostring(details.episode_number or "")
         convertedItem.SeriesIMDBParent = tostring(details.parent_imdb_id or "")
+        convertedItem.FeatureType = details.feature_type
+        convertedItem.FeatureParentTitle = details.parent_title
       end
 
       -- For the new API, we need to construct download URLs
@@ -5705,6 +5709,9 @@ end
 
 -- The server's own explanation of a refusal, or the HTTP status
 local function upload_error_text(status, answer)
+  if answer.error_code == "episode_required" then
+    return strings.ui_upload_episode_needed
+  end
   if type(answer.message) == "string" and answer.message ~= "" then
     return answer.message
   end
@@ -5718,12 +5725,38 @@ local function imdb_number(film)
   return film and tonumber(film.imdbid or film.imdb_id and string.match(tostring(film.imdb_id), "%d+"))
 end
 
+-- A TV series (not one of its episodes): subtitles go to an episode, so an
+-- upload to it needs the season and episode numbers
+local function is_series(film)
+  local kind = string.lower(tostring(film and (film.type or film.feature_type or film.kind) or ""))
+  if kind == "" or string.find(kind, "episode", 1, true) then
+    return false
+  end
+  return (string.find(kind, "show", 1, true) or string.find(kind, "series", 1, true)
+    or string.find(kind, "tv", 1, true)) ~= nil
+end
+
+-- Season and episode written in a file name: S01E02, s1e2, 1x02
+local function episode_from_name(name)
+  name = tostring(name or "")
+  local season, episode = string.match(name, "[Ss](%d%d?)[%s%._%-]*[Ee](%d%d?%d?)%f[%D]")
+  if not season then
+    season, episode = string.match(name, "%f[%d](%d%d?)[xX](%d%d%d?)%f[%D]")
+  end
+  return tonumber(season), tonumber(episode)
+end
+
 -- The Film line: "Title (year)", a link to the film's IMDb page when known
 local function film_text(film)
   if not film then
     return strings.ui_upload_film_unknown
   end
   local title = tostring(film.title or "?")
+  local season, episode = tonumber(film.season_number), tonumber(film.episode_number)
+  if film.parent_title and film.parent_title ~= "" and season and episode then
+    -- an episode: "How I Met Your Mother S01E02 - Purple Giraffe"
+    title = string.format("%s S%02dE%02d - %s", tostring(film.parent_title), season, episode, title)
+  end
   local year = tonumber(film.year)
   if year and year > 0 then
     title = tr("ui_upload_film_year", title, tostring(year))
@@ -5773,7 +5806,7 @@ local function upload_search_features(title, year)
     return nil
   end
   upload_state.film = { feature_id = tonumber(best.feature_id), title = best.original_title or best.title,
-    year = tonumber(best.year), imdbid = tonumber(best.imdb_id) }
+    year = tonumber(best.year), imdbid = tonumber(best.imdb_id), type = best.feature_type }
   return film_text(upload_state.film)
 end
 
@@ -5883,7 +5916,22 @@ local function upload_find_film(id_text, file_name)
       body.imdb_id = id_text
     end
     local status, answer = upload_request("POST", "/subtitles/upload/features/from_id", body)
-    if status == 200 and answer.exists_in_db and answer.feature_id then
+    -- an episode's id: the answer describes its show and adds the episode
+    local pick = status == 200 and type(answer.preselected) == "table" and answer.preselected
+    if pick then
+      upload_state.season = tostring(tonumber(pick.season_number) or "")
+      upload_state.episode = tostring(tonumber(pick.episode_number) or "")
+      if input_table["upload_season"] then
+        input_table["upload_season"]:set_text(upload_state.season)
+        input_table["upload_episode"]:set_text(upload_state.episode)
+      end
+    end
+    if pick and answer.exists_in_db and tonumber(pick.feature_id) then
+      upload_state.film = { feature_id = tonumber(pick.feature_id), title = pick.title, imdb_id = pick.imdb_id,
+        year = answer.year, type = "episode", parent_title = answer.title,
+        season_number = pick.season_number, episode_number = pick.episode_number }
+      return film_text(upload_state.film)
+    elseif status == 200 and answer.exists_in_db and answer.feature_id then
       upload_state.film = answer
       return film_text(answer)
     elseif status == 200 and answer.found then
@@ -5961,7 +6009,9 @@ local function upload_detect_film()
     -- and the same hash is sometimes recorded for more than one
     if best and count[best.FeatureID] * 2 > #pool then
       upload_state.film = { feature_id = best.FeatureID, title = best.FeatureTitle,
-        year = best.FeatureYear, imdbid = tonumber(best.MovieImdbID) }
+        year = best.FeatureYear, imdbid = tonumber(best.MovieImdbID), type = best.FeatureType,
+        parent_title = best.FeatureParentTitle, season_number = tonumber(best.SeriesSeason),
+        episode_number = tonumber(best.SeriesEpisode) }
       return film_text(upload_state.film)
     end
   end
@@ -6065,6 +6115,22 @@ function show_upload()
   upload_state.film_line = upload_detect_film()
   upload_state.imdb = imdb_text(upload_state.film or upload_state.new_film)
   upload_state.release = upload_release_default(upload_state.film or upload_state.new_film)
+  -- season / episode: from the subtitle's name, the video's, what GuessIt
+  -- read, or the film found (an episode)
+  local first = upload_state.candidates[1]
+  local season, episode = episode_from_name(first and first.name)
+  if not season then
+    season, episode = episode_from_name(openSub.file.name)
+  end
+  if not season then
+    season, episode = tonumber(openSub.movie.seasonNumber), tonumber(openSub.movie.episodeNumber)
+  end
+  local film = upload_state.film or upload_state.new_film
+  if not season and film then
+    season, episode = tonumber(film.season_number), tonumber(film.episode_number)
+  end
+  upload_state.season = season and episode and tostring(season) or ""
+  upload_state.episode = season and episode and tostring(episode) or ""
   trigger_menu(5)
 end
 
@@ -6114,6 +6180,10 @@ function interface_upload()
   dlg:add_label(strings.ui_upload_imdb .. ":", 1, next_row(), 1, 1)
   input_table["upload_imdb"] = dlg:add_text_input(upload_state.imdb or "", 2, row, 2, 1)
   dlg:add_button(strings.ui_upload_find, upload_find_clicked, 4, row, 1, 1)
+
+  dlg:add_label(strings.ui_upload_episode .. ":", 1, next_row(), 1, 1)
+  input_table["upload_season"] = dlg:add_text_input(upload_state.season or "", 2, row, 1, 1)
+  input_table["upload_episode"] = dlg:add_text_input(upload_state.episode or "", 3, row, 1, 1)
 
   dlg:add_label(strings.ui_filter_hearing_impaired .. ":", 1, next_row(), 1, 1)
   input_table["upload_hi"] = dlg:add_dropdown(2, row, 1, 1)
@@ -6208,6 +6278,15 @@ local function upload_fields()
   }
   if upload_state.film then
     fields.feature_id = tonumber(upload_state.film.feature_id)
+  end
+  -- a TV series: the subtitle goes to one of its episodes
+  if is_series(upload_state.film or upload_state.new_film) then
+    local season = tonumber((trim(input_table["upload_season"]:get_text() or "")))
+    local episode = tonumber((trim(input_table["upload_episode"]:get_text() or "")))
+    if not season or not episode or season < 0 or episode < 0 then
+      return nil, strings.ui_upload_episode_needed
+    end
+    fields.season_number, fields.episode_number = math.floor(season), math.floor(episode)
   end
   -- A subtitle that sits next to the video is taken to be made for it: the
   -- video's hash goes with it, so that the next person with this file finds
@@ -6304,7 +6383,9 @@ function upload_check_clicked()
       reasons[#reasons + 1] = tostring(reason)
     end
   end
-  if #reasons > 0 then
+  if #reasons == 1 and reasons[1] == "episode_required" then
+    setMessage(error_tag(strings.ui_upload_episode_needed))
+  elseif #reasons > 0 then
     setMessage(error_tag(tr("ui_upload_would_be_rejected", table.concat(reasons, ", "))))
   elseif answer.would_be_flagged then
     setMessage(success_tag(strings.ui_upload_would_be_reviewed))
@@ -6344,7 +6425,8 @@ function upload_send_clicked()
       return
     end
     upload_state.film = { feature_id = feature_id, title = upload_state.new_film.title, year = upload_state.new_film.year,
-                          imdb_id = upload_state.new_film.imdb_id, imdbid = upload_state.new_film.imdbid }
+                          imdb_id = upload_state.new_film.imdb_id, imdbid = upload_state.new_film.imdbid,
+                          type = upload_state.new_film.type }
     upload_state.new_film = nil
     fields.feature_id = tonumber(feature_id)
     input_table["upload_film"]:set_text(film_text(upload_state.film))

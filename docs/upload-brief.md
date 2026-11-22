@@ -135,6 +135,14 @@ the video goes with the video's hash, size and name; a file by path does not.
   film's title and year (a release group, source, quality - GuessIt's answer
   for the file counts); "Send.Help.2026" leaves the field empty.
 - After the upload: "Uploaded: <release>" linked to the subtitle's page.
+- TV series: a "Season / episode" row. Filled in from the subtitle's name,
+  the video's name (S01E02, s1e2, 1x02), GuessIt, or the episode found.
+  Sent only when the film is a series (`tvshow` / `Tvshow` / "tv series");
+  empty for a series -> "Which episode is it? Enter season and episode."
+  (also for the server's `episode_required`). An episode's own IMDb id:
+  `from_id` answers with the show and `preselected`; that episode is used
+  and shown as "Show S01E02 - Title". Real VLC: series without episode is
+  refused locally, with 1 / 2 Check says Ready.
 - Film not on the site yet: the Film line shows only the film; Upload adds
   it first without saying so (nothing the user has to know).
 - Already on the site (check `already_in_db` / upload 409): the message
