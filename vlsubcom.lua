@@ -5773,22 +5773,62 @@ end
 local FASTTEXT_DETECT = "http://api.opensubtitles.com/api/v1/utilities/fasttext/language/detect"
 local fasttext_down_until = 0
 
--- Up to 60 lines of a subtitle's text, without numbers, times and tags.
--- Not UTF-8 (an old code page): read as Latin-1, enough to tell the words.
+-- Text as UTF-8: UTF-16 (with its byte order mark) decoded; text that is
+-- not UTF-8 (an old code page) read as Latin-1 - enough to tell the words
+local function as_utf8(data)
+  local first, second = string.byte(data, 1, 2)
+  if (first == 255 and second == 254) or (first == 254 and second == 255) then
+    local little = first == 255
+    local out = {}
+    for i = 3, #data - 1, 2 do
+      local a, b = string.byte(data, i, i + 1)
+      local unit = little and (a + b * 256) or (a * 256 + b)
+      if unit < 128 then
+        out[#out + 1] = string.char(unit)
+      elseif unit < 2048 then
+        out[#out + 1] = string.char(192 + math.floor(unit / 64), 128 + unit % 64)
+      elseif unit < 55296 or unit > 57343 then -- surrogates (emoji ...) left out
+        out[#out + 1] = string.char(224 + math.floor(unit / 4096), 128 + math.floor(unit / 64) % 64, 128 + unit % 64)
+      end
+    end
+    return table.concat(out)
+  end
+  data = string.gsub(data, "^\239\187\191", "")
+  local rest = string.gsub(data, "[\194-\244][\128-\191]+", "")
+  if string.find(rest, "[\128-\255]") then
+    data = string.gsub(data, "[\128-\255]", function(c)
+      local b = string.byte(c)
+      return string.char(192 + math.floor(b / 64), 128 + b % 64)
+    end)
+  end
+  return data
+end
+
+-- Up to 60 lines of a subtitle's dialogue, without numbers, times, tags and
+-- headers: SRT, WebVTT, ASS / SSA, MicroDVD, MPL2, TMP, SAMI. When that
+-- leaves too little (a format not known here, a damaged file), the start of
+-- the file without its numbers and times: with them fastText is unsure
+-- (a Czech SRT as it is: 0.71; without numbers: 0.997).
 local function subtitle_sample(path)
   local file = path and io.open(path, "rb")
   if not file then
     return nil
   end
-  local data = file:read(65536) or ""
+  local data = as_utf8(file:read(65536) or "")
   file:close()
-  local lines = {}
+  local lines, in_style = {}, false
   for raw in string.gmatch(data, "[^\r\n]+") do
-    local line = string.gsub(string.gsub(raw, "<[^>]*>", ""), "{[^}]*}", "")
-    line = string.gsub(line, "^Dialogue:[^,]*,[^,]*,[^,]*,[^,]*,[^,]*,[^,]*,[^,]*,[^,]*,[^,]*,", "")
-    line = string.gsub(string.gsub(line, "\\[Nn]", " "), "^%s*(.-)%s*$", "%1")
-    if string.find(line, "%a") and not string.find(line, "%d+:%d+:%d+") and not string.find(line, "^%[")
-       and not string.find(line, "^%w+:%s") then
+    local lower = string.lower(raw)
+    in_style = (in_style or string.find(lower, "<style", 1, true)) and not string.find(lower, "</style", 1, true)
+    local line = in_style and "" or string.gsub(raw, "<[Bb][Rr]%s*/?>", " ")
+    line = string.gsub(string.gsub(line, "<[^>]*>", ""), "{[^}]*}", "") -- tags; MicroDVD {1}{25}
+    line = string.gsub(line, "^Dialogue:[^,]*,[^,]*,[^,]*,[^,]*,[^,]*,[^,]*,[^,]*,[^,]*,[^,]*,", "") -- ASS
+    line = string.gsub(line, "^%[%d+%]%[%d*%]", "") -- MPL2 [10][20]
+    line = string.gsub(line, "^%d+:%d+:%d+[:=]", "") -- TMP 00:00:01:
+    line = string.gsub(string.gsub(line, "\\[Nn]", " "), "|", " ")
+    line = string.gsub(line, "^%s*(.-)%s*$", "%1")
+    if string.find(line, "%a") and not string.find(line, "-->", 1, true) and not string.find(line, "%d+:%d+[:%.,]%d")
+       and not string.find(line, "^%[") and not string.find(line, "^[%w%-]+:") and line ~= "WEBVTT" then
       lines[#lines + 1] = line
       if #lines >= 60 then
         break
@@ -5796,15 +5836,14 @@ local function subtitle_sample(path)
     end
   end
   local text = table.concat(lines, "\n")
-  if #text < 30 then -- a few words say little
-    return nil
+  if #text < 30 then
+    text = string.gsub(string.sub(data, 1, 8000), "[\192-\255][\128-\191]*$", "") -- no half letter
+    text = string.gsub(string.gsub(text, "%-%->", " "), "[%d:%.,]*%d[%d:%.,]*", " ")
+    text = string.gsub(string.gsub(text, "[ \t]+", " "), "%s*\n%s*", "\n")
+    text = string.gsub(text, "^%s*(.-)%s*$", "%1")
   end
-  local valid = string.gsub(text, "[\194-\244][\128-\191]+", "")
-  if string.find(valid, "[\128-\255]") then
-    text = string.gsub(text, "[\128-\255]", function(c)
-      local b = string.byte(c)
-      return string.char(192 + math.floor(b / 64), 128 + b % 64)
-    end)
+  if not string.find(text, "%a%a%a") then -- no words at all
+    return nil
   end
   return text
 end

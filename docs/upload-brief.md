@@ -149,7 +149,9 @@ the video goes with the video's hash, size and name; a file by path does not.
   for the name ("VOSTFR" -> French); fastText on up to 60 text lines
   (`POST /utilities/fasttext/language/detect`, production only - the dev API
   answers 404 - with VLSub's own key; used from confidence 0.8 and about a
-  sentence of text; "pt"/"zh" become the user's own variant when it is one);
+  sentence of text; "pt"/"zh" become the user's own variant when it is one;
+  dialogue taken from SRT, WebVTT, ASS, MicroDVD, MPL2, TMP, SAMI, UTF-16;
+  anything else: the first 8 KB without numbers and times);
   else the user's language from Config. Detected for the first file only:
   the file dropdown has no change event in VLC.
 - A file name typed into the IMDb field ("how.i.met.your.mother.s01.e06",

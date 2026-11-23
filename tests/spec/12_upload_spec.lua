@@ -378,6 +378,42 @@ describe("upload: the subtitle's language", function()
     has(text, "co m")
   end)
 
+  it("the dialogue of every format: SRT, WebVTT, ASS, MicroDVD, MPL2, TMP, SAMI, UTF-16", function()
+    setup()
+    local sample = H.find_local("subtitle_sample")
+    local dir = H.tmpdir()
+    local function of(name, content)
+      H.write_file(dir .. "/" .. name, content)
+      return sample(dir .. "/" .. name)
+    end
+    local WANT = "Hello there, my friend.\nHow are you today?"
+    eq(of("a.vtt", "WEBVTT\n\nNOTE made by hand\n\n1\n00:01.000 --> 00:04.000 align:start\n<v Bob>Hello there, my friend.\n\n"
+       .. "00:05.000 --> 00:08.000\nHow are you today?\n"), "NOTE made by hand\n" .. WANT)
+    eq(of("a.ass", "[Script Info]\nTitle: Test film\nScriptType: v4.00+\n\n[V4+ Styles]\n"
+       .. "Format: Name, Fontname\nStyle: Default,Arial,20\n\n[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n"
+       .. "Dialogue: 0,0:00:01.00,0:00:04.00,Default,,0,0,0,,{\\i1}Hello there,\\Nmy friend.\n"
+       .. "Dialogue: 0,0:00:05.00,0:00:08.00,Default,,0,0,0,,How are you today?\n"),
+       "Hello there, my friend.\nHow are you today?")
+    eq(of("a.sub", "{1}{100}Hello there,|my friend.\n{120}{200}How are you today?\n"), WANT)
+    eq(of("a.mpl", "[10][40]Hello there,|my friend.\n[50][80]How are you today?\n"), WANT)
+    eq(of("a.txt", "00:00:01:Hello there,|my friend.\n00:00:05=How are you today?\n"), WANT)
+    eq(of("a.smi", "<SAMI><HEAD><STYLE TYPE=\"text/css\">\n<!--\nP { margin-left:8pt; }\n.ENCC { Name:English; }\n-->\n"
+       .. "</STYLE></HEAD><BODY>\n<SYNC Start=1000><P Class=ENCC>Hello there,<br>my friend.\n"
+       .. "<SYNC Start=5000><P Class=ENCC>How are you today?\n</BODY></SAMI>\n"), WANT)
+    local utf16 = "\255\254" .. ("1\r\n00:00:01,000 --> 00:00:04,000\r\nNev\237m, co m\225m d\236lat, je to tak.\r\n"):gsub(".", "%0\0")
+    eq(of("b16.srt", utf16), "Nev\195\173m, co m\195\161m d\195\172lat, je to tak.")
+  end)
+
+  it("a format not known here: the start of the file as it is", function()
+    setup()
+    local sample = H.find_local("subtitle_sample")
+    local path = H.tmpdir() .. "/odd.srt"
+    H.write_file(path, "@00:00:01.5 Dobr\195\189 den\n@00:00:04.0 D\196\155kuji moc\n")
+    eq(sample(path), "@ Dobr\195\189 den\n@ D\196\155kuji moc", "words kept, numbers and times left out")
+    H.write_file(path, "1\n2\n3\n")
+    eq(sample(path), nil, "no words: nothing to ask")
+  end)
+
   it("Portuguese: the user's own variant when it is one (recorded: pt 1.0)", function()
     local env = setup({ subtitles = { [VIDEO .. ".srt"] = CZECH }, fasttext = "fasttext_portuguese",
                         config = { language = "pt-br" } })
