@@ -67,8 +67,12 @@ end
 local function setup(o)
   o = o or {}
   local dir = H.tmpdir()
-  H.write_file(dir .. "/" .. VIDEO .. ".en.srt", o.content or SRT)
-  H.write_file(dir .. "/" .. VIDEO .. ".sk.srt", SRT .. "\r\n3\r\n00:00:09,000 --> 00:00:10,000\r\nSk.\r\n")
+  if o.subtitles then -- name -> content, in place of the two below
+    for name, content in pairs(o.subtitles) do H.write_file(dir .. "/" .. name, content) end
+  else
+    H.write_file(dir .. "/" .. VIDEO .. ".en.srt", o.content or SRT)
+    H.write_file(dir .. "/" .. VIDEO .. ".sk.srt", SRT .. "\r\n3\r\n00:00:09,000 --> 00:00:10,000\r\nSk.\r\n")
+  end
   H.write_file(dir .. "/Other.Film.2001.srt", SRT)
   H.write_file(dir .. "/" .. VIDEO .. ".nfo", "not a subtitle")
   local server = api.new()
@@ -88,6 +92,8 @@ local function setup(o)
   route("GET " .. API .. "/features", o.features or "upload_features_none")
   -- titles the site does not have: imdb.opensubtitles.org (recorded answers)
   route("GET imdb.opensubtitles.org/search/query-*", o.imdb or "imdb_query_none")
+  -- the language of a subtitle's text (production's fastText service)
+  route("POST " .. API .. "/utilities/fasttext/language/detect", o.fasttext or "fasttext_unsure")
   if o.video then H.video(dir, VIDEO .. ".mkv", 300000) end
   local env = H.launch({ server = server, media = "file://" .. dir .. "/" .. VIDEO .. ".mkv", config = o.config })
   env.sent, env.dir_video = sent, dir
@@ -314,6 +320,78 @@ describe("upload: a film the site does not have", function()
     w.send:_click()
     has(env.message(), "Which film is it?")
     eq(last(env, "/subtitles/upload"), nil)
+  end)
+end)
+
+describe("upload: the subtitle's language", function()
+  local CZECH = "1\r\n00:00:01,000 --> 00:00:04,000\r\n<i>Ahoj, jak se m\195\161\197\161?</i>\r\n\r\n"
+    .. "2\r\n00:00:05,000 --> 00:00:08,000\r\nNev\195\173m, co m\195\161m d\196\155lat.\r\n\r\n"
+    .. "3\r\n00:00:09,000 --> 00:00:12,000\r\nTo je ale p\196\155kn\195\189 den.\r\n"
+  local function chosen(env) return upload_window(env).language:_texts()[1] end
+  local function fasttext_sent(env) local r = last(env, "/fasttext/language/detect") return r and r.body end
+
+  it("every code and name a file name may use", function()
+    setup()
+    local read = H.find_local("upload_language_from_name")
+    local cases = {
+      ["Film.2020.sk.srt"] = "sk", ["Film.2020.cze.srt"] = "cs", ["Film.2020.ces.srt"] = "cs",
+      ["Film.2020.Czech.srt"] = "cs", ["Film.2020.pt-BR.srt"] = "pt-br", ["Film.2020.pob.srt"] = "pt-br",
+      ["Film.2020.por.srt"] = "pt-pt", ["Film.2020.ger.srt"] = "de", ["Film.2020.Deutsch.srt"] = "de",
+      ["Film.2020.Espa\195\177ol.srt"] = "es", ["Film_2020_fr.srt"] = "fr", ["Film.2020.chi.srt"] = "zh-cn",
+      ["Film.2020.zh-TW.srt"] = "zh-tw", ["Film.2020.Portuguese (BR).srt"] = "pt-br",
+      ["Film.2020.cs.forced.srt"] = "cs", ["Film.2020.English.SDH.srt"] = "en", ["Film.2020.en.subs.srt"] = "en",
+      ["Film.2020.srt"] = false, ["Up.srt"] = false, ["Film.2020.1080p.srt"] = false,
+    }
+    for name, want in pairs(cases) do
+      eq(read(name) or false, want, name)
+    end
+  end)
+
+  it("a tag the list lacks: GuessIt's reading of the name (recorded: VOSTFR -> French)", function()
+    local env = setup({ subtitles = { [VIDEO .. ".VOSTFR.srt"] = CZECH } })
+    env.server:on("GET " .. API .. "/utilities/guessit", function(req)
+      return api.fixture(req.query.filename:find("VOSTFR") and "guessit_subtitle_vostfr" or "guessit_subtitle_plain")
+    end)
+    eq(chosen(env), "French")
+    eq(fasttext_sent(env), nil, "the name was enough")
+  end)
+
+  it("nothing in the name: fastText reads the text (recorded: Czech 0.998)", function()
+    local env = setup({ subtitles = { [VIDEO .. ".srt"] = CZECH }, fasttext = "fasttext_czech",
+                        config = { language = "en" } })
+    eq(chosen(env), "Czech")
+    local body = fasttext_sent(env)
+    eq(body.texts, "Ahoj, jak se m\195\161\197\161?\nNev\195\173m, co m\195\161m d\196\155lat.\n"
+       .. "To je ale p\196\155kn\195\189 den.", "the text only: no numbers, times or tags")
+    eq(body.k, 2)
+    eq(last(env, "/fasttext/language/detect").api_key, "d3Sba6j6VYnty3ir5T8GXYoAuiLSBf0S",
+       "production's own key: the service is there")
+  end)
+
+  it("an old code page (not UTF-8) is still sent as UTF-8", function()
+    setup()
+    local sample = H.find_local("subtitle_sample")
+    local path = H.tmpdir() .. "/cp1250.srt"
+    H.write_file(path, "1\r\n00:00:01,000 --> 00:00:02,000\r\nNev\237m, co m\225m d\236lat, to je ale p\236kn\253 den.\r\n")
+    local text = sample(path)
+    ok(text and not text:gsub("[\194-\244][\128-\191]+", ""):find("[\128-\255]"), "valid UTF-8")
+    has(text, "co m")
+  end)
+
+  it("Portuguese: the user's own variant when it is one (recorded: pt 1.0)", function()
+    local env = setup({ subtitles = { [VIDEO .. ".srt"] = CZECH }, fasttext = "fasttext_portuguese",
+                        config = { language = "pt-br" } })
+    eq(chosen(env), "Portuguese (BR)")
+  end)
+
+  it("fastText unsure (recorded: Spanish 0.58) or down: the user's own language", function()
+    local env = setup({ subtitles = { [VIDEO .. ".srt"] = CZECH }, config = { language = "sk" } })
+    eq(chosen(env), "Slovak")
+    env.server.down["api.opensubtitles.com"] = nil
+    env.server:on("POST " .. API .. "/utilities/fasttext/language/detect", function()
+      return api.response(503, { message = "down" })
+    end)
+    eq(chosen(env), "Slovak")
   end)
 end)
 

@@ -1,0 +1,5 @@
+HTTP/1.1 200 OK
+Content-Type: application/json
+Connection: close
+
+{"results":{"text":"Eu não sei o que fazer.\nVocê está bem?\nVamos embora daqui.","languages":[{"language_code":"pt","iso639_3":"por","language_name":"Portuguese","language_name_original":"Português","flag":"🇵🇹","confidence":1.000048279762268},{"language_code":"en","iso639_3":"eng","language_name":"English","language_name_original":"English","flag":"🇺🇸","confidence":1.1549826012924314e-05}]},"api_version":"1.11.1"}

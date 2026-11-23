@@ -143,6 +143,15 @@ the video goes with the video's hash, size and name; a file by path does not.
   `from_id` answers with the show and `preselected`; that episode is used
   and shown as "Show S01E02 - Title". Real VLC: series without episode is
   refused locally, with 1 / 2 Check says Ready.
+- Subtitle language, in this order: the name's tag (two- and three-letter
+  codes, OpenSubtitles' own codes like pob / zht, English and native names,
+  "pt-BR", before "forced" / "sdh" / "hi"); GuessIt's `subtitle_language`
+  for the name ("VOSTFR" -> French); fastText on up to 60 text lines
+  (`POST /utilities/fasttext/language/detect`, production only - the dev API
+  answers 404 - with VLSub's own key; used from confidence 0.8 and about a
+  sentence of text; "pt"/"zh" become the user's own variant when it is one);
+  else the user's language from Config. Detected for the first file only:
+  the file dropdown has no change event in VLC.
 - A file name typed into the IMDb field ("how.i.met.your.mother.s01.e06",
   "The.Matrix.1999"): sent to `/subtitles/upload/guess` first (it finds
   episodes by name); else its title is searched and season / episode go in

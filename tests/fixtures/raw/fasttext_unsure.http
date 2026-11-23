@@ -1,0 +1,5 @@
+HTTP/1.1 200 OK
+Content-Type: application/json
+Connection: close
+
+{"results":{"text":"OK\nHmm\nNo","languages":[{"language_code":"es","iso639_3":"spa","language_name":"Spanish","language_name_original":"Español","flag":"🇪🇸","confidence":0.5819827914237976},{"language_code":"en","iso639_3":"eng","language_name":"English","language_name_original":"English","flag":"🇺🇸","confidence":0.3462983965873718}]},"api_version":"1.11.1"}

@@ -1,0 +1,5 @@
+HTTP/1.1 200 OK
+Content-Type: application/json
+Connection: close
+
+{"results":{"text":"Ahoj, jak se máš?\nNevím, co mám dělat.\nTo je ale pěkný den.\nPojď sem, musíme jít.","languages":[{"language_code":"cs","iso639_3":"cze","language_name":"Czech","language_name_original":"Čeština","flag":"🇨🇿","confidence":0.9977885484695435},{"language_code":"sk","iso639_3":"slo","language_name":"Slovak","language_name_original":"Slovenčina","flag":"🇸🇰","confidence":0.001584658632054925}]},"api_version":"1.11.1"}

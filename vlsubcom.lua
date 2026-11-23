@@ -4248,10 +4248,10 @@ end
 
 
 -- Simplified GuessIt function with persistent disk caching
-openSub.callGuessIt = function(filename)
+local function guessit_lookup(filename)
   if not filename or filename == "" then
     dbg("GuessIt: No filename provided")
-    return false
+    return nil
   end
 
 
@@ -4285,8 +4285,7 @@ openSub.callGuessIt = function(filename)
 
   -- Use cached data if valid
   if cache_valid and cached_data then
-    openSub.file.guessit_data = cached_data
-    return true
+    return cached_data
   end
 
   -- Prepare the GuessIt request
@@ -4308,29 +4307,27 @@ openSub.callGuessIt = function(filename)
 
   if not res then
     dbg("GuessIt: No response from API")
-    return false
+    return nil
   end
 
   if res.status ~= 200 then
     local status = res.status or "N/A"
     dbg("GuessIt: API request failed with status: " .. tostring(status))
-    return false
+    return nil
   end
 
   if not res.body then
     vlc.msg.err("[VLSub] GuessIt: Empty response body")
-    return false
+    return nil
   end
 
   -- Parse the GuessIt response
   local ok, guessit_response = decode_object(res.body)
   if not ok or not guessit_response then
     vlc.msg.err("[VLSub] GuessIt: Failed to parse response: " .. (res.body or "no body"))
-    return false
+    return nil
   end
 
-  -- Store the GuessIt data in memory
-  openSub.file.guessit_data = guessit_response
 
   -- Save to disk cache
   local cache_data = {
@@ -4349,7 +4346,17 @@ openSub.callGuessIt = function(filename)
 
   -- Simple debug output - just the raw JSON response
 
-  return true
+  return guessit_response
+end
+
+-- GuessIt for the playing video: its answer kept in openSub.file.guessit_data
+openSub.callGuessIt = function(filename)
+  local data = guessit_lookup(filename)
+  if data then
+    openSub.file.guessit_data = data
+    return true
+  end
+  return false
 end
 
 
@@ -5668,16 +5675,195 @@ local function upload_candidates()
   return list
 end
 
--- The language a file name ends with, if it is a known subtitle language
--- ("Film.2020.sk.srt" -> "sk")
-local function upload_language_from_name(file_name)
-  local tag = string.match(string.lower(file_name or ""), "[%._%-]([%a%-]+)%.%w+$")
+-- Other names for the subtitle languages, as file names write them:
+-- ISO 639-2 codes (both forms), OpenSubtitles' own three-letter codes and
+-- native names. The two-letter codes and English names come from the
+-- language list itself.
+local LANGUAGE_ALIASES = {
+  ab = "abk", af = "afr", sq = "alb sqi shqip", am = "amh", ar = "ara arabic", an = "arg",
+  hy = "arm hye", as = "asm", at = "ast asturianu", ["az-az"] = "aze az azerbaijani azərbaycan",
+  eu = "baq eus euskara", be = "bel", bn = "ben bangla", bs = "bos bosanski", br = "bre brezhoneg",
+  bg = "bul", my = "bur mya", ca = "cat catala català", ze = "zhe", ["zh-ca"] = "zhc yue cantonese",
+  ["zh-cn"] = "chi zho zh chs chinese simplified", ["zh-tw"] = "zht cht traditional",
+  hr = "hrv scr hrvatski", cs = "cze ces cz cesky česky cestina čeština", da = "dan dansk",
+  pr = "prs dari", nl = "dut nld nederlands", en = "eng", eo = "epo esperanto", et = "est eesti",
+  ex = "ext", fi = "fin suomi", fr = "fre fra francais français", gd = "gla gaelic", gl = "glg galego",
+  ka = "geo kat", de = "ger deu deutsch", el = "gre ell gr", he = "heb iw", hi = "hin", hu = "hun magyar",
+  is = "ice isl islenska íslenska", ig = "ibo", id = "ind indonesia", ia = "ina", ga = "gle gaeilge",
+  it = "ita italiano", ja = "jpn jp", kn = "kan", kk = "kaz", km = "khm", ko = "kor kr", ku = "kur kurdi",
+  lv = "lav latviesu latviešu", lt = "lit lietuviu lietuvių", lb = "ltz letzebuergesch", mk = "mac mkd",
+  ms = "may msa melayu", ml = "mal", ma = "mni", mr = "mar", mn = "mon", me = "mne crnogorski",
+  nv = "nav", ne = "nep", se = "sme", no = "nor nob nno nb nn norsk", oc = "oci", ["or"] = "ori",
+  fa = "per fas farsi", pl = "pol polski", ["pt-pt"] = "por pt portugues português",
+  ["pt-br"] = "pob pb ptbr brazilian brasileiro", pm = "mz", ps = "pus pashto", ro = "rum ron romana română",
+  ru = "rus russkiy", sx = "sat", sr = "scc srp srpski", sd = "snd", si = "sin sinhala", sk = "slo slk slovensky slovenčina slovencina",
+  sl = "slv slovenscina slovenščina", so = "som", ["az-zb"] = "azb", es = "spa espanol español castellano",
+  sw = "swa kiswahili", sv = "swe svenska", sy = "syr", tl = "tgl fil filipino", ta = "tam", tt = "tat",
+  te = "tel", ["tm-td"] = "tet", th = "tha", tp = "tok", tr = "tur turkce türkçe", tk = "tuk",
+  uk = "ukr ua", ur = "urd", uz = "uzb", vi = "vie tiengviet", cy = "wel cym cymraeg",
+}
+
+-- Words after the language in a subtitle's name: "Film.cs.forced.srt"
+local SUBTITLE_KIND_WORDS = { forced = true, sdh = true, hi = true, cc = true, full = true,
+  default = true, signs = true, songs = true, sub = true, subs = true, subtitles = true }
+
+-- Every word that names a language, lower case -> its code in the list
+local function language_words()
+  local words = {}
   for _, language in ipairs(openSub.conf.languages or {}) do
-    if language[1] == tag then
-      return tag
+    local code, name = language[1], string.lower(tostring(language[2] or ""))
+    words[code] = words[code] or code
+    -- "Portuguese (BR)" -> "portuguese (br)", "portuguesebr"; "Chinese (simplified)"
+    words[name] = words[name] or code
+    local plain = string.gsub(name, "[^%w]", "")
+    words[plain] = words[plain] or code
+  end
+  for _, language in ipairs(openSub.conf.languages or {}) do
+    for word in string.gmatch(LANGUAGE_ALIASES[language[1]] or "", "%S+") do
+      words[word] = words[word] or language[1]
     end
   end
-  return nil
+  -- a plain "portuguese", "chinese": the main one
+  words["portuguese"], words["chinese"] = "pt-pt", "zh-cn"
+  return words
+end
+
+-- The language a file name tells, if it is a known subtitle language:
+-- "Film.2020.sk.srt", "Film.2020.cze.srt", "Film.2020.Czech.srt",
+-- "Film.2020.pt-BR.srt" -> "sk", "cs", "cs", "pt-br". The last word before
+-- the extension, or the one before "forced", "sdh" ... ("Film.cs.forced.srt").
+local function upload_language_from_name(file_name)
+  local base = string.lower(string.match(file_name or "", "^(.*)%.%w+$") or "")
+  local words = language_words()
+  local tags = {}
+  for word in string.gmatch(base, "[^%s%._%-%[%]%(%)]+") do
+    tags[#tags + 1] = word
+  end
+  -- "pt-br", "zh-cn" as one tag
+  local joined = string.match(base, "[%._%s]([%a]+%-[%a]+)$")
+  if joined and words[joined] then
+    return words[joined]
+  end
+  local last = #tags
+  while last > 2 and SUBTITLE_KIND_WORDS[tags[last]] do
+    last = last - 1
+  end
+  -- two words as one: "Portuguese (BR)", "pt BR"
+  local pair = last > 2 and words[tags[last - 1] .. tags[last]]
+  -- not the only word: "Up.srt" is a film, not a language
+  return pair or last > 1 and words[tags[last]] or nil
+end
+
+-- What GuessIt reads from a subtitle's name: its language, by English
+-- name ("Czech", "Portuguese"), or nil
+local function upload_language_from_guessit(file_name)
+  if not file_name or file_name == "" then
+    return nil
+  end
+  local guess = guessit_lookup(file_name)
+  local said = type(guess) == "table" and guess.subtitle_language
+  if type(said) == "table" then
+    said = said[1]
+  end
+  return type(said) == "string" and language_words()[string.lower(said)] or nil
+end
+
+-- fastText language detection (the API's /utilities/fasttext; production
+-- only, the development API lacks it). Read-only: a sample of the text.
+local FASTTEXT_DETECT = "http://api.opensubtitles.com/api/v1/utilities/fasttext/language/detect"
+local fasttext_down_until = 0
+
+-- Up to 60 lines of a subtitle's text, without numbers, times and tags.
+-- Not UTF-8 (an old code page): read as Latin-1, enough to tell the words.
+local function subtitle_sample(path)
+  local file = path and io.open(path, "rb")
+  if not file then
+    return nil
+  end
+  local data = file:read(65536) or ""
+  file:close()
+  local lines = {}
+  for raw in string.gmatch(data, "[^\r\n]+") do
+    local line = string.gsub(string.gsub(raw, "<[^>]*>", ""), "{[^}]*}", "")
+    line = string.gsub(line, "^Dialogue:[^,]*,[^,]*,[^,]*,[^,]*,[^,]*,[^,]*,[^,]*,[^,]*,[^,]*,", "")
+    line = string.gsub(string.gsub(line, "\\[Nn]", " "), "^%s*(.-)%s*$", "%1")
+    if string.find(line, "%a") and not string.find(line, "%d+:%d+:%d+") and not string.find(line, "^%[")
+       and not string.find(line, "^%w+:%s") then
+      lines[#lines + 1] = line
+      if #lines >= 60 then
+        break
+      end
+    end
+  end
+  local text = table.concat(lines, "\n")
+  if #text < 30 then -- a few words say little
+    return nil
+  end
+  local valid = string.gsub(text, "[\194-\244][\128-\191]+", "")
+  if string.find(valid, "[\128-\255]") then
+    text = string.gsub(text, "[\128-\255]", function(c)
+      local b = string.byte(c)
+      return string.char(192 + math.floor(b / 64), 128 + b % 64)
+    end)
+  end
+  return text
+end
+
+-- The language fastText reads in a subtitle's text, as a code of the list;
+-- nil when unsure. Portuguese / Chinese: the user's own variant if it is one.
+local function upload_language_from_text(path)
+  if os.time() < fasttext_down_until then
+    return nil
+  end
+  local text = subtitle_sample(path)
+  if not text then
+    return nil
+  end
+  local client = Curl.new()
+  client:add_header("Api-Key", config.api_key) -- production's service
+  client:add_header("Content-Type", "application/json")
+  client:add_header("Accept", "application/json")
+  client:set_timeout(8)
+  client:set_deadline(8)
+  client:set_retries(0)
+  client:set_side_service()
+  local res = client:post(FASTTEXT_DETECT, json.encode({ texts = text, k = 2 }))
+  if not res or not res.status then
+    fasttext_down_until = os.time() + 60
+    return nil
+  end
+  local ok, answer = decode_object(res.status == 200 and res.body or "")
+  local results = ok and answer.results
+  local best = type(results) == "table" and type(results.languages) == "table" and results.languages[1]
+  -- below 0.8 it is a guess ("OK / Hmm / No": Spanish, 0.58)
+  if type(best) ~= "table" or (tonumber(best.confidence) or 0) < 0.8 then
+    return nil
+  end
+  local code = string.lower(tostring(best.language_code or ""))
+  local own = tostring(openSub.option.language or "")
+  local found
+  for _, language in ipairs(openSub.conf.languages or {}) do
+    local listed = language[1]
+    if listed == code or string.sub(listed, 1, #code + 1) == code .. "-" then
+      if listed == own then
+        return own
+      end
+      found = found or listed
+    end
+  end
+  return found or language_words()[code]
+end
+
+-- The language of the subtitle about to be uploaded: what its name says,
+-- what GuessIt reads from the name, what fastText reads in the text, else
+-- the user's own language
+local function upload_detect_language(candidate)
+  if not candidate then
+    return nil
+  end
+  return upload_language_from_name(candidate.name)
+    or upload_language_from_guessit(candidate.name)
+    or upload_language_from_text(candidate.path)
 end
 
 -- One request to the upload API. Returns the HTTP status (or nil) and the
@@ -6156,6 +6342,7 @@ function show_upload()
   end
   openSub.getFileInfo()
   upload_state = { candidates = upload_candidates() }
+  upload_state.language = upload_detect_language(upload_state.candidates[1])
   setMessage(loading_tag(strings.ui_upload_checking))
   -- the film first, so that the window is built with it
   upload_state.film_line = upload_detect_film()
@@ -6204,7 +6391,7 @@ function interface_upload()
 
   dlg:add_label(strings.ui_upload_language .. ":", 1, next_row(), 1, 1)
   input_table["upload_language"] = dlg:add_dropdown(2, row, 2, 1)
-  local wanted = upload_language_from_name(candidates[1] and candidates[1].name) or openSub.option.language
+  local wanted = upload_state.language or openSub.option.language
   local languages = openSub.conf.languages or {}
   for id, language in ipairs(languages) do
     if language[1] == wanted then
