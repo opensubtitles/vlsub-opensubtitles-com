@@ -45,6 +45,10 @@ local AI_LANGUAGE = os.getenv("VLSUB_AI_LANGUAGE") or "Hungarian"
 -- against production. Withdraw it afterwards - only it: its release name
 -- starts with "upload-test" (tools/upload_roundtrip.py does the same).
 local UPLOAD = os.getenv("VLSUB_UPLOAD") == "dev" and (os.getenv("VLSUB_API_URL") or "") ~= ""
+-- VLSUB_FEEDBACK=dev: rate, thank and take both back on the subtitle just
+-- downloaded. Only with VLSUB_API_URL (the development API): never votes on
+-- the real site.
+local FEEDBACK = os.getenv("VLSUB_FEEDBACK") == "dev" and (os.getenv("VLSUB_API_URL") or "") ~= ""
 if AI ~= "credits" and AI ~= "nocredits" then AI = nil end
 local VERBOSE = tonumber(os.getenv("VLSUB_VERBOSE") or "0") or 0
 
@@ -323,6 +327,71 @@ if USER and PASS then
   end)
 else
   line("SKIP login + download (set VLSUB_USER and VLSUB_PASS to include them)")
+end
+
+if FEEDBACK and USER and PASS then
+  step("feedback (development API): question after watching, Rate window, own rating in the rows", function()
+    -- something playing: 20 s of silence (a WAV is easy to write here)
+    local wav = SANDBOX .. "/The.Matrix.1999.wav"
+    local f = assert(io.open(wav, "wb"))
+    local rate, seconds = 8000, 20
+    local function u32(n) return string.char(n % 256, math.floor(n / 256) % 256, math.floor(n / 65536) % 256, math.floor(n / 16777216)) end
+    local function u16(n) return string.char(n % 256, math.floor(n / 256)) end
+    local size = rate * seconds
+    f:write("RIFF", u32(36 + size), "WAVEfmt ", u32(16), u16(1), u16(1), u32(rate), u32(rate), u16(1), u16(8),
+            "data", u32(size), string.rep("\128", size))
+    f:close()
+    vlc.playlist.add({ { path = "file://" .. wav } })
+    local waited = 0
+    while not vlc.object.input() and waited < 50 do
+      misc.mwait(misc.mdate() + 100000)
+      waited = waited + 1
+    end
+    check(vlc.object.input(), "nothing playing")
+    trigger_menu(1)
+    ui():_at(2, 2, "text_input"):set_text("") -- no season / episode left from before
+    ui():_at(4, 2, "text_input"):set_text("")
+    ui():_at(2, 1, "text_input"):set_text(QUERY)
+    ui():_button("Search$"):_click()
+    local rows = ui():_at(1, 9, "list")
+    rows:_select(rows.values[1].id)
+    ui():_button("Download"):_click()
+    line("     download: " .. message():gsub("<[^>]+>", ""))
+    -- the film "watched" to 90 %
+    vlc.var.set(vlc.object.input(), "position", 0.9)
+    trigger_menu(1)
+    local question = ui():_at(1, 12, "label")
+    check(question, "no question after watching")
+    line("     question: " .. question:get_text())
+    ui():_at(1, 13, "dropdown"):_choose(4)
+    ui():_at(2, 13, "dropdown"):_choose(2) -- timing right
+    ui():_at(4, 13, "button"):_click()
+    line("     send: " .. message():gsub("<[^>]+>", ""))
+    check(message():find("rating is saved"), "rating not saved")
+    -- the rows show it after the next search
+    ui():_button("Search$"):_click()
+    local list = ui():_at(1, 9, "list")
+    local marked
+    for _, v in ipairs(list.values) do
+      if v.text:find("★4", 1, true) then marked = v end
+    end
+    check(marked, "own rating not shown in the rows")
+    line("     row: " .. marked.text)
+    list:_select(marked.id)
+    ui():_button("^Rate$"):_click()
+    line("     status: " .. ui():_at(1, 8, "label"):get_text())
+    ui():_at(3, 4, "button"):_click() -- remove my rating
+    line("     remove: " .. message():gsub("<[^>]+>", ""))
+    check(message():find("removed"), "rating not removed")
+    ui():_at(2, 5, "button"):_click() -- thanks
+    line("     thanks: " .. message():gsub("<[^>]+>", ""))
+    check(message():find("Thanks sent"), "thanks not sent")
+    ui():_at(3, 5, "button"):_click() -- take back
+    line("     take back: " .. message():gsub("<[^>]+>", ""))
+    check(message():find("taken back"), "thanks not taken back")
+    check(ui():_at(2, 6, "dropdown") ~= nil, "no reasons")
+    ui():_at(4, 10, "button"):_click() -- back
+  end)
 end
 
 if UPLOAD and USER and PASS then

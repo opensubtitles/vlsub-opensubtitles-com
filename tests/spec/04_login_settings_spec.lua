@@ -300,7 +300,7 @@ describe("configuration window", function()
     local keys = {}
     for k in pairs(env.saved_config()) do keys[#keys + 1] = k end
     table.sort(keys)
-    eq(keys, { "aiTranslations", "detectedLanguage", "downloadBehaviour", "foreignPartsOnly",
+    eq(keys, { "aiTranslations", "askFeedback", "detectedLanguage", "downloadBehaviour", "foreignPartsOnly",
                "hearingImpaired", "interfaceLanguage", "langExt", "language", "language2", "language3",
                "machineTranslations", "os_password", "os_username", "progressBarSize", "removeTag",
                "sortDirection", "trustedOnly" })

@@ -1,0 +1,5 @@
+HTTP/1.1 201 Created
+Content-Type: application/json; charset=utf-8
+Connection: close
+
+{"status":"received","report_id":null,"reason":"out_of_sync","kind":"flag"}

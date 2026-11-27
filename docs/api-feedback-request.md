@@ -5,6 +5,33 @@ endpoints any client can use. Written 2026-11-21 from the work on two
 clients (the Kodi addon and the VLC extension, used as examples below); the
 request is for the API itself.
 
+## 0. Status (2026-11-27)
+
+Live on api.opensubtitles.com and on the development API since 2026-11-23
+(opensubtitles-dev/osdb3#309; answer in opensubtitles-dev/opensubtitles-wiki#11).
+VLSub uses all of it (see "Rate subtitles" in CHANGELOG.md):
+
+| Endpoint | VLSub |
+|---|---|
+| `PUT /subtitles/rating`, `DELETE /subtitles/rating?subtitle_id=` | question after watching, Rate window |
+| `PUT /subtitles/thanks`, `DELETE /subtitles/thanks?subtitle_id=` | Rate window |
+| `POST /subtitles/reports`, `GET /infos/report_reasons?language=` | Rate window (16 reasons, localized) |
+| `GET /subtitles/feedback?subtitle_ids=a,b` (50 at most) | own rating / thanks in result rows |
+
+Found while building it (measured on the development API):
+
+- The subtitle is named flat (`subtitle_id`) or nested (`subtitle: {subtitle_id | file_id | md5}`);
+  DELETE takes it in the query.
+- MD5 is of the file **as stored**: a file downloaded through `/download`
+  does not match (the download is converted), so rating "a file from disk"
+  works for files as they were uploaded. A downloaded file is rated by its id.
+- `other` needs a comment (422 "comment is required for reason other");
+  the list says so with `comment_required: true`.
+- Errors: `{code, message}` - `unknown_subtitle` 404, `own_upload` 403,
+  `invalid` 422.
+- Not done yet by the API: sync report with the delay, sync hint, "fits my
+  video", comments, lookup by hash, hash in search rows.
+
 ## 1. The gap
 
 `api.opensubtitles.com/api/v1` (30 paths) can only *read* feedback: `votes`,

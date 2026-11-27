@@ -1,0 +1,5 @@
+HTTP/1.1 200 OK
+Content-Type: application/json; charset=utf-8
+Connection: close
+
+{"data":[{"subtitle_id":1162205,"your_rating":2,"your_thanks":false}]}

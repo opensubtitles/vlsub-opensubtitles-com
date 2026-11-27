@@ -217,6 +217,9 @@ local options = {
   hearingImpaired = "include",      -- include / exclude / only (SDH, CC)
   foreignPartsOnly = "include",     -- include / exclude / only (forced)
   trustedOnly = false,              -- true: trusted uploaders only
+  -- after a film watched with a downloaded subtitle, the main window asks
+  -- how it was (window "Rate subtitles" turns it on and off)
+  askFeedback = true,
   progressBarSize = 80
 }
 
@@ -590,6 +593,58 @@ local strings = {
   ui_upload_no_files = "(no subtitle file next to the video)",
   ui_upload_login_first = "Log in to upload: enter username and password in Config, then Save.",
   ui_download_login_first = "Log in to download: enter username and password in Config, then Save.",
+  ui_feedback_rate = "Rate",
+  ui_feedback_title = "Rate subtitles",
+  ui_feedback_ask = "You watched %s with these subtitles - how were they?",
+  ui_feedback_choose_rating = "Your rating...",
+  ui_feedback_stars_5 = "★★★★★ Excellent",
+  ui_feedback_stars_4 = "★★★★☆ Good",
+  ui_feedback_stars_3 = "★★★☆☆ OK",
+  ui_feedback_stars_2 = "★★☆☆☆ Poor",
+  ui_feedback_stars_1 = "★☆☆☆☆ Bad",
+  ui_feedback_sync_unknown = "Timing: not sure",
+  ui_feedback_sync_good = "Timing: right",
+  ui_feedback_sync_early = "Timing: text too early",
+  ui_feedback_sync_late = "Timing: text too late",
+  ui_feedback_sync_drifting = "Timing: drifts away",
+  ui_feedback_sync_bad = "Timing: wrong throughout",
+  ui_feedback_send = "Send",
+  ui_feedback_more = "More...",
+  ui_feedback_not_now = "Not now",
+  ui_feedback_subtitle = "Subtitle",
+  ui_feedback_none = "None chosen: select a search result, or enter a subtitle file below.",
+  ui_feedback_file = "Or a file",
+  ui_feedback_use_file = "Use this file",
+  ui_feedback_from_file = "File %s",
+  ui_feedback_your_rating = "Your rating",
+  ui_feedback_remove_rating = "Remove my rating",
+  ui_feedback_uploader = "Uploader",
+  ui_feedback_thank = "Say thanks",
+  ui_feedback_unthank = "Take back thanks",
+  ui_feedback_problem = "Problem",
+  ui_feedback_choose_problem = "Choose a problem...",
+  ui_feedback_comment = "Comment",
+  ui_feedback_report = "Report",
+  ui_feedback_back = "Back",
+  ui_feedback_ask_on = "Ask after watching: on",
+  ui_feedback_ask_off = "Ask after watching: off",
+  ui_feedback_saved = "Thank you! Your rating is saved.",
+  ui_feedback_removed = "Your rating is removed.",
+  ui_feedback_thanked = "Thanks sent to the uploader.",
+  ui_feedback_unthanked = "Thanks taken back.",
+  ui_feedback_reported = "Thank you - the problem is reported.",
+  ui_feedback_reported_moderator = "Thank you - a moderator will look at it.",
+  ui_feedback_need_rating = "Choose a rating first.",
+  ui_feedback_need_problem = "Choose a problem first.",
+  ui_feedback_need_comment = "Describe the problem in the comment.",
+  ui_feedback_need_subtitle = "Choose a subtitle first: a search result, or a subtitle file.",
+  ui_feedback_unknown_file = "This file is not on OpenSubtitles, or it was changed after the download. Rate it from the search results.",
+  ui_feedback_ambiguous = "This file matches several subtitles. Rate it from the search results.",
+  ui_feedback_login_first = "Log in to rate: enter username and password in Config, then Save.",
+  ui_feedback_status_rated = "Your rating: %s",
+  ui_feedback_status_thanked = "You thanked the uploader.",
+  ui_feedback_status_none = "Not rated by you yet.",
+  ui_feedback_asking_off = "VLSub will not ask any more. Turn it back on in the Rate window.",
   ui_upload_choose_file = "Choose a subtitle file, or enter its full path.",
   ui_upload_cannot_read = "The file cannot be read: %s",
   ui_upload_too_small = "The file is too small to be a subtitle (at least 100 bytes).",
@@ -1897,7 +1952,13 @@ function menu()
 end
 
 function meta_changed()
+  feedback_track()
   return false
+end
+
+-- VLC: playing, paused, stopped ... - how far the film got
+function playing_changed()
+  feedback_track()
 end
 
 
@@ -2032,6 +2093,9 @@ function interface_main()
     strings.ui_upload, show_upload, 3, 11, 1, 1)
 
   dlg:add_button(
+    strings.ui_feedback_rate, show_feedback, 4, 11, 1, 1)
+
+  dlg:add_button(
     strings.ui_config, show_conf, 5, 11, 1, 1)
   dlg:add_button(
     strings.ui_help,
@@ -2057,6 +2121,10 @@ function interface_main()
   if has_results() then
     display_subtitles()
   end
+
+  -- Rows 12-13: how were the subtitles of the film just watched?
+  feedback_track()
+  feedback_add_prompt()
 end
 
 function interface_config()
@@ -2265,6 +2333,11 @@ function trigger_menu(dlg_id)
     dlg = new_dialog(
       openSub.conf.useragent..': '..strings.ui_upload_title)
     interface_upload()
+  elseif dlg_id == 6 then
+    close_dlg()
+    dlg = new_dialog(
+      openSub.conf.useragent..': '..strings.ui_feedback_title)
+    interface_feedback()
   end
   collectgarbage() --~ !important
 end
@@ -2640,6 +2713,8 @@ function display_subtitles()
   elseif has_results() then
     -- Get user selected languages in order
     local selectedLanguages = getUserSelectedLanguages()
+    -- the user's own ratings and thanks, once per search
+    feedback_mark_results(openSub.itemStore)
 
     -- Group subtitles by language
     local groupedSubtitles = {}
@@ -2828,6 +2903,14 @@ function buildSubtitleDisplayText(item, langCode)
     if uploaderLower ~= "anonymous" then
       displayText = displayText .. " 👤" .. item.UploaderName
     end
+  end
+
+  -- What the user gave this subtitle before
+  if item.YourRating then
+    displayText = displayText .. " ★" .. tostring(item.YourRating)
+  end
+  if item.YourThanks then
+    displayText = displayText .. " ♥"
   end
 
   -- Add download count with downwards arrow
@@ -5154,6 +5237,7 @@ openSub.saveAndLoadSubtitle = function(subtitle_content, item)
   local message
   if openSub.file.hasInput and add_sub(target) then
     dbg("Subtitle loaded successfully into VLC")
+    feedback_note_loaded(item) -- asked about after the film
     message = strings[({ video = "ui_loaded_with_video", downloads = "ui_loaded_in_downloads",
                          vlsub = "ui_loaded_in_vlsub" })[place]]
   elseif in_downloads then
@@ -5376,6 +5460,7 @@ end
 
 function input_changed()
   collectgarbage()
+  feedback_track()
 
   -- Only update interface if not in config mode, or preserve messages in config mode
   -- NOTE: VLC dialogs have set_title() but no get_title(); the open window is
@@ -5861,7 +5946,6 @@ local function upload_language_from_text(path)
   local client = Curl.new()
   client:add_header("Api-Key", config.api_key) -- production's service
   client:add_header("Content-Type", "application/json")
-  client:add_header("Accept", "application/json")
   client:set_timeout(8)
   client:set_deadline(8)
   client:set_retries(0)
@@ -5914,16 +5998,20 @@ local function upload_request(method, path, body, timeout)
   if auth_header then
     client:add_header("Authorization", auth_header)
   end
-  client:add_header("Accept", "application/json")
+  -- (no Accept header: the client sends "Accept: */*" itself; a second one
+  -- is a protocol error)
   client:set_timeout(timeout or 20)
   client:set_deadline(timeout or 20)
   client:set_retries(0) -- an upload is never sent twice by itself
   local res
   if method == "GET" then
     res = client:get(api_url(path))
+  elseif method == "DELETE" then
+    res = client:delete(api_url(path))
   else
     client:add_header("Content-Type", "application/json")
-    res = client:post(api_url(path), json.encode(body or {}))
+    local data = json.encode(body or {})
+    res = method == "PUT" and client:put(api_url(path), data) or client:post(api_url(path), data)
   end
   if not res then
     return nil, {}
@@ -6721,6 +6809,640 @@ end
 -- AI credits of the logged-in account (GET /ai/credits), or nil when they
 -- cannot be read. One short request. (Global: the configuration code above
 -- uses it.)
+            --[[ Feedback: rate a subtitle, thank its uploader, report it ]]--
+
+-- After a film watched with a subtitle VLSub loaded, the main window asks
+-- once how it was (never over the film: only when VLSub's window is opened).
+-- The "Rate" window does the same for any subtitle: a search result, one
+-- loaded before, or a file (named by its MD5). Logged-in users only.
+--
+-- VLC stops the extension when its window closes, so how far the film got
+-- is read whenever the window is open (and VLC reports a change); a film no
+-- longer playing counts as watched when the time since the subtitle was
+-- loaded covers most of it.
+--
+-- Everything in one table: the main chunk can hold only 200 locals.
+local Feedback = {
+  KEEP = 20,           -- subtitles remembered
+  WATCHED = 0.7,       -- share of the film that counts as watched
+  MAX_AGE = 3 * 24 * 3600, -- a film not playing any more: asked for up to 3 days
+  NOT_NOW_LIMIT = 3,   -- "Not now" this often in a row: asking stops
+  SYNC = { "unknown", "good", "early", "late", "drifting", "bad" },
+  SYNC_TEXT = { "ui_feedback_sync_unknown", "ui_feedback_sync_good", "ui_feedback_sync_early",
+                "ui_feedback_sync_late", "ui_feedback_sync_drifting", "ui_feedback_sync_bad" },
+  STARS_TEXT = { "ui_feedback_stars_1", "ui_feedback_stars_2", "ui_feedback_stars_3",
+                 "ui_feedback_stars_4", "ui_feedback_stars_5" },
+  -- GET /infos/report_reasons (recorded 2026-11-27), used when the API
+  -- cannot be asked
+  REASONS = {
+    { reason = "out_of_sync", label = "Sync errors", kind = "flag" },
+    { reason = "wrong_movie", label = "Wrong movie", kind = "report" },
+    { reason = "wrong_language", label = "Wrong language", kind = "report" },
+    { reason = "bad_translation", label = "Bad Translations", kind = "flag" },
+    { reason = "incomplete", label = "Missing parts", kind = "flag" },
+    { reason = "untranslated_parts", label = "Incomplete translation", kind = "flag" },
+    { reason = "ocr_error", label = "OCR errors", kind = "flag" },
+    { reason = "bad_formatting", label = "Encoding errors", kind = "flag" },
+    { reason = "stolen_subtitle", label = "Stolen subtitles", kind = "report" },
+    { reason = "machine_translated", label = "Machine translated", kind = "report" },
+    { reason = "hearing_impaired_wrong", label = "Hearing impaired flag is wrong", kind = "report" },
+    { reason = "foreign_parts_wrong", label = "Foreign parts flag is wrong", kind = "report" },
+    { reason = "ads_or_spam", label = "Contains ads or spam", kind = "report" },
+    { reason = "offensive", label = "Offensive content", kind = "report" },
+    { reason = "not_a_subtitle", label = "Not a subtitle", kind = "report" },
+    { reason = "other", label = "Other", kind = "report", comment_required = true },
+  },
+  data = nil,          -- { records = {...}, not_now = n }: vlsub_feedback.json
+  reasons = {},        -- interface language -> the API's list
+  target = nil,        -- what the Rate window rates
+  mine = nil,          -- the user's own rating / thanks of the target
+  shown_reasons = {},  -- dropdown id -> reason
+}
+
+function Feedback.path()
+  return openSub.conf.dirPath and (openSub.conf.dirPath .. slash .. "vlsub_feedback.json") or nil
+end
+
+function Feedback.load()
+  if Feedback.data then
+    return Feedback.data
+  end
+  local data
+  local path = Feedback.path()
+  local file = path and io.open(path, "rb")
+  if file then
+    local ok, stored = decode_object(file:read("*a") or "")
+    file:close()
+    data = ok and stored or nil
+  end
+  data = type(data) == "table" and data or {}
+  if type(data.records) ~= "table" then
+    data.records = {}
+  end
+  data.not_now = tonumber(data.not_now) or 0
+  Feedback.data = data
+  return data
+end
+
+function Feedback.save()
+  local path = Feedback.path()
+  if not path or not Feedback.data then
+    return
+  end
+  local file = io.open(path, "wb")
+  if file then
+    file:write(json.encode(Feedback.data))
+    file:close()
+  end
+end
+
+-- The playing item: its address, how far it got (0..1), its length (s)
+function Feedback.playing()
+  local ok, uri, position, duration = pcall(function()
+    local item = vlc.input.item()
+    if not item then
+      return nil
+    end
+    local input = vlc.object.input()
+    return item:uri(), input and tonumber(vlc.var.get(input, "position")), tonumber(item:duration())
+  end)
+  if ok then
+    return uri, position, duration
+  end
+end
+
+-- A subtitle VLSub has just loaded into the playing video
+function feedback_note_loaded(item)
+  if not item or item.OnDemand or not tonumber(item.SubtitleID) then
+    return
+  end
+  local uri, position, duration = Feedback.playing()
+  if not uri then
+    return
+  end
+  local data = Feedback.load()
+  local records = data.records
+  for i = #records, 1, -1 do -- one subtitle per film: the last one loaded
+    if records[i].uri == uri then
+      table.remove(records, i)
+    end
+  end
+  local title = item.FeatureTitle and item.FeatureTitle ~= "" and item.FeatureTitle
+  if title and tonumber(item.FeatureYear) and tonumber(item.FeatureYear) > 0 then
+    title = tr("ui_upload_film_year", title, tostring(item.FeatureYear))
+  end
+  records[#records + 1] = {
+    subtitle_id = tonumber(item.SubtitleID), file_id = tonumber(item.FileID),
+    title = title or item.MovieReleaseName or item.SubFileName,
+    release = item.MovieReleaseName or item.SubFileName,
+    uri = uri, duration = duration and duration > 0 and duration or nil,
+    loaded_at = os.time(), position = position or 0,
+    moviehash = openSub.file.hash ~= "" and openSub.file.hash or nil,
+    moviebytesize = tonumber(openSub.file.bytesize),
+  }
+  while #records > Feedback.KEEP do
+    table.remove(records, 1)
+  end
+  Feedback.save()
+end
+
+-- How far the playing film got, for its subtitle (called on VLC's events
+-- and when the window opens); written down in steps of 5 %
+function feedback_track()
+  local uri, position = Feedback.playing()
+  if not uri or not position then
+    return
+  end
+  for _, record in ipairs(Feedback.load().records) do
+    if record.uri == uri and not record.done and position > (record.position or 0) then
+      local step = position - (record.saved_position or 0) >= 0.05
+      record.position = position
+      if step then
+        record.saved_position = position
+        Feedback.save()
+      end
+    end
+  end
+end
+
+-- The subtitle to ask about now, if any: watched, not answered yet
+function Feedback.pending()
+  if openSub.option.askFeedback == false or not has_login() then
+    return nil
+  end
+  local playing = Feedback.playing()
+  local records = Feedback.load().records
+  for i = #records, 1, -1 do
+    local record = records[i]
+    if not record.done then
+      local watched = (record.position or 0) >= Feedback.WATCHED
+      if not watched and record.uri ~= playing and record.duration then
+        local elapsed = os.time() - (record.loaded_at or 0)
+        watched = elapsed >= Feedback.WATCHED * record.duration and elapsed <= Feedback.MAX_AGE
+      end
+      if watched then
+        return record
+      end
+    end
+  end
+end
+
+-- What the API needs to name the subtitle
+function Feedback.subtitle_of(target)
+  if target.subtitle_id then
+    return { subtitle_id = target.subtitle_id }
+  elseif target.file_id then
+    return { file_id = target.file_id }
+  end
+  return { md5 = target.md5 }
+end
+
+function Feedback.query_of(target)
+  local named = Feedback.subtitle_of(target)
+  local key, value = next(named)
+  return key .. "=" .. tostring(value)
+end
+
+-- Logged in, with a token; else says what to do
+function Feedback.logged_in()
+  if has_login() and openSub.checkSession() and openSub.getAuthHeader() then
+    return true
+  end
+  setMessage(error_tag(strings.ui_feedback_login_first))
+  return false
+end
+
+-- The API's answer as a sentence for the user
+function Feedback.error_text(status, answer, target)
+  if answer.code == "unknown_subtitle" and target and target.md5 then
+    return strings.ui_feedback_unknown_file
+  elseif answer.code == "ambiguous" or answer.code == "ambiguous_md5" then
+    return strings.ui_feedback_ambiguous
+  elseif status == 401 then
+    return strings.ui_feedback_login_first
+  end
+  return upload_error_text(status, answer)
+end
+
+-- The rating dropdown (ids: the rating, 0 = not chosen) and the timing one
+-- (ids: index in Feedback.SYNC); `rating` is shown first when given
+function Feedback.add_rating_choices(dropdown, rating)
+  if rating and Feedback.STARS_TEXT[rating] then
+    dropdown:add_value(strings[Feedback.STARS_TEXT[rating]], rating)
+  else
+    dropdown:add_value(strings.ui_feedback_choose_rating, 0)
+  end
+  for stars = 5, 1, -1 do
+    if stars ~= rating then
+      dropdown:add_value(strings[Feedback.STARS_TEXT[stars]], stars)
+    end
+  end
+end
+
+function Feedback.add_sync_choices(dropdown)
+  for id, key in ipairs(Feedback.SYNC_TEXT) do
+    dropdown:add_value(strings[key], id)
+  end
+end
+
+-- PUT /subtitles/rating. Returns true, or nil and the error text.
+function Feedback.send_rating(target, rating, sync_id)
+  local body = { subtitle = Feedback.subtitle_of(target), rating = rating,
+                 sync = Feedback.SYNC[sync_id] or "unknown", client = app_useragent }
+  local record = target.record
+  if record then
+    if (record.position or 0) > 0 then
+      body.watched_ratio = math.floor(math.min(record.position, 1) * 100 + 0.5) / 100
+    end
+    if record.moviehash then
+      body.video = { moviehash = record.moviehash, moviebytesize = record.moviebytesize }
+    end
+  end
+  local status, answer = upload_request("PUT", "/subtitles/rating", body)
+  if status == 200 then
+    if record then
+      record.done = true
+      Feedback.load().not_now = 0
+      Feedback.save()
+    end
+    return true
+  end
+  return nil, Feedback.error_text(status, answer, target)
+end
+
+            --[[ The question in the main window ]]--
+
+-- Rows 12 and 13 of the main window, when a watched film is waiting
+function feedback_add_prompt()
+  local record = Feedback.pending()
+  Feedback.prompt = record
+  if not record then
+    return
+  end
+  dlg:add_label(tr("ui_feedback_ask", tostring(record.title or record.release or "?")), 1, 12, 6, 1)
+  input_table["fb_rating"] = dlg:add_dropdown(1, 13, 1, 1)
+  Feedback.add_rating_choices(input_table["fb_rating"])
+  input_table["fb_sync"] = dlg:add_dropdown(2, 13, 2, 1)
+  Feedback.add_sync_choices(input_table["fb_sync"])
+  dlg:add_button(strings.ui_feedback_send, feedback_prompt_send, 4, 13, 1, 1)
+  dlg:add_button(strings.ui_feedback_more, function() show_feedback(Feedback.prompt) end, 5, 13, 1, 1)
+  dlg:add_button(strings.ui_feedback_not_now, feedback_prompt_not_now, 6, 13, 1, 1)
+end
+
+function feedback_prompt_send()
+  local record = Feedback.prompt
+  if not record or not Feedback.logged_in() then
+    return
+  end
+  local rating = input_table["fb_rating"]:get_value()
+  if not rating or rating < 1 then
+    setMessage(error_tag(strings.ui_feedback_need_rating))
+    return
+  end
+  local ok, problem = Feedback.send_rating({ subtitle_id = record.subtitle_id, record = record },
+    rating, input_table["fb_sync"]:get_value())
+  if ok then
+    trigger_menu(1) -- without the question
+    setMessage(success_tag(strings.ui_feedback_saved))
+  else
+    setMessage(error_tag(problem))
+  end
+end
+
+function feedback_prompt_not_now()
+  local record = Feedback.prompt
+  if not record then
+    return
+  end
+  local data = Feedback.load()
+  record.done = true
+  data.not_now = (data.not_now or 0) + 1
+  local stopped = data.not_now >= Feedback.NOT_NOW_LIMIT
+  if stopped then
+    data.not_now = 0
+    openSub.option.askFeedback = false
+    save_config()
+  end
+  Feedback.save()
+  trigger_menu(1)
+  if stopped then
+    setMessage(strings.ui_feedback_asking_off)
+  end
+end
+
+            --[[ Your own ratings in the search results ]]--
+
+-- GET /subtitles/feedback for the listed subtitles (50 at most): what the
+-- user gave each before. Only with a token already there - never a login
+-- just for this. Rows then show "★4" and "♥".
+function feedback_mark_results(items)
+  if type(items) ~= "table" or items.feedback_checked or openSub.getAuthHeader() == nil then
+    return
+  end
+  items.feedback_checked = true
+  local ids, by_id = {}, {}
+  for _, item in ipairs(items) do
+    local id = not item.OnDemand and tonumber(item.SubtitleID)
+    if id and not by_id[id] and #ids < 50 then
+      ids[#ids + 1] = tostring(id)
+      by_id[id] = {}
+    end
+    if id and by_id[id] then
+      table.insert(by_id[id], item)
+    end
+  end
+  if #ids == 0 then
+    return
+  end
+  local status, answer = upload_request("GET", "/subtitles/feedback?subtitle_ids=" .. table.concat(ids, ","), nil, 10)
+  if status ~= 200 or type(answer.data) ~= "table" then
+    return
+  end
+  for _, row in ipairs(answer.data) do
+    for _, item in ipairs(type(row) == "table" and by_id[tonumber(row.subtitle_id)] or {}) do
+      item.YourRating = tonumber(row.your_rating)
+      item.YourThanks = row.your_thanks == true
+    end
+  end
+end
+
+            --[[ The Rate window ]]--
+
+-- Opened by "Rate" (the selected search result, else the subtitle loaded
+-- last) or by "More..." of the question (that subtitle)
+function show_feedback(record)
+  if not Feedback.logged_in() then
+    return
+  end
+  local target
+  if type(record) == "table" and record.subtitle_id then
+    target = { subtitle_id = record.subtitle_id, title = record.title, release = record.release, record = record }
+  else
+    local index = input_table["mainlist"] and has_results() and get_first_sel(input_table["mainlist"]) or 0
+    local item = index > 0 and openSub.itemStore[index]
+    if item and not item.OnDemand and tonumber(item.SubtitleID) then
+      target = { subtitle_id = tonumber(item.SubtitleID), title = item.FeatureTitle,
+                 release = item.MovieReleaseName or item.SubFileName }
+    else
+      local records = Feedback.load().records
+      local last = records[#records]
+      if last then
+        target = { subtitle_id = last.subtitle_id, title = last.title, release = last.release, record = last }
+      end
+    end
+  end
+  Feedback.target, Feedback.mine = target, nil
+  if target and target.subtitle_id then
+    Feedback.mine = Feedback.fetch_mine(target.subtitle_id)
+  end
+  trigger_menu(6)
+end
+
+-- The user's own rating / thanks of one subtitle, or nil
+function Feedback.fetch_mine(subtitle_id)
+  local status, answer = upload_request("GET", "/subtitles/feedback?subtitle_ids=" .. tostring(subtitle_id), nil, 10)
+  local row = status == 200 and type(answer.data) == "table" and answer.data[1]
+  if type(row) == "table" then
+    return { rating = tonumber(row.your_rating), thanks = row.your_thanks == true }
+  end
+end
+
+-- The reasons in the interface language (the API's list; built in when
+-- the API cannot be asked)
+function Feedback.reason_list()
+  local language = wanted_interface_language() or "en"
+  if Feedback.reasons[language] then
+    return Feedback.reasons[language]
+  end
+  local status, answer = upload_request("GET", "/infos/report_reasons?language=" .. language, nil, 10)
+  local list = {}
+  if status == 200 and type(answer.data) == "table" then
+    for _, row in ipairs(answer.data) do
+      if type(row) == "table" and type(row.reason) == "string" and type(row.label) == "string" then
+        list[#list + 1] = row
+      end
+    end
+  end
+  if #list == 0 then
+    return Feedback.REASONS -- not kept: asked again next time
+  end
+  Feedback.reasons[language] = list
+  return list
+end
+
+function Feedback.target_text()
+  local target = Feedback.target
+  if not target then
+    return strings.ui_feedback_none
+  end
+  local text = tostring(target.release or target.title or "?")
+  if target.title and target.release and target.title ~= target.release then
+    text = tostring(target.title) .. " - " .. text
+  end
+  return text
+end
+
+function Feedback.status_text()
+  local mine = Feedback.mine
+  if not mine then
+    return ""
+  end
+  local parts = {}
+  if mine.rating then
+    local stars = Feedback.STARS_TEXT[mine.rating]
+    parts[#parts + 1] = tr("ui_feedback_status_rated", stars and strings[stars] or tostring(mine.rating))
+  end
+  if mine.thanks then
+    parts[#parts + 1] = strings.ui_feedback_status_thanked
+  end
+  return #parts > 0 and table.concat(parts, " ") or strings.ui_feedback_status_none
+end
+
+function interface_feedback()
+  local mine = Feedback.mine or {}
+  dlg:add_label(strings.ui_feedback_subtitle .. ":", 1, 1, 1, 1)
+  input_table["fb_target"] = dlg:add_label(Feedback.target_text(), 2, 1, 3, 1)
+
+  dlg:add_label(strings.ui_feedback_file .. ":", 1, 2, 1, 1)
+  local first = upload_candidates()[1]
+  input_table["fb_path"] = dlg:add_text_input(not Feedback.target and first and first.path or "", 2, 2, 2, 1)
+  dlg:add_button(strings.ui_feedback_use_file, feedback_use_file, 4, 2, 1, 1)
+
+  dlg:add_label(strings.ui_feedback_your_rating .. ":", 1, 3, 1, 1)
+  input_table["fb_rating"] = dlg:add_dropdown(2, 3, 1, 1)
+  Feedback.add_rating_choices(input_table["fb_rating"], mine.rating)
+  input_table["fb_sync"] = dlg:add_dropdown(3, 3, 2, 1)
+  Feedback.add_sync_choices(input_table["fb_sync"])
+
+  dlg:add_button(strings.ui_feedback_send, feedback_send, 2, 4, 1, 1)
+  dlg:add_button(strings.ui_feedback_remove_rating, feedback_remove_rating, 3, 4, 1, 1)
+
+  dlg:add_label(strings.ui_feedback_uploader .. ":", 1, 5, 1, 1)
+  dlg:add_button("♥ " .. strings.ui_feedback_thank, feedback_thank, 2, 5, 1, 1)
+  dlg:add_button(strings.ui_feedback_unthank, feedback_unthank, 3, 5, 1, 1)
+
+  dlg:add_label(strings.ui_feedback_problem .. ":", 1, 6, 1, 1)
+  input_table["fb_reason"] = dlg:add_dropdown(2, 6, 3, 1)
+  input_table["fb_reason"]:add_value(strings.ui_feedback_choose_problem, 0)
+  Feedback.shown_reasons = Feedback.reason_list()
+  for id, row in ipairs(Feedback.shown_reasons) do
+    input_table["fb_reason"]:add_value(row.label, id)
+  end
+  dlg:add_label(strings.ui_feedback_comment .. ":", 1, 7, 1, 1)
+  input_table["fb_comment"] = dlg:add_text_input("", 2, 7, 2, 1)
+  dlg:add_button(strings.ui_feedback_report, feedback_report, 4, 7, 1, 1)
+
+  input_table["fb_status"] = dlg:add_label(Feedback.status_text(), 1, 8, 4, 1)
+  local two_empty_lines = "&nbsp;<br>&nbsp;" -- macOS does not grow the window for a message
+  input_table["message"] = dlg:add_label(on_macos() and two_empty_lines or "", 1, 9, 4, 1)
+
+  input_table["fb_ask"] = dlg:add_button(openSub.option.askFeedback == false and strings.ui_feedback_ask_off
+    or strings.ui_feedback_ask_on, feedback_toggle_asking, 1, 10, 2, 1)
+  dlg:add_button(strings.ui_feedback_back, show_main, 4, 10, 1, 1)
+end
+
+-- The window's subtitle, or nil (and says so)
+function Feedback.need_target()
+  if Feedback.target then
+    return Feedback.target
+  end
+  setMessage(error_tag(strings.ui_feedback_need_subtitle))
+end
+
+-- "Use this file": the subtitle file named by its MD5 (works for a file as
+-- it was uploaded; a downloaded one is changed by the download)
+function feedback_use_file()
+  local path = trim(input_table["fb_path"]:get_text() or "")
+  if path == "" then
+    setMessage(error_tag(strings.ui_feedback_need_subtitle))
+    return
+  end
+  local file = io.open(path, "rb")
+  local data = file and file:read("*a")
+  if file then
+    file:close()
+  end
+  if not data or data == "" then
+    setMessage(error_tag(tr("ui_upload_cannot_read", path)))
+    return
+  end
+  local name = string.match(path, "([^/\\]+)$") or path
+  Feedback.target = { md5 = md5_hex(data), title = tr("ui_feedback_from_file", name), release = tr("ui_feedback_from_file", name) }
+  Feedback.mine = nil
+  input_table["fb_target"]:set_text(Feedback.target_text())
+  input_table["fb_status"]:set_text("")
+  setMessage("")
+end
+
+function feedback_send()
+  local target = Feedback.need_target()
+  if not target or not Feedback.logged_in() then
+    return
+  end
+  local rating = input_table["fb_rating"]:get_value()
+  if not rating or rating < 1 then
+    setMessage(error_tag(strings.ui_feedback_need_rating))
+    return
+  end
+  local ok, problem = Feedback.send_rating(target, rating, input_table["fb_sync"]:get_value())
+  if ok then
+    Feedback.mine = Feedback.mine or {}
+    Feedback.mine.rating = rating
+    input_table["fb_status"]:set_text(Feedback.status_text())
+    setMessage(success_tag(strings.ui_feedback_saved))
+  else
+    setMessage(error_tag(problem))
+  end
+end
+
+-- DELETE /subtitles/rating or /subtitles/thanks (the subtitle in the query)
+function Feedback.withdraw(what)
+  local target = Feedback.need_target()
+  if not target or not Feedback.logged_in() then
+    return nil
+  end
+  local status, answer = upload_request("DELETE", "/subtitles/" .. what .. "?" .. Feedback.query_of(target))
+  if status == 200 then
+    return true
+  end
+  setMessage(error_tag(Feedback.error_text(status, answer, target)))
+end
+
+function feedback_remove_rating()
+  if Feedback.withdraw("rating") then
+    Feedback.mine = Feedback.mine or {}
+    Feedback.mine.rating = nil
+    input_table["fb_status"]:set_text(Feedback.status_text())
+    setMessage(success_tag(strings.ui_feedback_removed))
+  end
+end
+
+function feedback_thank()
+  local target = Feedback.need_target()
+  if not target or not Feedback.logged_in() then
+    return
+  end
+  local status, answer = upload_request("PUT", "/subtitles/thanks", { subtitle = Feedback.subtitle_of(target) })
+  if status == 200 then
+    Feedback.mine = Feedback.mine or {}
+    Feedback.mine.thanks = true
+    input_table["fb_status"]:set_text(Feedback.status_text())
+    setMessage(success_tag(strings.ui_feedback_thanked))
+  else
+    setMessage(error_tag(Feedback.error_text(status, answer, target)))
+  end
+end
+
+function feedback_unthank()
+  if Feedback.withdraw("thanks") then
+    Feedback.mine = Feedback.mine or {}
+    Feedback.mine.thanks = false
+    input_table["fb_status"]:set_text(Feedback.status_text())
+    setMessage(success_tag(strings.ui_feedback_unthanked))
+  end
+end
+
+-- POST /subtitles/reports
+function feedback_report()
+  local target = Feedback.need_target()
+  if not target or not Feedback.logged_in() then
+    return
+  end
+  local row = Feedback.shown_reasons[input_table["fb_reason"]:get_value() or 0]
+  if not row then
+    setMessage(error_tag(strings.ui_feedback_need_problem))
+    return
+  end
+  local comment = trim(input_table["fb_comment"]:get_text() or "")
+  if comment == "" and (row.comment_required or row.reason == "other") then
+    setMessage(error_tag(strings.ui_feedback_need_comment))
+    return
+  end
+  local body = { subtitle = Feedback.subtitle_of(target), reason = row.reason }
+  if comment ~= "" then
+    body.comment = comment
+  end
+  local status, answer = upload_request("POST", "/subtitles/reports", body)
+  if status == 200 or status == 201 then
+    input_table["fb_comment"]:set_text("")
+    local to_moderator = (answer.kind or row.kind) == "report"
+    setMessage(success_tag(to_moderator and strings.ui_feedback_reported_moderator or strings.ui_feedback_reported))
+  else
+    setMessage(error_tag(Feedback.error_text(status, answer, target)))
+  end
+end
+
+function feedback_toggle_asking()
+  openSub.option.askFeedback = openSub.option.askFeedback == false
+  if openSub.option.askFeedback then
+    Feedback.load().not_now = 0
+    Feedback.save()
+  end
+  save_config()
+  input_table["fb_ask"]:set_text(openSub.option.askFeedback and strings.ui_feedback_ask_on or strings.ui_feedback_ask_off)
+end
+
+
 function ai_credits()
   local auth_header = openSub.getAuthHeader()
   if not auth_header then

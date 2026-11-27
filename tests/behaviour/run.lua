@@ -108,7 +108,19 @@ EXCEPTIONS[9] = {
       "Authentication required for download",
   },
 }
+EXCEPTIONS[10] = {
+  name = "rating subtitles (2.0)",
+  why = "new feature, asked for by the user: a 'Rate' button in the main window and its "
+     .. "window; after a film watched with a subtitle VLSub loaded, a question in two more "
+     .. "rows of the main window; the user's own ratings in the result rows (one request "
+     .. "to /subtitles/feedback after a search, when logged in); the askFeedback setting and "
+     .. "vlsub_feedback.json. Left out of the comparison; nothing else may change.",
+}
+local function is_feedback_request(text) -- exception 10
+  return text:find("/api/v1/subtitles/feedback", 1, true) ~= nil
+end
 local DROP_CONFIG_KEYS = EXCEPTIONS[2].drop_config_keys
+DROP_CONFIG_KEYS.askFeedback = true -- exception 10
 DROP_CONFIG_KEYS.interfaceLanguage = true
 DROP_CONFIG_KEYS.detectedLanguage = true
 DROP_CONFIG_KEYS.aiTranslations = true -- exception 7
@@ -206,7 +218,7 @@ local function snapshot(env, norm, cursor)
   for i = cursor.requests + 1, #env.server.requests do
     local r = env.server.requests[i]
     if not is_locale_request(r.host .. r.path) and not is_ai_request(r.host .. r.path)
-       and not is_network_test(r.host .. r.path) then
+       and not is_network_test(r.host .. r.path) and not is_feedback_request(r.host .. r.path) then
     local headers = {}
     for _, h in ipairs(r.header_list) do headers[#headers + 1] = h[1] .. ": " .. h[2] end
     table.sort(headers) -- custom headers are emitted in table order, which is not behaviour
@@ -255,7 +267,8 @@ local function snapshot(env, norm, cursor)
       -- help window in 2.0 (exception 7): it is left out of the comparison
       local moved_button = is_config and x.kind == "button" and (x.text or ""):find("Check Updates", 1, true)
       -- the main window's "Upload" button is new in 2.0 (exception 7)
-      local new_button = x.kind == "button" and (x.text or ""):find("Upload", 1, true) ~= nil
+      local new_button = x.kind == "button" and ((x.text or ""):find("Upload", 1, true) ~= nil
+        or x.text == "Rate") -- exception 10
       moved_button = moved_button or new_button
       if not (is_config and skip[x.row]) and not is_help and not moved_button then
         local row = is_config and row_number[x.row] or x.row
@@ -279,7 +292,7 @@ local function snapshot(env, norm, cursor)
   snap.files = {}
   local p = H.real_popen('cd "' .. env.home .. '" && find . -type f | LC_ALL=C sort')
   for path in p:lines() do
-    if not path:find("/vlsub.com/locale/", 1, true) then
+    if not path:find("/vlsub.com/locale/", 1, true) and not path:find("vlsub_feedback.json", 1, true) then
     local full = env.home .. "/" .. path:sub(3)
     local ls = H.real_popen('ls -l "' .. full .. '"')
     local mode = (ls:read("*l") or ""):sub(1, 10)
@@ -316,7 +329,8 @@ local function snapshot(env, norm, cursor)
     for _, pattern in ipairs(EXCEPTIONS[5].log_lines) do
       if l.msg:find(pattern) then unreachable = true end
     end
-    if l.level ~= "dbg" and not is_locale_request(l.msg) and not is_ai_request(l.msg) and not unreachable
+    if l.level ~= "dbg" and not is_locale_request(l.msg) and not is_ai_request(l.msg)
+       and not is_feedback_request(l.msg) and not unreachable
        and not is_network_test(l.msg) then
       snap.log[#snap.log + 1] = l.level .. " " .. norm(l.msg)
     end
@@ -459,5 +473,5 @@ print(string.format("\n%d sessions, %d steps compared on %s: %d identical, %d di
 -- comparing against an older script (CANDIDATE / baseline swapped by hand).
 print("baseline: v" .. tostring((H.read_file(BASELINE) or ""):match('local app_version = "([^"]+)"'))
   .. "   agreed exceptions: " .. EXCEPTIONS[1].name .. "; " .. EXCEPTIONS[7].name
-  .. "; " .. EXCEPTIONS[8].name .. "; " .. EXCEPTIONS[9].name)
+  .. "; " .. EXCEPTIONS[8].name .. "; " .. EXCEPTIONS[9].name .. "; " .. EXCEPTIONS[10].name)
 os.exit(failed == 0 and 0 or 1)

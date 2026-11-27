@@ -139,10 +139,14 @@ function M.new(opts)
   function s:on(key, handler) self.routes[key] = handler end
 
   -- Requests matching a "METHOD host/path" pattern (plain prefix match)
+  -- The look-up of the user's own ratings after a search (2.0) is left out
+  -- unless asked for by name: what a search sends is the search itself.
   function s:seen(prefix)
     local out = {}
+    local own_ratings = prefix:find("/subtitles/feedback", 1, true)
     for _, r in ipairs(self.requests) do
-      if (r.method .. " " .. r.host .. r.path):sub(1, #prefix) == prefix then
+      if (r.method .. " " .. r.host .. r.path):sub(1, #prefix) == prefix
+         and (own_ratings or r.path ~= "/api/v1/subtitles/feedback") then
         out[#out + 1] = r
       end
     end
